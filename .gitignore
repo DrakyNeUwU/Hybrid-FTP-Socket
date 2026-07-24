@@ -20,3 +20,10 @@ tests/sample_files/*
 
 # Logs
 *.log
+
+# Personal notes — không commit lên repo
+second-brain.md
+
+# File phân chia công việc — chỉ dùng nội bộ nhóm, không nộp
+Socket Role.md
+tuan-1-chi-tiet-socket.md
