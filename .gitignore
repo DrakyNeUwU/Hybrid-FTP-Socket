@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Project-specific: dữ liệu test transfer, không commit file test lớn
+tests/sample_files/*
+!tests/sample_files/.gitkeep
+
+# Logs
+*.log
