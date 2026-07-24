@@ -3,14 +3,6 @@
 Ứng dụng FTP lai (Hybrid FTP): control channel qua TCP, data channel qua UDP
 với tầng Reliable Data Transfer (RDT) tự cài đặt.
 
-## Thành viên & Vai trò
-
-| Role | Người | Phụ trách |
-|---|---|---|
-| A | ___________ | TCP Control Channel & Session |
-| B | ___________ | UDP Data Channel & RDT |
-| C | Khánh | File/Concurrency & Integration (Leader) |
-
 ## Cấu trúc thư mục
 
 ```
