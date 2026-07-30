@@ -1,6 +1,6 @@
 import struct
 
-class RDT: 
+class RDTHeader: 
     format = "!IIHHH"
     size = struct.calcsize(format) 
     def __init__ (value, seq_num: int, ack_num: int, flags: int, checksum: int = 0, length: int = 0):
