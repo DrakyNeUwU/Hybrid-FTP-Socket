@@ -34,6 +34,31 @@ def safe_log(msg: str):
     with log_lock:
         print(msg, flush=True)
 
+def parse_command(command_raw: str):
+    """
+    Tách chuỗi lệnh thành command và argument.
+    Ví dụ:
+        USER admin
+    =>
+        command = USER
+        argument = admin
+    """
+    parts = command_raw.split(maxsplit=1)
+
+    command = parts[0].upper()
+    argument = parts[1] if len(parts) > 1 else ""
+
+    return command, argument
+
+class Session:
+    """
+    Quản lý trạng thái của từng client.
+    """
+
+    def __init__(self):
+        self.username = None
+        self.is_logged_in = False
+        self.current_dir = os.getcwd()
 
 class ClientHandler(threading.Thread):
     """
@@ -47,6 +72,7 @@ class ClientHandler(threading.Thread):
         self.client_socket = client_socket
         self.client_address = client_address
         self.server = server
+        self.session = Session()
         self.is_running = True
         self.daemon = True  # Thread tự đóng khi main program thoát
 
@@ -81,14 +107,126 @@ class ClientHandler(threading.Thread):
 
                 safe_log(f"[{self.client_address[0]}:{self.client_address[1]}] Command: {command_raw}")
 
-                # TUẦN 1: Echo mode test đơn giản / Xử lý lệnh QUIT cơ bản
-                if command_raw.upper() == "QUIT":
+                command, argument = parse_command(command_raw)
+
+                if command == "USER":
+                    if argument == "admin":
+                        self.session.username = argument
+                        self.send_response("331 Username OK, need password\r\n")
+                    else:
+                        self.send_response("530 Invalid username\r\n")
+
+                elif command == "PASS":
+
+                    if self.session.username != "admin":
+                        self.send_response("503 Login with USER first\r\n")
+
+                    elif argument == "123456":
+                        self.session.is_logged_in = True
+                        self.send_response("230 Login successful\r\n")
+
+                    else:
+                        self.send_response("530 Login incorrect\r\n")
+                elif command == "NOOP":
+
+                    if not self.session.is_logged_in:
+                        self.send_response("530 Not logged in\r\n")
+
+                    else:
+                        self.send_response("200 OK\r\n")
+                elif command == "PWD":
+
+                    if not self.session.is_logged_in:
+                        self.send_response("530 Not logged in\r\n")
+
+                    else:
+                        self.send_response(f'257 "{self.session.current_dir}"\r\n')
+                
+                elif command == "CWD":
+
+                    if not self.session.is_logged_in:
+                        self.send_response("530 Not logged in\r\n")
+
+                    elif argument == "":
+                        self.send_response("550 Directory not found\r\n")
+
+                    elif os.path.isdir(argument):
+                        self.session.current_dir = os.path.abspath(argument)
+                        self.send_response("250 Directory changed\r\n")
+
+                    else:
+                        self.send_response("550 Directory not found\r\n")
+                
+                elif command == "LIST":
+
+                    if not self.session.is_logged_in:
+                        self.send_response("530 Not logged in\r\n")
+
+                    else:
+                        files = os.listdir(self.session.current_dir)
+
+                        if files:
+                            self.send_response("\n".join(files) + "\r\n226 Transfer complete\r\n")
+                        else:
+                            self.send_response("226 Directory is empty\r\n")
+                
+                elif command == "MKD":
+
+                    if not self.session.is_logged_in:
+                        self.send_response("530 Not logged in\r\n")
+
+                    elif argument == "":
+                        self.send_response("550 Missing directory name\r\n")
+
+                    else:
+                        try:
+                            path = os.path.join(self.session.current_dir, argument)
+                            os.mkdir(path)
+                            self.send_response("257 Directory created\r\n")
+                        except:
+                            self.send_response("550 Cannot create directory\r\n")
+                elif command == "RMD":
+
+                    if not self.session.is_logged_in:
+                        self.send_response("530 Not logged in\r\n")
+
+                    elif argument == "":
+                        self.send_response("550 Missing directory name\r\n")
+
+                    else:
+                        try:
+                            path = os.path.join(self.session.current_dir, argument)
+                            os.rmdir(path)
+                            self.send_response("250 Directory removed\r\n")
+                        except:
+                            self.send_response("550 Cannot remove directory\r\n")
+
+                elif command == "DELE":
+
+                    if not self.session.is_logged_in:
+                        self.send_response("530 Not logged in\r\n")
+
+                    elif argument == "":
+                        self.send_response("550 Missing filename\r\n")
+
+                    else:
+                        try:
+                            path = os.path.join(self.session.current_dir, argument)
+                            os.remove(path)
+                            self.send_response("250 File deleted\r\n")
+                        except:
+                            self.send_response("550 File not found\r\n")
+                elif command == "QUIT":
                     self.send_response("221 Goodbye.\r\n")
                     break
-                else:
-                    # Phản hồi dạng Echo để test đa luồng ở Tuần 1
-                    self.send_response(f"200 ECHO: {command_raw}\r\n")
 
+                else:
+
+                    if not self.session.is_logged_in:
+                        self.send_response("530 Not logged in\r\n")
+
+                    else:
+                        self.send_response("502 Command not implemented\r\n")
         except (ConnectionResetError, BrokenPipeError):
             safe_log(f"[-] Client {self.client_address} ngắt kết nối đột ngột.")
         except Exception as e:
