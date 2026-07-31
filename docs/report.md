@@ -3,14 +3,96 @@
 > Khung theo đúng 7 mục bắt buộc (Section 2.4 đề bài). Ai code phần nào tự điền phần đó.
 
 ## 1. Application Scenario & Protocol Interaction
-_(Sequence diagram toàn bộ lifecycle TCP + UDP — A vẽ khung TCP, B bổ sung nhánh UDP, C kiểm tra khớp thực tế)_
+
+Hệ thống Hybrid FTP tách thành hai kênh độc lập: TCP Control Channel truyền lệnh, FTP reply và trạng thái session; UDP Data Channel truyền payload file thông qua lớp Reliable Data Transfer (RDT) do nhóm tự xây dựng.
+
+Ở phía TCP, sau khi client kết nối thành công, server gửi `220 Hybrid FTP Server Ready`. Client xác thực lần lượt bằng `USER` và `PASS`. Khi đăng nhập thành công, client có thể gửi các lệnh điều khiển; mỗi request được server parse, kiểm tra trạng thái, xử lý và phản hồi bằng FTP reply code tương ứng. `QUIT` kết thúc session và đóng control connection an toàn.
+
+Sequence diagram đầy đủ của lifecycle TCP + UDP sẽ được hoàn thiện khi tích hợp: Role A phụ trách nhánh TCP, Role B bổ sung DATA/ACK/retransmission trên UDP, Role C kiểm tra thread, filesystem và cleanup theo hệ thống thực tế.
 
 ## 2. Project-Wide Data Structures
-_(Control packet format — A | RDTHeader byte-level — B | Session structure — A)_
+
+### 2.1 FTP Control Command Format (Role A)
+
+Lệnh trên TCP Control Channel có dạng:
+
+```text
+COMMAND [argument]\r\n
+```
+
+Trong đó `COMMAND` là tên lệnh FTP và `argument` là tham số tùy chọn. Ví dụ:
+
+```text
+USER admin
+PASS 123456
+CWD test
+MKD demo
+```
+
+Sau khi nhận dữ liệu từ TCP socket, server dùng `parse_command()` để tách command và argument trước khi chuyển đến command handler. Mọi phản hồi được gửi lại qua cùng TCP connection dưới dạng FTP reply code ba chữ số và nội dung mô tả.
+
+### 2.2 Session Structure (Role A)
+
+Mỗi client sở hữu một `Session` độc lập để lưu trạng thái xác thực và thư mục làm việc:
+
+```python
+class Session:
+    def __init__(self):
+        self.username = None
+        self.is_logged_in = False
+        self.current_dir = os.getcwd()
+```
+
+| Thuộc tính | Ý nghĩa |
+|---|---|
+| `username` | Tên tài khoản đang thực hiện quá trình đăng nhập |
+| `is_logged_in` | Trạng thái xác thực của client |
+| `current_dir` | Thư mục làm việc hiện tại của session |
+
+Việc tách session giúp server mở rộng sang mô hình thread-per-client mà không dùng chung trạng thái giữa các client. Cấu trúc này sẽ tiếp tục được mở rộng cho transfer type, Active/PASV endpoint, rename state và transfer state trong giai đoạn tích hợp.
+
+### 2.3 RDT Header (Role B)
+
+_(Role B bổ sung bảng byte-level gồm sequence number, ACK, checksum, flags và payload length.)_
 
 ## 3. Functional Workflows (Flowcharts)
 
-### 3.1 Thread-Dispatch Workflow (Role C)
+### 3.1 Authentication Workflow (Role A)
+
+```mermaid
+flowchart TD
+    Connect["Client kết nối TCP"] --> Banner["Server trả 220 Service Ready"]
+    Banner --> User["Client gửi USER username"]
+    User --> ValidUser{"Username hợp lệ?"}
+    ValidUser -- "Không" --> UserFail["530 Invalid username"]
+    ValidUser -- "Có" --> NeedPass["Lưu username và trả 331 Need password"]
+    NeedPass --> Pass["Client gửi PASS password"]
+    Pass --> ValidPass{"Password hợp lệ?"}
+    ValidPass -- "Không" --> PassFail["530 Login incorrect"]
+    ValidPass -- "Có" --> LoggedIn["Đặt is_logged_in = True"]
+    LoggedIn --> Success["230 Login successful"]
+```
+
+Nếu client gửi `PASS` trước `USER`, server trả `503 Login with USER first`. Các lệnh yêu cầu quyền truy cập bị từ chối bằng `530 Not logged in` cho đến khi xác thực thành công.
+
+### 3.2 FTP Command Processing Workflow (Role A)
+
+```mermaid
+flowchart TD
+    Receive["Nhận dữ liệu bằng recv()"] --> Parse["parse_command()"]
+    Parse --> Known{"Command được hỗ trợ?"}
+    Known -- "Không" --> NotImplemented["502 Command not implemented"]
+    Known -- "Có" --> NeedAuth{"Command yêu cầu đăng nhập?"}
+    NeedAuth -- "Không" --> Dispatch["Gọi command handler"]
+    NeedAuth -- "Có" --> Authenticated{"Session đã đăng nhập?"}
+    Authenticated -- "Không" --> NotLoggedIn["530 Not logged in"]
+    Authenticated -- "Có" --> Dispatch
+    Dispatch --> Reply["Gửi FTP reply code qua TCP"]
+```
+
+Mỗi command được parse, kiểm tra cú pháp và trạng thái session trước khi chuyển đến handler. Handler trả kết quả để control channel ánh xạ thành FTP reply code; exception đầu vào không được làm dừng client thread hoặc server.
+
+### 3.3 Thread-Dispatch Workflow (Role C)
 
 Mô hình xử lý đa luồng (Multi-threaded Server Architecture) phía Server giúp phục vụ nhiều client kết nối đồng thời mà không bị nghẽn (non-blocking giữa các phiên client).
 
@@ -58,7 +140,7 @@ flowchart TD
 
 ---
 
-### 3.2 Path Validation & Security Sandbox Workflow (Role C)
+### 3.4 Path Validation & Security Sandbox Workflow (Role C)
 
 Quy trình ngăn chặn lỗ hổng bảo mật **Path Traversal Attack** (ví dụ: client cố tình gửi lệnh `CWD ../../etc/passwd` để đọc file hệ thống bên ngoài thư mục root của FTP).
 
@@ -89,123 +171,74 @@ flowchart TD
 
 ---
 
-### 3.3 RDT Sender/Receiver State Machines (Role B)
+### 3.5 RDT Sender/Receiver State Machines (Role B)
 _(Sẽ được cập nhật bởi Role B)_
 
-### 3.4 Active/Passive Mode Toggle Workflow (Role C & Role A)
+### 3.6 Active/Passive Mode Toggle Workflow (Role C & Role A)
 _(Sẽ được cập nhật khi tích hợp Tuần 2)_
 
 ## 4. Task Assignment Matrix
-_(Xem `phan-chia-cong-viec.md`, C tổng hợp bảng cuối)_
+
+| Module/Component | Owner | Collaborators |
+|---|---|---|
+| TCP server/client control connection | Role A | Role C (integration/review) |
+| FTP command parser và reply-code handling | Role A | Role C (review) |
+| Authentication (`USER`, `PASS`) | Role A | — |
+| Session management | Role A | Role C (thread/session integration) |
+| UDP Data Channel và RDT | Role B | Role A, Role C (integration) |
+| Filesystem và path sandbox | Role C | Role A (command integration) |
+| Multi-threaded server và active-session registry | Role C | Role A, Role B (review) |
+| End-to-end integration | Role C | Role A, Role B |
+| TCP + UDP sequence diagram | Role A, Role B | Role C (kiểm tra theo code) |
+| RDT state machines và header table | Role B | — |
+| Thread-dispatch và path-validation flowcharts | Role C | — |
+
+Ma trận sẽ được cập nhật theo commit history và kết quả cuối cùng trước khi nộp báo cáo.
 
 ## 5. Self-Assessment & Peer Evaluation
-_(Mỗi người tự viết, tổng % = 100%)_
 
-## 6. GenAI Usage & Code Refinement Log
-_(Xem `docs/genai-log-a.md`, `docs/genai-log-b.md`, `docs/genai-log-c.md` — mỗi người tự log)_
+### 5.1 Role A — Self-Assessment
 
-## 7. Application Demo Evidence
-_(Screenshot/log upload, download, hash, session table, concurrent test — C tổng hợp)_
+Role A đã xây dựng TCP Control Channel, command parser, cơ chế xác thực người dùng và session cơ bản. Các luồng `USER`/`PASS`, `QUIT`, `NOOP` và các trường hợp xác thực sai đã được xử lý bằng FTP reply code. Cấu trúc session được tách riêng để chuẩn bị cho mô hình nhiều client ở giai đoạn tích hợp.
 
-# Technical Report — Hybrid FTP
+Role A cần tiếp tục đối chiếu tài liệu với code sau khi tích hợp đầy đủ command, Active/PASV và UDP transfer lifecycle.
 
-Role A — TCP Control & Session Management
+### 5.2 Role B — Self-Assessment
 
-## 1. Application Scenario & Protocol Interaction
+_(Role B tự bổ sung đánh giá phần UDP/RDT.)_
 
-Trong tuần đầu tiên, Role A chịu trách nhiệm xây dựng TCP Control Channel của hệ thống Hybrid FTP. Đây là kênh điều khiển giữa Client và Server, có nhiệm vụ tiếp nhận các lệnh FTP, thực hiện xác thực người dùng, quản lý trạng thái phiên làm việc (Session) và trả về các FTP Reply Code theo đúng đặc tả giao thức.
+### 5.3 Role C — Self-Assessment
 
-Khi Client thiết lập kết nối TCP thành công, Server sẽ gửi thông điệp chào 220 Hybrid FTP Server Ready. Tiếp theo, Client thực hiện xác thực bằng hai lệnh USER và PASS. Sau khi đăng nhập thành công, Client được phép thực hiện các lệnh điều khiển như NOOP, PWD, LIST, MKD, CWD, RMD, DELE và kết thúc phiên làm việc bằng QUIT.
+_(Role C tự bổ sung đánh giá phần filesystem, concurrency và integration.)_
 
-Luồng giao tiếp được thiết kế theo mô hình request-response, trong đó mỗi lệnh từ Client đều được Server phân tích, xử lý và phản hồi bằng FTP Reply Code tương ứng.
+### 5.4 Peer Evaluation
 
-## 2. Project-Wide Data Structures
-### 2.1 FTP Control Command Format
-
-Role A sử dụng định dạng FTP Control Message dưới dạng chuỗi ký tự theo chuẩn:
-
-COMMAND argument
-
-Trong đó:
-
-COMMAND là tên lệnh FTP.
-argument là tham số của lệnh (nếu có).
-
-Ví dụ:
-
-USER admin
-PASS 123456
-CWD test
-MKD demo
-
-Sau khi nhận dữ liệu từ TCP Socket, Server sử dụng hàm parse_command() để tách chuỗi thành hai thành phần là Command và Argument trước khi chuyển đến bộ xử lý lệnh.
-
-### 2.2 Session Structure
-
-Để quản lý trạng thái của từng Client, hệ thống xây dựng lớp Session. Mỗi Client khi kết nối tới Server sẽ được cấp phát một Session riêng nhằm lưu trữ trạng thái đăng nhập và thư mục làm việc hiện tại.
-
-class Session:
-    def __init__(self):
-        self.username = None
-        self.is_logged_in = False
-        self.current_dir = os.getcwd()
-
-Các trường dữ liệu của Session bao gồm:
-
-Thuộc tính	Ý nghĩa
-username	Tên tài khoản đã đăng nhập
-is_logged_in	Trạng thái xác thực của Client
-current_dir	Thư mục làm việc hiện tại
-
-Việc tách Session thành một lớp riêng giúp dễ dàng mở rộng khi tích hợp mô hình đa luồng ở các giai đoạn tiếp theo, trong đó mỗi Client sẽ sở hữu một Session độc lập.
-
-## 3. Functional Workflows
-### 3.1 Authentication Workflow (Role A)
-
-Quy trình xác thực đảm bảo chỉ những Client có thông tin đăng nhập hợp lệ mới được phép sử dụng các chức năng của FTP Server. Quá trình xác thực bao gồm hai bước là kiểm tra Username và Password.
-
-Mô tả chi tiết Authentication Workflow
-Sau khi thiết lập kết nối TCP thành công, Server gửi mã phản hồi 220 Hybrid FTP Server Ready để thông báo dịch vụ đã sẵn sàng.
-Client gửi lệnh USER. Server kiểm tra Username, nếu hợp lệ sẽ lưu Username vào Session và trả về 331 Username OK, need password. Nếu Username không tồn tại, Server trả về 530 Invalid username.
-Client tiếp tục gửi lệnh PASS. Nếu chưa thực hiện lệnh USER, Server trả về 503 Login with USER first. Nếu Password không chính xác, Server trả về 530 Login incorrect. Khi Password hợp lệ, Server cập nhật trạng thái Session.is_logged_in = True và trả về 230 Login successful.
-Sau khi xác thực thành công, Client được phép thực hiện các lệnh FTP khác. Nếu chưa đăng nhập mà gửi lệnh yêu cầu quyền truy cập, Server sẽ trả về 530 Not logged in.
-### 3.2 FTP Command Processing Workflow (Role A)
-
-Sau khi Client đăng nhập thành công, Server tiếp nhận các FTP Command thông qua TCP Control Channel. Mỗi lệnh được phân tích bằng hàm parse_command(), sau đó chuyển đến bộ xử lý tương ứng và phản hồi bằng FTP Reply Code.
-
-Mô tả chi tiết FTP Command Processing
-Server nhận dữ liệu từ TCP Socket thông qua hàm recv().
-Chuỗi dữ liệu được truyền vào parse_command() để tách thành tên lệnh và tham số.
-Trước khi thực hiện lệnh, Server kiểm tra trạng thái Session.is_logged_in. Nếu Client chưa xác thực, Server từ chối yêu cầu bằng mã 530 Not logged in.
-Khi Client đã đăng nhập, Server sử dụng cấu trúc điều kiện (if-elif) để phân phối lệnh đến đoạn mã xử lý tương ứng.
-Sau khi hoàn thành xử lý, Server gửi FTP Reply Code phản ánh kết quả thực hiện của lệnh. Đối với các lệnh chưa được hỗ trợ, Server trả về 502 Command not implemented.
-## 4. Task Assignment Matrix
-Ngày	Công việc
-26/07	Xây dựng TCP Server (bind, listen, accept), TCP Client (connect), thống nhất định dạng Control Message
-27/07	Xây dựng parser lệnh, triển khai USER và PASS theo FTP Reply Code
-28/07	Triển khai QUIT, NOOP và Session Object
-29/07	Kiểm thử Authentication Flow và các trường hợp lỗi
-30/07	Thiết kế Sequence Diagram cho TCP Control Flow
-31/07	Rà soát, sửa lỗi sau review và tối ưu mã nguồn
-01/08	Demo toàn bộ TCP Control Flow cho các thành viên trong nhóm
-## 5. Self-Assessment
-
-Role A đã hoàn thành việc xây dựng TCP Control Channel, triển khai cơ chế xác thực người dùng, quản lý Session và xử lý các FTP Command cơ bản theo đúng kế hoạch của tuần đầu. Các FTP Reply Code được cài đặt theo đúng đặc tả của đề bài và đã được kiểm thử với nhiều trường hợp hợp lệ cũng như không hợp lệ nhằm đảm bảo Server không bị lỗi hoặc dừng đột ngột khi nhận dữ liệu đầu vào bất thường.
+_(Cả nhóm thống nhất phần trăm đóng góp; tổng phải bằng 100%.)_
 
 ## 6. GenAI Usage & Code Refinement Log
 
-Trong quá trình phát triển, GenAI được sử dụng để tham khảo tài liệu về FTP Reply Code, cơ chế Thread-per-Client, cách tổ chức Session Object và kiểm tra tính hợp lý của luồng xử lý xác thực. Sau khi tham khảo, toàn bộ mã nguồn được chỉnh sửa và tích hợp lại để phù hợp với kiến trúc chung của dự án.
+GenAI được dùng như công cụ tham khảo và review; mỗi thành viên phải tự kiểm tra, giải thích và refactor kết quả trước khi đưa vào hệ thống. Prompt chính xác, raw output và phần chỉnh sửa thủ công được lưu riêng tại:
+
+- Role A: `docs/genai-log-a.md`.
+- Role B: `docs/genai-log-b.md`.
+- Role C: `docs/genai-log-c.md`.
+
+Phần phụ lục cuối phải trích hoặc đính kèm đầy đủ các log trên; mô tả tổng quát trong báo cáo không thay thế yêu cầu ghi exact prompt và raw output.
 
 ## 7. Application Demo Evidence
 
-Quá trình kiểm thử được thực hiện bằng cách khởi động FTP Server và sử dụng Netcat (nc) để đóng vai trò FTP Client.
+### 7.1 TCP Control và Authentication (Role A)
 
-Luồng kiểm thử bao gồm:
+Quy trình kiểm thử TCP Control Channel sử dụng client của dự án hoặc Netcat (`nc`) gồm:
 
-Thiết lập kết nối TCP.
-Đăng nhập bằng USER/PASS.
-Kiểm tra các trường hợp sai Username, sai Password và gửi PASS trước USER.
-Thực hiện các lệnh NOOP, PWD, LIST, MKD, CWD.
-Kết thúc phiên làm việc bằng QUIT.
+1. Thiết lập TCP connection và nhận banner `220`.
+2. Đăng nhập bằng `USER`/`PASS`.
+3. Kiểm tra sai username, sai password và gửi `PASS` trước `USER`.
+4. Gửi `NOOP` và các command điều khiển đã được triển khai.
+5. Gửi `QUIT`, nhận `221` và xác nhận server đóng session an toàn.
 
-Kết quả cho thấy toàn bộ FTP Reply Code được trả về đúng theo đặc tả, Server hoạt động ổn định và không xảy ra lỗi trong suốt quá trình kiểm thử.
+Kết quả được ghi nhận trong phần báo cáo Role A: server trả FTP reply tương ứng và không dừng đột ngột khi nhận các đầu vào xác thực không hợp lệ. Cần bổ sung screenshot hoặc terminal log thực tế tại đây trước khi nộp.
+
+### 7.2 UDP Transfer, Integrity và Concurrency
+
+_(C bổ sung screenshot/log upload, download, hash comparison, active-session table và concurrent-client test sau khi tích hợp; B cung cấp fault-injection/RDT evidence.)_

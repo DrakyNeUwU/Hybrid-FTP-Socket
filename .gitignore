@@ -23,6 +23,10 @@ tests/sample_files/*
 
 # Personal notes — không commit lên repo
 second-brain.md
+AGENTS.md
+
+# Editor / Workspace settings
+*.code-workspace
 
 # File phân chia công việc — chỉ dùng nội bộ nhóm, không nộp
 Socket Role.md
