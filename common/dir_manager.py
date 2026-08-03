@@ -119,7 +119,10 @@ def resolve_path(base_dir: str, cwd: str, relative_path: str) -> str:
     if not relative_path:
         # Client gửi lệnh không có argument (ví dụ: LIST không có path)
         # → trả về cwd hiện tại
-        return os.path.realpath(cwd)
+        resolved_cwd = os.path.realpath(cwd)
+        if not validate_path(base_dir, resolved_cwd):
+            raise PermissionError("Current directory is outside the FTP root.")
+        return resolved_cwd
 
     # Kiểm tra path có phải "absolute" theo góc nhìn FTP không.
     # FTP client luôn gửi đường dẫn kiểu Unix: "/docs", "/images/photo.jpg"
@@ -153,7 +156,7 @@ def resolve_path(base_dir: str, cwd: str, relative_path: str) -> str:
 # LIST DIRECTORY — Danh sách file/thư mục
 # ============================================================
 
-def list_directory(path: str) -> list:
+def list_directory(path: str, base_dir: str | None = None) -> list:
     """
     Trả về danh sách chi tiết file/thư mục trong path.
 
@@ -201,6 +204,9 @@ def list_directory(path: str) -> list:
     with os.scandir(path) as scanner:
         for entry in scanner:
             try:
+                if base_dir is not None and not validate_path(base_dir, entry.path):
+                    # Không để symlink trong FTP root làm lộ metadata bên ngoài root.
+                    continue
                 entry_stat = entry.stat()
 
                 entries.append({
@@ -220,7 +226,7 @@ def list_directory(path: str) -> list:
     return entries
 
 
-def list_names(path: str) -> list:
+def list_names(path: str, base_dir: str | None = None) -> list:
     """
     Trả về danh sách TÊN file/thư mục (chỉ tên, không metadata).
 
@@ -244,7 +250,12 @@ def list_names(path: str) -> list:
             raise NotADirectoryError(f"Not a directory: '{path}'")
         raise FileNotFoundError(f"Directory not found: '{path}'")
 
-    names = os.listdir(path)
+    with os.scandir(path) as scanner:
+        names = [
+            entry.name
+            for entry in scanner
+            if base_dir is None or validate_path(base_dir, entry.path)
+        ]
     names.sort(key=str.lower)
     return names
 
@@ -341,7 +352,7 @@ def remove_directory(base_dir: str, path: str) -> None:
 # THÔNG TIN FILE — Cho lệnh STAT, MDTM, SIZE, DELE, RNFR/RNTO
 # ============================================================
 
-def get_entry_info(path: str) -> dict:
+def get_entry_info(path: str, base_dir: str | None = None) -> dict:
     """
     Trả về metadata của 1 file hoặc thư mục.
 
@@ -355,6 +366,9 @@ def get_entry_info(path: str) -> dict:
     Returns:
         dict: {name, size, type, permissions, modified}
     """
+    if base_dir is not None and not validate_path(base_dir, path):
+        raise PermissionError("Access denied: path outside FTP root.")
+
     if not os.path.exists(path):
         raise FileNotFoundError(f"Path not found: '{path}'")
 
