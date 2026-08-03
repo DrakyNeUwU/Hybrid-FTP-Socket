@@ -22,7 +22,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from server.threaded_server import FTPServer
+from server.threaded_server import FTPServer, _redact_command
 
 TEST_HOST = "127.0.0.1"
 TEST_PORT = 21210  # Dùng port riêng để tránh đụng độ với server thật
@@ -150,3 +150,33 @@ class TestThreadedServer:
         # Stop server
         server.stop()
         assert server.get_active_client_count() == 0
+
+    def test_stop_with_connected_client_does_not_deadlock(self):
+        """stop() phải đóng client đang mở mà không tự khóa chính nó."""
+        port = TEST_PORT + 26
+        server = FTPServer(host=TEST_HOST, port=port)
+        server_thread = threading.Thread(target=server.start, daemon=True)
+        server_thread.start()
+        time.sleep(0.2)
+
+        client = socket.create_connection((TEST_HOST, port), timeout=1)
+        client.recv(1024)
+        time.sleep(0.05)
+
+        sessions = server.get_active_sessions()
+        assert len(sessions) == 1
+        assert sessions[0]["session_id"].startswith("S")
+
+        stop_thread = threading.Thread(target=server.stop)
+        stop_thread.start()
+        stop_thread.join(timeout=2)
+
+        assert not stop_thread.is_alive(), "server.stop() bị deadlock"
+        assert server.get_active_client_count() == 0
+        client.close()
+        server_thread.join(timeout=1)
+
+    def test_password_is_redacted_from_log(self):
+        assert _redact_command("PASS secret-password") == "PASS ********"
+        assert _redact_command("pass secret-password") == "pass ********"
+        assert _redact_command("USER khanh") == "USER khanh"
