@@ -1,7 +1,7 @@
 import struct
 import zlib
 class RDTHeader: 
-    format = "!IIHHH"
+    format = "!IIHIH"
     size = struct.calcsize(format) 
 
     FLAG_DATA = 0x0 
