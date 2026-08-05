@@ -1,12 +1,14 @@
 import struct
-
+import zlib
 class RDTHeader: 
     format = "!IIHHH"
     size = struct.calcsize(format) 
 
-    FLAG_DATA = 0x0  # Gói tin chứa dữ liệu
-    FLAG_ACK  = 0x1  # Gói tin phản hồi ACK
-    FLAG_FIN  = 0x2  # Gói tin đánh dấu kết thúc file (is_last)
+    FLAG_DATA = 0x0 
+    FLAG_ACK  = 0x1 # phản hồi ACK
+    FLAG_FIN  = 0x2 # kết thúc file (is_last)
+    FLAG_START= 0x4
+    FLAG_ABORT= 0x8 # hủy truyển file
     def __init__ (value, seq_num: int, ack_num: int, flags: int, checksum: int = 0, length: int = 0):
         value.seq_num = seq_num
         value.ack_num = ack_num
