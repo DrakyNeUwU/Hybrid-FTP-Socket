@@ -1,211 +1,330 @@
 # Technical Report — Hybrid FTP
 
-> Khung theo đúng 7 mục bắt buộc (Section 2.4 đề bài). Ai code phần nào tự điền phần đó.
-
-## 1. Application Scenario & Protocol Interaction
-_(Sequence diagram toàn bộ lifecycle TCP + UDP — A vẽ khung TCP, B bổ sung nhánh UDP, C kiểm tra khớp thực tế)_
-
-## 2. Project-Wide Data Structures
-_(Control packet format — A | RDTHeader byte-level — B | Session structure — A)_
-
-## 3. Functional Workflows (Flowcharts)
-
-### 3.1 Thread-Dispatch Workflow (Role C)
-
-Mô hình xử lý đa luồng (Multi-threaded Server Architecture) phía Server giúp phục vụ nhiều client kết nối đồng thời mà không bị nghẽn (non-blocking giữa các phiên client).
-
-```mermaid
-flowchart TD
-    Start(["Khởi động Server (FTPServer.start)"]) --> BindListen["Bind IP/Port & socket.listen(5)"]
-    BindListen --> TimeoutSet["Set socket.settimeout(0.5)"]
-    TimeoutSet --> LoopAccept{"Vòng lặp accept()<br/>(is_running == True?)"}
-    
-    LoopAccept -- "Không (Server Stop)" --> StopServer["Đóng Server Socket & ngắt tất cả Client Threads"]
-    StopServer --> End(["Kết thúc Server"])
-    
-    LoopAccept -- "Có" --> TryAccept["Chờ Client kết nối (accept)"]
-    TryAccept -- "Timeout (0.5s)" --> LoopAccept
-    TryAccept -- "Có Client mới" --> SpawnThread["Tạo luồng mới:<br/>ClientHandler(threading.Thread)"]
-    
-    SpawnThread --> RegClient["Đăng ký Client vào active_clients<br/>(Dùng Lock để Thread-Safe)"]
-    RegClient --> StartThread["ClientHandler.start()"]
-    StartThread --> LoopAccept
-
-    subgraph PerClientThread ["Luồng xử lý Per-Client (ClientHandler.run)"]
-        InitClient["Gửi Banner 220 Service Ready"] --> LoopRecv{"Vòng lặp recv()<br/>(is_running == True?)"}
-        LoopRecv -- "Có dữ liệu" --> ParseCmd["Parse lệnh FTP"]
-        ParseCmd -- "Lệnh QUIT" --> Send221["Gửi 221 Goodbye"]
-        Send221 --> CloseClient["Đóng Client Socket & Unregister"]
-        ParseCmd -- "Lệnh khác" --> ProcessCmd["Xử lý lệnh (Echo/Filesystem/RDT)"]
-        ProcessCmd --> SendResp["Gửi Reply Code"]
-        SendResp --> LoopRecv
-        
-        LoopRecv -- "Client ngắt kết nối / Lỗi" --> CloseClient
-        CloseClient --> ExitThread(["Kết thúc Luồng Client"])
-    end
-
-    StartThread -.-> InitClient
-```
-
-#### Mô tả chi tiết luồng Thread-Dispatch:
-1. **Luồng chính (Main Thread):** 
-   - Lắng nghe kết nối TCP trên cổng mặc định (2121).
-   - Thiết lập `socket.settimeout(0.5)` để định kỳ unblock hàm `accept()`, cho phép Server rà soát cờ dừng `is_running` để thực hiện *Graceful Shutdown*.
-   - Khi có kết nối mới, khởi tạo một instance `ClientHandler` (kế thừa `threading.Thread`) và gọi `.start()` để đẩy công việc xử lý sang luồng mới.
-2. **Luồng phụ (Client Thread):**
-   - Mỗi Client có 1 thread riêng quản lý trạng thái kết nối độc lập.
-   - Khi ngắt kết nối hoặc gửi lệnh `QUIT`, socket client sẽ được đóng an toàn thông qua `shutdown(socket.SHUT_RDWR)` và gỡ khỏi danh sách `active_clients` bằng `threading.Lock()` để đảm bảo an toàn đa luồng (Thread-safety).
-
----
-
-### 3.2 Path Validation & Security Sandbox Workflow (Role C)
-
-Quy trình ngăn chặn lỗ hổng bảo mật **Path Traversal Attack** (ví dụ: client cố tình gửi lệnh `CWD ../../etc/passwd` để đọc file hệ thống bên ngoài thư mục root của FTP).
-
-```mermaid
-flowchart TD
-    ClientReq["Client gửi câu lệnh chứa Path<br/>(CWD, RETR, LIST, MKD, DELE...)"] --> ResolvePath["resolve_path(base_dir, cwd, input_path)"]
-    
-    ResolvePath --> CheckAbs{"Input path là Absolute?<br/>(bắt đầu bằng /)"}
-    CheckAbs -- "Có" --> JoinBase["Stripped '/' và Join với base_dir"]
-    CheckAbs -- "Không" --> JoinCWD["Join với CWD hiện tại"]
-    
-    JoinBase --> RealPath["os.path.realpath()<br/>(Resolve tất cả symlink và '../')"]
-    JoinCWD --> RealPath
-    
-    RealPath --> ValidatePath{"validate_path():<br/>real_path.startswith(real_base + '/')<br/>HOẶC real_path == real_base?"}
-    
-    ValidatePath -- "KHÔNG (Thoát Sandbox)" --> RaisePermErr["Raise PermissionError<br/>'Access Denied'"]
-    RaisePermErr --> Reply550["Server trả mã lỗi:<br/>550 Requested action not taken"]
-    
-    ValidatePath -- "CÓ (An toàn)" --> ExecuteFS["Thực thi thao tác Filesystem<br/>(os.scandir, os.remove, open...)"]
-    ExecuteFS --> ReplySuccess["Server trả mã thành công<br/>(200, 250, 257...)"]
-```
-
-#### Mô tả chi tiết cơ chế bảo mật Sandbox:
-1. **Khử đường dẫn (Path Normalization):** Sử dụng `os.path.realpath()` để giải mã tất cả các ký tự di chuyển `..`, `.` cũng như resolve các đường dẫn tắt (Symbolic Links).
-2. **Kiểm tra ranh giới (Boundary Enforcement):** So sánh chuỗi đường dẫn sau khi resolve xem có bắt đầu bằng `real_base + os.sep` hay không. Việc thêm ký tự phân cách `os.sep` (`/` hoặc `\`) giúp tránh lỗi so sánh chuỗi sai lệch giữa `/ftp_root` và `/ftp_root_backup`.
-3. **Phản hồi chuẩn FTP:** Nếu đường dẫn nằm ngoài sandbox, hệ thống từ chối truy cập và phản hồi mã chuẩn FTP `550 Requested action not taken`.
-
----
-
-### 3.3 RDT Sender/Receiver State Machines (Role B)
-_(Sẽ được cập nhật bởi Role B)_
-
-### 3.4 Active/Passive Mode Toggle Workflow (Role C & Role A)
-_(Sẽ được cập nhật khi tích hợp Tuần 2)_
-
-## 4. Task Assignment Matrix
-_(Xem `phan-chia-cong-viec.md`, C tổng hợp bảng cuối)_
-
-## 5. Self-Assessment & Peer Evaluation
-_(Mỗi người tự viết, tổng % = 100%)_
-
-## 6. GenAI Usage & Code Refinement Log
-_(Xem `docs/genai-log-a.md`, `docs/genai-log-b.md`, `docs/genai-log-c.md` — mỗi người tự log)_
-
-## 7. Application Demo Evidence
-_(Screenshot/log upload, download, hash, session table, concurrent test — C tổng hợp)_
-
-# Technical Report — Hybrid FTP
-
-Role A — TCP Control & Session Management
+> This document follows the seven mandatory sections in Section 2.4 of the
+> project specification. Each member completes the sections related to their
+> implementation.
 
 ## 1. Application Scenario & Protocol Interaction
 
-Trong tuần đầu tiên, Role A chịu trách nhiệm xây dựng TCP Control Channel của hệ thống Hybrid FTP. Đây là kênh điều khiển giữa Client và Server, có nhiệm vụ tiếp nhận các lệnh FTP, thực hiện xác thực người dùng, quản lý trạng thái phiên làm việc (Session) và trả về các FTP Reply Code theo đúng đặc tả giao thức.
+The Hybrid FTP system uses two independent channels. The TCP control channel
+carries commands, FTP replies, and session state. The UDP data channel carries
+file payloads through a custom Reliable Data Transfer (RDT) layer developed by
+the team.
 
-Khi Client thiết lập kết nối TCP thành công, Server sẽ gửi thông điệp chào 220 Hybrid FTP Server Ready. Tiếp theo, Client thực hiện xác thực bằng hai lệnh USER và PASS. Sau khi đăng nhập thành công, Client được phép thực hiện các lệnh điều khiển như NOOP, PWD, LIST, MKD, CWD, RMD, DELE và kết thúc phiên làm việc bằng QUIT.
+After a TCP client connects, the server sends `220 Hybrid FTP Server Ready`. The
+client authenticates with `USER` followed by `PASS`. After successful login, the
+client may issue control commands. The server parses each request, validates the
+session state, performs the operation, and returns the corresponding FTP reply.
+`QUIT` ends the session and closes the control connection safely.
 
-Luồng giao tiếp được thiết kế theo mô hình request-response, trong đó mỗi lệnh từ Client đều được Server phân tích, xử lý và phản hồi bằng FTP Reply Code tương ứng.
+The complete TCP-plus-UDP sequence diagram will be finalized during integration.
+Role A owns the TCP lifecycle, Role B adds UDP DATA/ACK/retransmission behavior,
+and Role C verifies threading, filesystem operations, and cleanup against the
+integrated implementation.
 
 ## 2. Project-Wide Data Structures
-### 2.1 FTP Control Command Format
 
-Role A sử dụng định dạng FTP Control Message dưới dạng chuỗi ký tự theo chuẩn:
+### 2.1 FTP Control Command Format (Role A)
 
-COMMAND argument
+A command on the TCP control channel has this form:
 
-Trong đó:
+```text
+COMMAND [argument]\r\n
+```
 
-COMMAND là tên lệnh FTP.
-argument là tham số của lệnh (nếu có).
+`COMMAND` is an FTP command name and `argument` is optional. Examples:
 
-Ví dụ:
-
+```text
 USER admin
 PASS 123456
 CWD test
 MKD demo
+```
 
-Sau khi nhận dữ liệu từ TCP Socket, Server sử dụng hàm parse_command() để tách chuỗi thành hai thành phần là Command và Argument trước khi chuyển đến bộ xử lý lệnh.
+After receiving data from the TCP socket, the server uses `parse_command()` to
+separate the command and argument before dispatching to a command handler. Every
+response returns over the same TCP connection as a three-digit FTP reply code
+with a descriptive message.
 
-### 2.2 Session Structure
+### 2.2 Session Structure (Role A)
 
-Để quản lý trạng thái của từng Client, hệ thống xây dựng lớp Session. Mỗi Client khi kết nối tới Server sẽ được cấp phát một Session riêng nhằm lưu trữ trạng thái đăng nhập và thư mục làm việc hiện tại.
+Every client owns an independent `Session` that stores authentication and
+working-directory state:
 
+```python
 class Session:
     def __init__(self):
         self.username = None
         self.is_logged_in = False
         self.current_dir = os.getcwd()
+```
 
-Các trường dữ liệu của Session bao gồm:
+| Attribute | Meaning |
+|---|---|
+| `username` | Account name currently used during authentication |
+| `is_logged_in` | Whether the client has authenticated successfully |
+| `current_dir` | Current working directory for this session |
 
-Thuộc tính	Ý nghĩa
-username	Tên tài khoản đã đăng nhập
-is_logged_in	Trạng thái xác thực của Client
-current_dir	Thư mục làm việc hiện tại
+Separate sessions allow a thread-per-client model without sharing client state.
+Integration will extend this structure with transfer type, Active/PASV endpoint,
+rename state, and current transfer state.
 
-Việc tách Session thành một lớp riêng giúp dễ dàng mở rộng khi tích hợp mô hình đa luồng ở các giai đoạn tiếp theo, trong đó mỗi Client sẽ sở hữu một Session độc lập.
+### 2.3 RDT Header (Role B)
 
-## 3. Functional Workflows
+_(Role B will add a byte-level table containing the sequence number, ACK,
+checksum, flags, and payload length.)_
+
+## 3. Functional Workflows (Flowcharts)
+
 ### 3.1 Authentication Workflow (Role A)
 
-Quy trình xác thực đảm bảo chỉ những Client có thông tin đăng nhập hợp lệ mới được phép sử dụng các chức năng của FTP Server. Quá trình xác thực bao gồm hai bước là kiểm tra Username và Password.
+```mermaid
+flowchart TD
+    Connect["Client opens TCP connection"] --> Banner["Server replies 220 Service Ready"]
+    Banner --> User["Client sends USER username"]
+    User --> ValidUser{"Valid username?"}
+    ValidUser -- "No" --> UserFail["530 Invalid username"]
+    ValidUser -- "Yes" --> NeedPass["Store username and reply 331 Need password"]
+    NeedPass --> Pass["Client sends PASS password"]
+    Pass --> ValidPass{"Valid password?"}
+    ValidPass -- "No" --> PassFail["530 Login incorrect"]
+    ValidPass -- "Yes" --> LoggedIn["Set is_logged_in = True"]
+    LoggedIn --> Success["230 Login successful"]
+```
 
-Mô tả chi tiết Authentication Workflow
-Sau khi thiết lập kết nối TCP thành công, Server gửi mã phản hồi 220 Hybrid FTP Server Ready để thông báo dịch vụ đã sẵn sàng.
-Client gửi lệnh USER. Server kiểm tra Username, nếu hợp lệ sẽ lưu Username vào Session và trả về 331 Username OK, need password. Nếu Username không tồn tại, Server trả về 530 Invalid username.
-Client tiếp tục gửi lệnh PASS. Nếu chưa thực hiện lệnh USER, Server trả về 503 Login with USER first. Nếu Password không chính xác, Server trả về 530 Login incorrect. Khi Password hợp lệ, Server cập nhật trạng thái Session.is_logged_in = True và trả về 230 Login successful.
-Sau khi xác thực thành công, Client được phép thực hiện các lệnh FTP khác. Nếu chưa đăng nhập mà gửi lệnh yêu cầu quyền truy cập, Server sẽ trả về 530 Not logged in.
+If a client sends `PASS` before `USER`, the server replies
+`503 Login with USER first`. Commands that require access return
+`530 Not logged in` until authentication succeeds.
+
 ### 3.2 FTP Command Processing Workflow (Role A)
 
-Sau khi Client đăng nhập thành công, Server tiếp nhận các FTP Command thông qua TCP Control Channel. Mỗi lệnh được phân tích bằng hàm parse_command(), sau đó chuyển đến bộ xử lý tương ứng và phản hồi bằng FTP Reply Code.
+```mermaid
+flowchart TD
+    Receive["Receive data with recv()"] --> Parse["parse_command()"]
+    Parse --> Known{"Supported command?"}
+    Known -- "No" --> NotImplemented["502 Command not implemented"]
+    Known -- "Yes" --> NeedAuth{"Authentication required?"}
+    NeedAuth -- "No" --> Dispatch["Call command handler"]
+    NeedAuth -- "Yes" --> Authenticated{"Session authenticated?"}
+    Authenticated -- "No" --> NotLoggedIn["530 Not logged in"]
+    Authenticated -- "Yes" --> Dispatch
+    Dispatch --> Reply["Send FTP reply over TCP"]
+```
 
-Mô tả chi tiết FTP Command Processing
-Server nhận dữ liệu từ TCP Socket thông qua hàm recv().
-Chuỗi dữ liệu được truyền vào parse_command() để tách thành tên lệnh và tham số.
-Trước khi thực hiện lệnh, Server kiểm tra trạng thái Session.is_logged_in. Nếu Client chưa xác thực, Server từ chối yêu cầu bằng mã 530 Not logged in.
-Khi Client đã đăng nhập, Server sử dụng cấu trúc điều kiện (if-elif) để phân phối lệnh đến đoạn mã xử lý tương ứng.
-Sau khi hoàn thành xử lý, Server gửi FTP Reply Code phản ánh kết quả thực hiện của lệnh. Đối với các lệnh chưa được hỗ trợ, Server trả về 502 Command not implemented.
+Every command is parsed and checked for valid syntax and session state before
+dispatch. The handler returns a result that the control channel maps to an FTP
+reply. Invalid input must not terminate the client thread or server.
+
+### 3.3 Thread-Dispatch Workflow (Role C)
+
+The multithreaded server architecture serves multiple clients concurrently
+without one client blocking another.
+
+```mermaid
+flowchart TD
+    Start(["Start FTPServer.start()"]) --> BindListen["Bind IP/port and call listen(5)"]
+    BindListen --> TimeoutSet["Set socket timeout to 0.5 seconds"]
+    TimeoutSet --> LoopAccept{"Continue accept loop?<br/>is_running == True"}
+
+    LoopAccept -- "No" --> StopServer["Close server socket and client threads"]
+    StopServer --> End(["Server stopped"])
+
+    LoopAccept -- "Yes" --> TryAccept["Wait for client with accept()"]
+    TryAccept -- "Timeout" --> LoopAccept
+    TryAccept -- "New client" --> SpawnThread["Create ClientHandler thread"]
+
+    SpawnThread --> RegClient["Register client under active-client lock"]
+    RegClient --> StartThread["Call ClientHandler.start()"]
+    StartThread --> LoopAccept
+
+    subgraph PerClientThread ["Per-client ClientHandler.run()"]
+        InitClient["Send 220 Service Ready"] --> LoopRecv{"Continue recv loop?<br/>is_running == True"}
+        LoopRecv -- "Data received" --> ParseCmd["Parse FTP command"]
+        ParseCmd -- "QUIT" --> Send221["Send 221 Goodbye"]
+        Send221 --> CloseClient["Close socket and unregister client"]
+        ParseCmd -- "Other command" --> ProcessCmd["Process Echo/Filesystem/RDT operation"]
+        ProcessCmd --> SendResp["Send reply code"]
+        SendResp --> LoopRecv
+        LoopRecv -- "Disconnect or error" --> CloseClient
+        CloseClient --> ExitThread(["Client thread exits"])
+    end
+
+    StartThread -.-> InitClient
+```
+
+#### Thread-dispatch details
+
+1. **Main thread:**
+   - Listens for TCP connections on the default port, 2121.
+   - Uses `socket.settimeout(0.5)` so `accept()` periodically unblocks and checks
+     `is_running`, enabling graceful shutdown.
+   - Creates a `ClientHandler`, registers it, and calls `.start()` for every new
+     connection.
+2. **Client thread:**
+   - Each client has an independent thread and connection state.
+   - On disconnect or `QUIT`, the handler calls
+     `shutdown(socket.SHUT_RDWR)`, closes the socket, and removes itself from
+     `active_clients` under a lock.
+   - Server shutdown snapshots the client list, releases the registry lock,
+     cleans up clients, and joins their threads. Releasing the lock before
+     cleanup prevents a deadlock when a handler unregisters itself.
+
+### 3.4 Path Validation and Security Sandbox (Role C)
+
+This workflow prevents path-traversal attacks, such as a client sending
+`CWD ../../etc/passwd` to access data outside the FTP root.
+
+```mermaid
+flowchart TD
+    ClientReq["Client sends command containing a path<br/>CWD, RETR, LIST, MKD, DELE, etc."] --> ResolvePath["resolve_path(base_dir, cwd, input_path)"]
+    ResolvePath --> CheckAbs{"FTP-absolute path?<br/>Starts with /"}
+    CheckAbs -- "Yes" --> JoinBase["Remove leading slash and join with base_dir"]
+    CheckAbs -- "No" --> JoinCWD["Join with current CWD"]
+    JoinBase --> RealPath["Call os.path.realpath()<br/>Resolve symlinks, dots, and parent segments"]
+    JoinCWD --> RealPath
+    RealPath --> ValidatePath{"Inside real FTP root?"}
+    ValidatePath -- "No" --> RaisePermErr["Raise PermissionError"]
+    RaisePermErr --> Reply550["Return 550 Requested action not taken"]
+    ValidatePath -- "Yes" --> ExecuteFS["Perform filesystem operation"]
+    ExecuteFS --> ReplySuccess["Return success reply such as 200, 250, or 257"]
+```
+
+#### Sandbox details
+
+1. **Path normalization:** `os.path.realpath()` resolves `..`, `.`, and symbolic
+   links before access.
+2. **Boundary enforcement:** The resolved target must equal the FTP root or
+   begin with `real_base + os.sep`. Including the separator prevents
+   `/ftp_root_backup` from matching `/ftp_root`.
+3. **FTP error mapping:** An outside path is rejected and mapped to
+   `550 Requested action not taken`.
+4. **Symlink listings:** `LIST` and `NLST` omit entries whose resolved targets
+   leave the FTP root.
+
+### 3.5 Atomic Upload and File Locking (Role C)
+
+```mermaid
+flowchart TD
+    Request["STOR, STOU, or APPE request"] --> Resolve["Resolve and validate target path"]
+    Resolve --> Lock["Acquire per-path lock"]
+    Lock --> Temp["Create hidden .part file in target directory"]
+    Temp --> Cancelled{"Transfer cancelled?"}
+    Cancelled -- "Yes" --> Remove["Delete .part file and keep old target"]
+    Cancelled -- "No" --> Write["Write binary chunks"]
+    Write --> More{"More chunks?"}
+    More -- "Yes" --> Cancelled
+    More -- "No" --> Flush["Flush and fsync"]
+    Flush --> Replace["Atomically replace target"]
+    Replace --> Unlock["Release path lock"]
+```
+
+`STOR` replaces an existing file only after all data is written successfully.
+`APPE` copies the existing content into the temporary file and appends new
+chunks while holding one path lock, preventing concurrent clients from mixing
+bytes. `STOU` generates a unique server-side name. A cancellation maps to reply
+`426`; path errors map to `550`; invalid parameters map to `501`; and other local
+filesystem failures map to `451`.
+
+### 3.6 RDT Sender/Receiver State Machines (Role B)
+
+_(Role B will complete this section.)_
+
+### 3.7 Active/Passive Mode Workflow (Roles A, B, and C)
+
+_(This section will be completed after the Week 2 integration.)_
+
 ## 4. Task Assignment Matrix
-Ngày	Công việc
-26/07	Xây dựng TCP Server (bind, listen, accept), TCP Client (connect), thống nhất định dạng Control Message
-27/07	Xây dựng parser lệnh, triển khai USER và PASS theo FTP Reply Code
-28/07	Triển khai QUIT, NOOP và Session Object
-29/07	Kiểm thử Authentication Flow và các trường hợp lỗi
-30/07	Thiết kế Sequence Diagram cho TCP Control Flow
-31/07	Rà soát, sửa lỗi sau review và tối ưu mã nguồn
-01/08	Demo toàn bộ TCP Control Flow cho các thành viên trong nhóm
-## 5. Self-Assessment
 
-Role A đã hoàn thành việc xây dựng TCP Control Channel, triển khai cơ chế xác thực người dùng, quản lý Session và xử lý các FTP Command cơ bản theo đúng kế hoạch của tuần đầu. Các FTP Reply Code được cài đặt theo đúng đặc tả của đề bài và đã được kiểm thử với nhiều trường hợp hợp lệ cũng như không hợp lệ nhằm đảm bảo Server không bị lỗi hoặc dừng đột ngột khi nhận dữ liệu đầu vào bất thường.
+| Module or component | Owner | Collaborators |
+|---|---|---|
+| TCP server/client control connection | Role A | Role C (integration and review) |
+| FTP command parser and reply handling | Role A | Role C (review) |
+| Authentication (`USER`, `PASS`) | Role A | — |
+| Session management | Role A | Role C (thread/session integration) |
+| UDP data channel and RDT | Role B | Roles A and C (integration) |
+| Filesystem and path sandbox | Role C | Role A (command integration) |
+| Multithreaded server and active-session registry | Role C | Roles A and B (review) |
+| End-to-end integration | Role C | Roles A and B |
+| TCP-plus-UDP sequence diagram | Roles A and B | Role C (code verification) |
+| RDT state machines and header table | Role B | — |
+| Thread dispatch, path validation, and file lifecycle diagrams | Role C | — |
+
+This matrix will be updated using commit history and the final implementation
+before submission.
+
+## 5. Self-Assessment & Peer Evaluation
+
+### 5.1 Role A — Self-Assessment
+
+Role A implemented the TCP control channel, command parser, user authentication,
+and basic session management. The `USER`, `PASS`, `QUIT`, and `NOOP` flows and
+invalid authentication cases use FTP reply codes. Session state is separated in
+preparation for concurrent clients.
+
+Role A must compare this description with the final code after all commands,
+Active/PASV negotiation, and the UDP transfer lifecycle are integrated.
+
+### 5.2 Role B — Self-Assessment
+
+_(Role B will add the UDP/RDT assessment.)_
+
+### 5.3 Role C — Self-Assessment
+
+Role C implemented binary-safe file helpers, FTP-root path confinement,
+directory and metadata operations, a structured filesystem integration API,
+atomic uploads, per-path locks, transfer cancellation cleanup, a multithreaded
+server, active-session snapshots, and safe operational logging. Unit and socket
+tests cover independent paths, traversal attempts, concurrent append, unique
+names, cancellation, and server shutdown.
+
+The current branch does not yet contain the final Role A and Role B modules, so
+full TCP-plus-UDP upload/download behavior remains unverified. Role C will lead
+that integration and collect end-to-end evidence after both modules are merged.
+
+### 5.4 Peer Evaluation
+
+_(The team must agree on contribution percentages totaling 100%.)_
 
 ## 6. GenAI Usage & Code Refinement Log
 
-Trong quá trình phát triển, GenAI được sử dụng để tham khảo tài liệu về FTP Reply Code, cơ chế Thread-per-Client, cách tổ chức Session Object và kiểm tra tính hợp lý của luồng xử lý xác thực. Sau khi tham khảo, toàn bộ mã nguồn được chỉnh sửa và tích hợp lại để phù hợp với kiến trúc chung của dự án.
+GenAI is used for reference and review. Every member must inspect, understand,
+test, and refine generated material before integrating it. Exact prompts, raw
+output, and manual refinements are stored in:
+
+- Role A: `docs/genai-log-a.md`
+- Role B: `docs/genai-log-b.md`
+- Role C: `docs/genai-log-c.md`
+
+The final appendix must include or attach these logs. A general summary in this
+report does not replace exact prompts and raw output.
 
 ## 7. Application Demo Evidence
 
-Quá trình kiểm thử được thực hiện bằng cách khởi động FTP Server và sử dụng Netcat (nc) để đóng vai trò FTP Client.
+### 7.1 TCP Control and Authentication (Role A)
 
-Luồng kiểm thử bao gồm:
+The TCP control test uses the project client or Netcat (`nc`) to:
 
-Thiết lập kết nối TCP.
-Đăng nhập bằng USER/PASS.
-Kiểm tra các trường hợp sai Username, sai Password và gửi PASS trước USER.
-Thực hiện các lệnh NOOP, PWD, LIST, MKD, CWD.
-Kết thúc phiên làm việc bằng QUIT.
+1. Open a TCP connection and receive the `220` banner.
+2. Log in with `USER` and `PASS`.
+3. Test an invalid username, invalid password, and `PASS` before `USER`.
+4. Send `NOOP` and other implemented control commands.
+5. Send `QUIT`, receive `221`, and confirm safe session cleanup.
 
-Kết quả cho thấy toàn bộ FTP Reply Code được trả về đúng theo đặc tả, Server hoạt động ổn định và không xảy ra lỗi trong suốt quá trình kiểm thử.
+Role A's report must include actual terminal output or screenshots before final
+submission. The server should return the expected FTP replies without crashing
+on invalid authentication input.
+
+### 7.2 Filesystem and Concurrency Evidence (Role C)
+
+On August 3, 2026, `py -m pytest -v` collected 90 tests and reported
+`89 passed, 1 skipped` without warnings. Covered behavior includes binary file
+handling, directory operations, path traversal, atomic upload, cancellation,
+concurrent append, unique STOU names, ten concurrent TCP clients, and shutdown
+with a connected client. The skipped symlink test requires privileges not
+available in the Windows test environment.
+
+### 7.3 UDP Transfer and End-to-End Evidence
+
+_(After integration, Role C will add upload/download screenshots, SHA-256
+comparisons, and active-session/concurrent-client logs. Role B will provide RDT
+fault-injection evidence.)_

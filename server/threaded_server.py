@@ -21,6 +21,8 @@ import socket
 import threading
 import sys
 import os
+import itertools
+import time
 
 # Đảm bảo import được module common
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -31,8 +33,23 @@ log_lock = threading.Lock()
 
 def safe_log(msg: str):
     """Ghi log an toàn giữa các luồng (Thread-safe logging)."""
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{timestamp}] {msg}"
     with log_lock:
-        print(msg, flush=True)
+        try:
+            print(line, flush=True)
+        except UnicodeEncodeError:
+            encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+            printable = line.encode(encoding, errors="replace").decode(encoding)
+            print(printable, flush=True)
+
+
+def _redact_command(command: str) -> str:
+    """Ẩn credential trước khi ghi command vào server log."""
+    verb, separator, _argument = command.partition(" ")
+    if separator and verb.upper() == "PASS":
+        return f"{verb} ********"
+    return command
 
 def parse_command(command_raw: str):
     """
@@ -75,14 +92,18 @@ class ClientHandler(threading.Thread):
         self.session = Session()
         self.is_running = True
         self.daemon = True  # Thread tự đóng khi main program thoát
+        self.session_id = server.next_session_id()
+        self.connected_at = time.time()
+        self._cleanup_lock = threading.Lock()
+        self._cleaned_up = False
 
     def run(self):
         """Vòng lặp nhận và xử lý lệnh từ Client (TCP Control Channel)."""
-        safe_log(f"[+] Client mới kết nối từ: {self.client_address[0]}:{self.client_address[1]}")
+        safe_log(
+            f"[+] [{self.session_id}] Client mới kết nối từ: "
+            f"{self.client_address[0]}:{self.client_address[1]}"
+        )
         
-        # Thêm client vào danh sách quản lý của server
-        self.server.register_client(self)
-
         # Set timeout 0.5s để recv không bị block mãi mãi
         self.client_socket.settimeout(0.5)
 
@@ -105,7 +126,11 @@ class ClientHandler(threading.Thread):
                 if not command_raw:
                     continue
 
-                safe_log(f"[{self.client_address[0]}:{self.client_address[1]}] Command: {command_raw}")
+                safe_log(
+                    f"[{self.session_id}] "
+                    f"[{self.client_address[0]}:{self.client_address[1]}] "
+                    f"Command: {_redact_command(command_raw)}"
+                )
 
                 command, argument = parse_command(command_raw)
 
@@ -228,9 +253,15 @@ class ClientHandler(threading.Thread):
                     else:
                         self.send_response("502 Command not implemented\r\n")
         except (ConnectionResetError, BrokenPipeError):
-            safe_log(f"[-] Client {self.client_address} ngắt kết nối đột ngột.")
+            safe_log(
+                f"[-] [{self.session_id}] Client {self.client_address} "
+                "ngắt kết nối đột ngột."
+            )
         except Exception as e:
-            safe_log(f"[!] Lỗi xử lý client {self.client_address}: {e}")
+            safe_log(
+                f"[!] [{self.session_id}] Lỗi xử lý client "
+                f"{self.client_address}: {e}"
+            )
         finally:
             self.cleanup()
 
@@ -243,17 +274,24 @@ class ClientHandler(threading.Thread):
 
     def cleanup(self):
         """Dọn dẹp tài nguyên khi Client ngắt kết nối."""
-        self.is_running = False
-        try:
-            self.client_socket.shutdown(socket.SHUT_RDWR)
-        except Exception:
-            pass
-        try:
-            self.client_socket.close()
-        except Exception:
-            pass
+        with self._cleanup_lock:
+            if self._cleaned_up:
+                return
+            self._cleaned_up = True
+            self.is_running = False
+            try:
+                self.client_socket.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                self.client_socket.close()
+            except OSError:
+                pass
         self.server.unregister_client(self)
-        safe_log(f"[-] Đã đóng kết nối với {self.client_address[0]}:{self.client_address[1]}")
+        safe_log(
+            f"[-] [{self.session_id}] Đã đóng kết nối với "
+            f"{self.client_address[0]}:{self.client_address[1]}"
+        )
 
 
 class FTPServer:
@@ -268,6 +306,8 @@ class FTPServer:
         self.is_running = False
         self.active_clients = []
         self.clients_lock = threading.Lock()
+        self._session_ids = itertools.count(1)
+        self._session_id_lock = threading.Lock()
 
     def start(self):
         """Khởi chạy TCP Server và bắt đầu lắng nghe kết nối."""
@@ -291,6 +331,8 @@ class FTPServer:
                     
                     # Tạo và chạy Thread xử lý cho Client mới
                     handler = ClientHandler(client_sock, client_addr, self)
+                    # Đăng ký trước khi start để stop() không bỏ sót thread vừa tạo.
+                    self.register_client(handler)
                     handler.start()
                 except socket.timeout:
                     continue
@@ -319,11 +361,18 @@ class FTPServer:
                 pass
             self.server_socket = None
 
-        # Đóng tất cả luồng client đang kết nối
+        # Chụp snapshot rồi nhả lock trước khi cleanup(). cleanup() gọi lại
+        # unregister_client(), nên giữ clients_lock ở đây sẽ gây deadlock.
         with self.clients_lock:
-            for client in list(self.active_clients):
-                client.cleanup()
-            self.active_clients.clear()
+            clients = list(self.active_clients)
+
+        for client in clients:
+            client.cleanup()
+
+        current_thread = threading.current_thread()
+        for client in clients:
+            if client is not current_thread and client.is_alive():
+                client.join(timeout=1.0)
 
         safe_log("[*] Server đã dừng hoàn toàn.")
 
@@ -342,6 +391,25 @@ class FTPServer:
         """Lấy số lượng client đang kết nối đồng thời."""
         with self.clients_lock:
             return len(self.active_clients)
+
+    def next_session_id(self) -> str:
+        """Cấp session ID duy nhất để log và theo dõi client."""
+        with self._session_id_lock:
+            return f"S{next(self._session_ids):06d}"
+
+    def get_active_sessions(self) -> list[dict]:
+        """Trả snapshot an toàn của bảng session đang hoạt động."""
+        with self.clients_lock:
+            return [
+                {
+                    "session_id": client.session_id,
+                    "client_ip": client.client_address[0],
+                    "client_port": client.client_address[1],
+                    "connected_at": client.connected_at,
+                    "alive": client.is_alive(),
+                }
+                for client in self.active_clients
+            ]
 
 
 if __name__ == "__main__":
