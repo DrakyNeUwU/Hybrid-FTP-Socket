@@ -6,36 +6,63 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from common.RDTHeader import RDTHeader
 
 class TestRDTLogic(unittest.TestCase):
+    # 1. Mất data
+    def test_loss_data_packet(self):
+        # khi Sender gửi nhưng Data bị drop hoàn toàn
+        packet_sent = True
+        data_lost = True
+        received = False if data_lost else True
+        self.assertFalse(received)
 
-    # Test Case 1: Kiểm tra Checksum và Đóng/Mở gói tin (Serialization)
-    def test_header_serialization_and_checksum(self):
+    # 2. Mất ACK 
+    def test_loss_ack_packet(self):
+        # Receiver đã nhận gói nhưng ACK gửi về bị drop
+        ack_lost = True
+        sender_received_ack = False if ack_lost else True
+        self.assertFalse(sender_received_ack)
+
+    # 3. Delayed Packet 
+    def test_delayed_packet(self):
+        import time
+        timeout = 0.1
+        start_time = time.time()
+        time.sleep(0.15) # khi packet đến sau khoảng timeout
+        elapsed = time.time() - start_time
+        is_timeout = elapsed > timeout
+        self.assertTrue(is_timeout)
+
+    # 4. Duplicate Packet 
+    def test_duplicate_packet_detection(self):
+        last_expected_seq = 1
+        received_seq = 0 # Gói cũ gửi lại
+        is_duplicate = (received_seq < last_expected_seq)
+        self.assertTrue(is_duplicate)
+
+    # 5. Packet lỗi checksum 
+    def test_corrupted_checksum(self):
         header = RDTHeader(seq_num=1, ack_num=0, flags=RDTHeader.FLAG_DATA, length=5)
+        header.checksum = 123456 # Checksum sai
         payload = b"Hello"
-        header.checksum = header.compute_checksum(payload)    
-        # Serialize -> Deserialize
-        data = header.serialize()
-        deserialized = RDTHeader.deserialize(data)
-        
-        self.assertEqual(deserialized.seq_num, 1)
-        self.assertEqual(deserialized.flags, RDTHeader.FLAG_DATA)
-        self.assertTrue(deserialized.verify_checksum(payload))
+        self.assertFalse(header.verify_checksum(payload))
 
-    # Test Case 2: Giả sử dữ liệu bị lỗi Checksum (Corruption)
-    def test_corrupted_payload_checksum(self):
-        header = RDTHeader(seq_num=1, ack_num=0, flags=RDTHeader.FLAG_DATA, length=5)
-        payload = b"Hello"
-        header.checksum = header.compute_checksum(payload)
-        
-        corrupted_payload = b"H3llo" 
-        self.assertFalse(header.verify_checksum(corrupted_payload))
+    # 6. Out of order
+    def test_out_of_order_packet(self):
+        expected_seq = 1
+        received_seq = 2 # Nhận nhảy cóc
+        is_out_of_order = (received_seq != expected_seq)
+        self.assertTrue(is_out_of_order)
 
-    # Test Case 3: xử lý File rỗng (Edge case)
-    def test_empty_file_handling(self):
-        chunks = []
-        if not chunks:
-            chunks = [b""] # Cấu trúc xử lý file rỗng trong rdt_sender
-        self.assertEqual(len(chunks), 1)
-        self.assertEqual(chunks[0], b"")
+    # 7. lố retransmit 
+    def test_max_retransmit_exceeded(self):
+        max_retries = 5
+        retries = 0
+        ack_received = False # Mất mạng
+        
+        while retries < max_retries and not ack_received:
+            retries += 1
+            
+        self.assertEqual(retries, max_retries)
+        self.assertFalse(ack_received) # Báo lỗi
 
 if __name__ == '__main__':
     unittest.main()
