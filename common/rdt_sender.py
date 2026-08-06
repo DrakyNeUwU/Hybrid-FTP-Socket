@@ -1,6 +1,6 @@
 import socket
-from common.rdt_header import RDTHeader
-from common.file_utils import read_file_chunks
+from common.RDTHeader import RDTHeader
+from common.file_handler import read_file_chunks
 import os
 
 def send_file_rdt(filepath: str, dest_ip: str, dest_port: int, progress_cb=None, is_cancelled=lambda: False, max_retries: int = 10):

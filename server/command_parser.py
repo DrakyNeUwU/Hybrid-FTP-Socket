@@ -13,25 +13,13 @@ class FTPCommand:
 
 class CommandParser:
 
-
     @staticmethod
     def parse(raw):
+        if not raw or not raw.strip():
+            return FTPCommand("", "")
 
-        parts = raw.strip().split(
-            maxsplit=1
-        )
+        parts = raw.strip().split(maxsplit=1)
+        name = parts[0].upper()
+        argument = parts[1] if len(parts) > 1 else ""
 
-
-        name=parts[0].upper()
-
-
-        argument=""
-
-        if len(parts)>1:
-            argument=parts[1]
-
-
-        return FTPCommand(
-            name,
-            argument
-        )
+        return FTPCommand(name, argument)

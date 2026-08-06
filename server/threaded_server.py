@@ -6,7 +6,7 @@ import itertools
 import time
 
 
-from client_handler import ClientHandler
+from server.client_handler import ClientHandler
 
 
 
@@ -277,6 +277,10 @@ class FTPServer:
 
 
 
+
+    def get_active_client_count(self):
+        with self.clients_lock:
+            return len(self.active_clients)
 
     def get_active_sessions(self):
 
