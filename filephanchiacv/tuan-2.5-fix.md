@@ -43,6 +43,38 @@
 - [ ] Test file rỗng, text, binary, nhỏ hơn chunk, một chunk và đúng bội chunk.
 - [ ] Cập nhật bảng header, state machine và `docs/genai-log-b.md`.
 
+### Role C — việc của C
+
+- [ ] Chốt và cung cấp API filesystem dùng chung cho A/B; mọi client path phải
+  đi qua `common.filesystem_service.FilesystemService`.
+- [ ] Kiểm tra root confinement cho `CWD`, `LIST`, `NLST`, `STAT`, `SIZE`,
+  `MDTM`, `MKD`, `RMD`, `DELE`, `RNFR/RNTO`, `HASH`, `RETR`, `STOR`, `STOU` và
+  `APPE`; chặn `..`, absolute path ngoài root, symlink escape và prefix collision.
+- [ ] Hoàn thiện atomic upload: ghi `.part`, chỉ `os.replace` sau FIN hợp lệ;
+  lỗi, timeout hoặc ABOR phải xóa file tạm và giữ file cũ.
+- [ ] Hoàn thiện chính sách ghi đồng thời: per-path lock cho `APPE`, tên duy nhất
+  cho `STOU`, không trộn byte giữa các client và không giữ global lock khi chờ
+  UDP ACK.
+- [ ] Nối `TransferManager` với filesystem service và adapter RDT của B; ánh xạ
+  `TransferResult`/`FilesystemOperationError` thành reply của A.
+- [ ] Hoàn thiện threaded server: session ID, active-session registry, session
+  isolation, một client lỗi không làm chết server, cleanup khi QUIT/disconnect/
+  shutdown và join worker hữu hạn.
+- [ ] Đảm bảo `ABOR`, timeout và disconnect đóng TCP/UDP socket, dừng worker,
+  clear session state và không để `.part` hoặc session stale.
+- [ ] Hoàn thiện CLI/log: connection state, command/reply, Active/PASV mode,
+  transfer progress, timestamp, client IP, session ID, transfer ID và kết quả;
+  không log password hoặc nội dung file.
+- [ ] Viết test Role C cho traversal, symlink/prefix collision, atomic failure,
+  APPE lock, STOU unique, nhiều client, cùng file, disconnect giữa transfer,
+  server shutdown và active-session cleanup.
+- [ ] Chạy integration test TCP control + UDP data + filesystem cho Active/PASV,
+  upload/download, file rỗng/text/binary/chunk-boundary và SHA-256.
+- [ ] Thu evidence: path-security log, `.part` cleanup, concurrent-client log,
+  active-session table, CLI progress và command log đã redact password.
+- [ ] Cập nhật `docs/role-c-week-2.md`, phần Role C trong `docs/report.md` và
+  `docs/genai-log-c.md` bằng prompt/raw output/refinement/evidence thật.
+
 ## 2. Shared contract — phải chốt trước khi ráp
 
 ### TCP → transfer
