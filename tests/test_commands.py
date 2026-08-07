@@ -579,6 +579,15 @@ class TestRoleAValidationAndRDTAdapter(unittest.TestCase):
             resp = self.handler.handle(CommandParser.parse(transfer_cmd), self.session)
             self.assertTrue(resp.startswith("425"), f"Expected 425 for '{transfer_cmd}', got: {resp}")
 
+    def test_second_transfer_is_rejected_while_first_is_active(self):
+        self.session.data_host = "127.0.0.1"
+        self.session.data_port = 9999
+        self.session.current_transfer = {"type": "RETR", "file": "first.bin"}
+
+        resp = self.handler.handle(CommandParser.parse("STOR second.bin"), self.session)
+
+        self.assertTrue(resp.startswith("450"), resp)
+
     def test_rdt_adapter_import_and_instantiation(self):
         from server.rdt_adapter import RDTSenderAdapter, RDTReceiverAdapter
         sender = RDTSenderAdapter()

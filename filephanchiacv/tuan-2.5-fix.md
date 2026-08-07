@@ -469,3 +469,45 @@ chưa được xem là hoàn thành chỉ vì unit test đơn giản đang pass.
 - [ ] Có trace/evidence cho ACK của FIN bị mất, out-of-order không được ACK sai,
   ABOR giữa transfer và receiver timeout; tất cả kết thúc hữu hạn, hash đúng và
   không còn worker/socket/file tạm.
+
+## 12. Cập nhật sau kiểm tra Role A — 07/08/2026
+
+### Đã sửa trong vòng này
+
+- [x] Thêm guard chống chạy đồng thời nhiều transfer trên cùng một session.
+  `RETR`, `STOR`, `STOU`, `APPE` trả `450 Transfer already in progress` nếu
+  transfer trước vẫn còn worker hoặc `current_transfer`.
+- [x] Thêm unit test cho trường hợp transfer thứ hai bị từ chối trong
+  `tests/test_commands.py`.
+- [x] Xác nhận 52 test Role A chạy bằng `unittest` pass.
+
+### Role A còn có thể tự sửa
+
+- [ ] Thêm integration test dùng đúng chuỗi TCP command → `TransferManager` →
+  UDP/RDT adapter → filesystem.
+- [ ] Chốt lifecycle data socket sau mỗi transfer: đóng socket, reset endpoint
+  và không dùng lại socket PASV đã stale.
+- [ ] Thiết kế lại contract Active/PASV với Role B/C. Hiện `PORT` chỉ lưu
+  endpoint client, còn `RDTReceiverAdapter` yêu cầu server có `data_socket`,
+  nên Active upload chưa có server endpoint để nhận UDP một cách đầy đủ.
+- [ ] Quyết định và triển khai data-channel cho `LIST`/`NLST`; code hiện tại
+  trả listing trực tiếp trên TCP control, chưa chứng minh đúng hybrid data path.
+- [ ] Thêm test ABOR/disconnect thật trong lúc worker đang chờ UDP, kiểm tra
+  worker, socket và file `.part` đều kết thúc hữu hạn.
+
+### Không thể tự đánh dấu hoàn thành nếu chưa có Role B/C
+
+- [!] RETR/STOR/STOU/APPE end-to-end qua UDP/RDT.
+- [!] Active upload/download và PASV upload/download.
+- [!] Kiểm tra duplicate, out-of-order, corruption, mất ACK/FIN và peer
+  validation trong adapter production.
+- [!] SHA-256 nguồn/đích và bằng chứng multi-client.
+
+### Bằng chứng mới nhất
+
+- `python -m unittest tests.test_command_parser tests.test_session tests.test_commands -q`:
+  **52 tests passed**.
+- `python -m pytest -q`: chưa chạy được vì môi trường hiện thiếu package
+  `pytest` (`No module named pytest`).
+- `python -m unittest discover -s tests -q`: không hoàn tất trong thời gian
+  kiểm tra; chưa được xem là pass toàn bộ.

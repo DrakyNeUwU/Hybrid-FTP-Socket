@@ -453,6 +453,15 @@ class CommandHandler:
         t.start()
         session.transfer_worker = t
 
+    @staticmethod
+    def _transfer_in_progress(session):
+        """Return whether this session already owns an active transfer."""
+        worker = getattr(session, "transfer_worker", None)
+        return bool(
+            isinstance(getattr(session, "current_transfer", None), dict)
+            or (worker is not None and worker.is_alive())
+        )
+
     def retr(self, arg, session):
         if not session.is_logged_in:
             return "530 Not logged in\r\n"
@@ -460,6 +469,8 @@ class CommandHandler:
             return "501 Missing filename\r\n"
         if not session.data_socket and not session.data_host:
             return "425 Use PORT or PASV first\r\n"
+        if self._transfer_in_progress(session):
+            return "450 Transfer already in progress\r\n"
         tm = self.transfer_manager
         if tm is None:
             return "502 No transfer manager configured\r\n"
@@ -474,6 +485,8 @@ class CommandHandler:
             return "501 Missing filename\r\n"
         if not session.data_socket and not session.data_host:
             return "425 Use PORT or PASV first\r\n"
+        if self._transfer_in_progress(session):
+            return "450 Transfer already in progress\r\n"
         tm = self.transfer_manager
         if tm is None:
             return "502 No transfer manager configured\r\n"
@@ -486,6 +499,8 @@ class CommandHandler:
             return "530 Not logged in\r\n"
         if not session.data_socket and not session.data_host:
             return "425 Use PORT or PASV first\r\n"
+        if self._transfer_in_progress(session):
+            return "450 Transfer already in progress\r\n"
         tm = self.transfer_manager
         if tm is None:
             return "502 No transfer manager configured\r\n"
@@ -500,6 +515,8 @@ class CommandHandler:
             return "501 Missing filename\r\n"
         if not session.data_socket and not session.data_host:
             return "425 Use PORT or PASV first\r\n"
+        if self._transfer_in_progress(session):
+            return "450 Transfer already in progress\r\n"
         tm = self.transfer_manager
         if tm is None:
             return "502 No transfer manager configured\r\n"
