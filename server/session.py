@@ -1,7 +1,10 @@
 import os
 import threading
+import itertools
 
 class Session:
+    _transfer_counter = itertools.count(1)
+    _transfer_counter_lock = threading.Lock()
 
     def __init__(self, ftp_root="./ftp_root"):
 
@@ -24,7 +27,14 @@ class Session:
         self.transfer_cancel_event = None
         self.current_transfer = None
         self.transfer_worker = None  # daemon thread running the current transfer
+        self.transfer_id = None
 
         # Session identity (set by ClientHandler / tests)
         self.session_id = None
         self.send_reply = None       # injected by ClientHandler
+        self.peer_ip = None
+
+    def new_transfer_id(self) -> str:
+        with Session._transfer_counter_lock:
+            self.transfer_id = f"T{next(Session._transfer_counter):06d}"
+        return self.transfer_id

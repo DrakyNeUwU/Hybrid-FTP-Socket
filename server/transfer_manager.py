@@ -91,7 +91,9 @@ class TransferManager:
         session: Any,
         filepath: str,
         *,
-        chunks: Iterable[bytes],
+        chunks: Iterable[bytes] | None = None,
+        data_socket: Any = None,
+        endpoint: tuple[str, int] | None = None,
         cancel_event: threading.Event | None = None,
     ) -> TransferResult:
         """Append received chunks through the filesystem service atomically."""
@@ -99,6 +101,8 @@ class TransferManager:
         event = self._event_for(session, cancel_event)
         try:
             service, cwd, client_path = self._target(service_path=filepath, session=session)
+            if chunks is None:
+                chunks = self._receive(data_socket, endpoint, event)
             result = service.append(cwd, client_path, chunks, event)
             return TransferResult(True, 226, result.bytes_written, result.path)
         except (TransferCancelledError, FilesystemOperationError) as error:
@@ -112,7 +116,9 @@ class TransferManager:
         self,
         session: Any,
         *,
-        chunks: Iterable[bytes],
+        chunks: Iterable[bytes] | None = None,
+        data_socket: Any = None,
+        endpoint: tuple[str, int] | None = None,
         cancel_event: threading.Event | None = None,
     ) -> TransferResult:
         """Store an upload under a server-generated unique filename."""
@@ -120,6 +126,8 @@ class TransferManager:
         event = self._event_for(session, cancel_event)
         try:
             service = self._service_for(session)
+            if chunks is None:
+                chunks = self._receive(data_socket, endpoint, event)
             result = service.store_unique(session.current_dir, chunks, event)
             return TransferResult(True, 226, result.bytes_written, result.path)
         except (TransferCancelledError, FilesystemOperationError) as error:
@@ -179,6 +187,7 @@ class TransferManager:
                 data_socket.close()
             except OSError:
                 pass
+            session.data_socket = None
 
     def _service_for(self, session: Any) -> FilesystemService:
         if self.filesystem is not None:
@@ -214,12 +223,8 @@ class TransferManager:
 
     @staticmethod
     def _invoke(method: Callable, *args):
-        """Call adapters with the full contract, allowing simple test doubles."""
-        try:
-            return method(*args)
-        except TypeError:
-            # Transitional compatibility for adapters that omit endpoint.
-            return method(*[arg for arg in args if arg is not None])
+        """Call adapters with the full contract."""
+        return method(*args)
 
     @staticmethod
     def _event_for(session: Any, event: threading.Event | None) -> threading.Event:

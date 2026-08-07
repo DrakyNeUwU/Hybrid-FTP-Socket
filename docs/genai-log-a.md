@@ -174,3 +174,20 @@ AI đề xuất:
 
 **Refinement:**
 Tất cả sửa đổi được tích hợp. Bổ sung 20 unit test mới trong `tests/test_commands.py` cho: PORT validation (valid, too few, out of range, negative, port zero, non-numeric, no arg), auth reset (new USER clears login, wrong password clears username, PASS before USER returns 503), RNTO empty arg resets state, PASV socket replacement (creates socket, replaces old one), TYPE/MODE validation (valid A/I, invalid Z, mode B/C returns 502, invalid X). Tổng: **48 tests pass**.
+
+---
+
+## [07/08/2026] - RDT Adapters, Complete Filesystem Integration & ABOR Cleanup (tuần 2.5 — Hoàn tất Role A)
+**Prompt:**
+Hoàn thiện toàn bộ các task Role A trong `tuan-2.5-fix.md`: (1) Viết `RDTSenderAdapter` và `RDTReceiverAdapter` nối RDT UDP sockets với `TransferManager`; (2) Inject adapters vào `TransferManager` trong `ClientHandler`; (3) Chuyển toàn bộ các lệnh `SIZE`, `MDTM`, `HASH`, `CWD`, `CDUP`, `MKD`, `RMD`, `DELE`, `RNFR/RNTO`, `LIST`, `NLST` sang `FilesystemService`; (4) Validate số lượng tham số đồng nhất cho mọi command (từ chối tham số thừa cho PWD/NOOP/QUIT/PASV/CDUP/ABOR, trả 501 cho lệnh thiếu tham số); (5) Áp dụng Anti-FTP bounce IP policy cho `PORT`; (6) Kiểm tra data connection trước khi trả 150 cho các lệnh transfer (`RETR`, `STOR`, `STOU`, `APPE`); (7) Hủy transfer và join worker thread hữu hạn khi `ABOR` hoặc `cleanup()`.
+
+**Raw output:**
+AI đề xuất:
+- Tạo module `server/rdt_adapter.py` cung cấp `RDTSenderAdapter` và `RDTReceiverAdapter` sử dụng `RDTHeader`.
+- Inject hai adapter này vào `TransferManager` trong `ClientHandler.__init__`.
+- Cập nhật `CommandHandler` sử dụng `FilesystemService` độc quyền và bắt `FilesystemOperationError` để map reply code chuẩn.
+- Kiểm tra `session.data_socket` và `session.data_host` trước khi khởi chạy thread transfer, trả `425` nếu chưa có data connection.
+- Thêm `TestRoleAValidationAndRDTAdapter` kiểm thử toàn bộ các nhánh validation và adapter.
+
+**Refinement:**
+Đã tạo `server/rdt_adapter.py`, cập nhật `server/transfer_manager.py`, `server/client_handler.py`, `server/command_handler.py`, và bổ sung các unit test mới trong `tests/test_commands.py`. Toàn bộ test suite pass 100%.

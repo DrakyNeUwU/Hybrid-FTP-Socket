@@ -7,6 +7,7 @@ from server.command_handler import CommandHandler
 from server.session import Session
 from server.ftp_reply import FTPReply
 from server.transfer_manager import TransferManager
+from server.rdt_adapter import RDTSenderAdapter, RDTReceiverAdapter
 from common.filesystem_service import FilesystemService
 
 class ClientHandler(threading.Thread):
@@ -21,10 +22,17 @@ class ClientHandler(threading.Thread):
         self.session = Session(ftp_root="./ftp_root")
         self.session.session_id = self.session_id
         self.session.send_reply = self.send
+        self.session.peer_ip = addr[0] if (addr and isinstance(addr, tuple)) else None
 
         os.makedirs(self.session.ftp_root, exist_ok=True)
         self.filesystem_service = FilesystemService(self.session.ftp_root)
-        self.transfer_manager = TransferManager(filesystem=self.filesystem_service)
+        self.sender_adapter = RDTSenderAdapter()
+        self.receiver_adapter = RDTReceiverAdapter()
+        self.transfer_manager = TransferManager(
+            filesystem=self.filesystem_service,
+            sender=self.sender_adapter,
+            receiver=self.receiver_adapter,
+        )
 
         self.handler = CommandHandler(self.transfer_manager)
         self.buffer = b""
@@ -73,12 +81,16 @@ class ClientHandler(threading.Thread):
     def cleanup(self):
         try:
             self.transfer_manager.cancel(self.session)
-        except:
+        except Exception:
             pass
+
+        worker = getattr(self.session, "transfer_worker", None)
+        if worker and worker.is_alive():
+            worker.join(timeout=1.0)
 
         if getattr(self.session, 'data_socket', None):
             try: self.session.data_socket.close()
-            except: pass
+            except Exception: pass
             self.session.data_socket = None
 
         self.session.data_host = None
@@ -87,10 +99,11 @@ class ClientHandler(threading.Thread):
         self.session.rename_from = None
         self.session.transfer_cancelled = False
         self.session.current_transfer = None
+        self.session.transfer_worker = None
 
         if self.server:
             try: self.server.unregister_client(self)
-            except: pass
+            except Exception: pass
         
         try: self.socket.close()
-        except: pass
+        except Exception: pass

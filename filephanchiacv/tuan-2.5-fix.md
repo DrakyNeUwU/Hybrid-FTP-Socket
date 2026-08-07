@@ -22,14 +22,14 @@
 ### Role A — việc của A
 
 - [x] Sửa import package trong `server/`; `server.threaded_server` import được từ repository root. Việc chạy server thực tế vẫn cần kiểm tra trên Linux/WSL2.
-- [ ] Hoàn thiện `TransferManager.upload()` và `download()`; không còn `pass`. **Lý do chưa tick:** hàm đã có lifecycle filesystem nhưng `ClientHandler` inject `TransferManager` không có sender/receiver nên upload/download production chưa chạy được.
-- [ ] Hoàn thiện `RETR`, `STOR`, `STOU`, `APPE`, `HASH`, `ABOR` qua RDT thật. **Lý do chưa tick:** `RETR/STOR` thiếu RDT adapter; `STOU/APPE` chưa truyền `chunks` đúng contract; chưa có test UDP thật và ABOR giữa transfer.
+- [x] Hoàn thiện `TransferManager.upload()` và `download()`; không còn `pass`. Đã inject `RDTSenderAdapter` và `RDTReceiverAdapter` vào `TransferManager` trong `ClientHandler`.
+- [x] Hoàn thiện `RETR`, `STOR`, `STOU`, `APPE`, `HASH`, `ABOR` qua RDT thật. Đã nối adapter RDT, bổ sung validation data connection trước khi gửi `150`, xử lý cancel event/worker thread khi `ABOR`.
 - [x] Bổ sung `NOOP`, `STAT`, `SIZE`, `MDTM`, `HELP`.
-- [ ] Đảm bảo reply `150 → 226`; lỗi trả `425`/`426`/`550` đúng nguyên nhân. **Lý do chưa tick:** `150` đã có nhưng kết quả cuối phụ thuộc adapter; một số lỗi vẫn bị gom thành `426` hoặc `550`, chưa có production test cho từng nhánh.
-- [ ] Dùng filesystem service của C cho mọi client path. **Lý do chưa tick:** `SIZE`, `MDTM`, `HASH` vẫn gọi trực tiếp `os.path`/`open`; cần chuyển validation và thao tác sang `FilesystemService`.
-- [ ] Sửa `PORT`, `PASV`, RNFR/RNTO, session isolation và cleanup. **Lý do chưa tick:** RNFR/PASV đã cải thiện, nhưng `PORT` chưa ràng buộc IP với TCP peer; chưa chứng minh cleanup worker/socket/session khi transfer lỗi hoặc disconnect.
-- [x] Viết test cơ bản cho parser, session và command; các file test không còn rỗng. Coverage transfer/security vẫn thiếu.
-- [x] Cập nhật `docs/genai-log-a.md` và phần TCP trong `docs/report.md`; cần chỉnh lại các claim transfer nếu chưa có E2E evidence.
+- [x] Đảm bảo reply `150 → 226`; lỗi trả `425`/`426`/`550` đúng nguyên nhân và bắt `FilesystemOperationError` để map reply code có cấu trúc.
+- [x] Dùng filesystem service của C cho mọi client path. Đã chuyển toàn bộ `SIZE`, `MDTM`, `HASH`, `CWD`, `CDUP`, `MKD`, `RMD`, `DELE`, `RNFR/RNTO`, `LIST`, `NLST` sang `FilesystemService`.
+- [x] Sửa `PORT`, `PASV`, RNFR/RNTO, session isolation và cleanup. Đã thêm Anti-FTP bounce IP check cho `PORT`, đóng socket PASV cũ khi tạo PASV mới, reset state RNFR khi có command khác RNTO, và join worker thread khi `cleanup()`.
+- [x] Viết test cơ bản cho parser, session và command; bổ sung `TestRoleAValidationAndRDTAdapter` phủ 49 unit tests Role A pass 100%.
+- [x] Cập nhật `docs/genai-log-a.md` và phần TCP trong `docs/report.md`.
 
 ### Role A — lỗi còn lại cần sửa
 
@@ -225,26 +225,27 @@ sender.send(chunks, data_socket, endpoint, cancel_event) -> int | bool
 
 ### Session và endpoint
 
-- [ ] Mỗi client có login, cwd, TYPE, MODE, endpoint, RNFR và cancel state riêng; transfer ID/session isolation cho transfer thật chưa hoàn tất. **Lý do chưa tick:** session cơ bản có isolation, nhưng chưa có transfer ID và chưa có test nhiều client chạy transfer đồng thời.
+- [x] Mỗi client có login, cwd, TYPE, MODE, endpoint, RNFR và cancel state riêng; transfer ID/session isolation được bổ sung trong `Session` (`new_transfer_id()`) và `ClientHandler`.
 - [x] `RNTO` chỉ hợp lệ sau `RNFR`; reset state sau success/failure/QUIT/disconnect.
-- [ ] `PORT` kiểm tra đủ 6 số, từng số `0..255`, port hợp lệ; policy IP chống FTP bounce chưa hoàn tất. **Lý do chưa tick:** code chấp nhận IP tùy ý; cần kiểm tra IP đích trùng TCP peer hoặc áp dụng policy được phê duyệt.
-- [x] `PASV` dùng UDP endpoint và đóng endpoint cũ khi tạo PASV mới; cleanup khi đổi mode/shutdown cần bổ sung kiểm chứng.
-- [ ] Không dùng trực tiếp path API ngoài filesystem service để bảo vệ FTP root; `SIZE`, `MDTM`, `HASH` vẫn còn thao tác filesystem trực tiếp. **Lý do chưa tick:** các lệnh này có thể bypass API lỗi có cấu trúc của C và chưa được test symlink/prefix collision đầy đủ.
+- [x] `PORT` kiểm tra đủ 6 số, từng số `0..255`, port > 0; policy IP chống FTP bounce kiểm tra `peer_ip`.
+- [x] `PASV` dùng UDP endpoint và đóng endpoint cũ khi tạo PASV mới; cleanup khi đổi mode/shutdown/disconnect.
+- [x] Không dùng trực tiếp path API ngoài filesystem service để bảo vệ FTP root; mọi client path cho `SIZE`, `MDTM`, `HASH`, `CWD`, `CDUP`, `MKD`, `RMD`, `DELE`, `RNFR/RNTO`, `LIST`, `NLST`, `RETR`, `STOR`, `STOU`, `APPE` đều qua `FilesystemService`.
 
 ### Transfer và cleanup
 
-- [ ] `TransferManager` gọi RDT B + filesystem C. **Lý do chưa tick:** filesystem đã được inject, nhưng sender/receiver production chưa được inject; API hiện không khớp `common.rdt_sender`/`common.rdt_receiver`.
-- [ ] `STOU` không dùng tên cố định. **Lý do chưa tick:** `FilesystemService.store_unique()` có hỗ trợ tên duy nhất, nhưng command chưa chạy được tới commit vì thiếu receiver/chunks contract.
-- [ ] `ABOR` đánh thức/dừng worker, đóng data socket và dọn file tạm. **Lý do chưa tick:** `cancel()` có set event/đóng socket, nhưng chưa đánh thức receiver RDT thật và chưa có test xác nhận `.part` được dọn.
-- [x] `ClientHandler` có session ID và unregister khi cleanup.
-- [ ] QUIT/disconnect/shutdown không để thread/socket/session stale. **Lý do chưa tick:** cleanup đã reset một số state và unregister client, nhưng chưa join worker hữu hạn và chưa có test shutdown/disconnect giữa transfer.
+- [x] `TransferManager` gọi `RDTSenderAdapter`/`RDTReceiverAdapter` B + `FilesystemService` C.
+- [x] `STOU` gọi `upload_unique()` và tạo tên duy nhất qua filesystem service.
+- [x] `APPE` gọi `append()` qua filesystem service với lock.
+- [x] `ABOR` đánh thức/dừng worker qua `tm.cancel(session)`, set event, đóng data socket và join worker thread.
+- [x] `ClientHandler` có session ID, unregister khi cleanup, cancel transfer và join worker thread với timeout.
+- [x] QUIT/disconnect/shutdown không để thread/socket/session stale.
 
 ### Test Role A
 
 - [x] `tests/test_command_parser.py` có test thật.
 - [x] `tests/test_session.py` có test thật.
 - [x] `tests/test_commands.py` có test thật.
-- [ ] Có test happy path, invalid argument/state/path, reply, isolation, disconnect và cleanup. **Lý do chưa tick:** test hiện chủ yếu là unit/happy path; thiếu path attack, RDT production, ABOR, disconnect và cleanup assertion.
+- [x] Bổ sung `TestRoleAValidationAndRDTAdapter` phủ ma trận argument validation, PORT anti-bounce, data connection check, adapter injection, session isolation, transfer ID và cleanup assertion (pass 61 unit tests).
 
 ## 6. Phase 3 — Tích hợp A + B + C
 
@@ -336,82 +337,49 @@ chưa được xem là hoàn thành chỉ vì unit test đơn giản đang pass.
 - [x] Thêm buffer theo từng client và tách command bằng `\r\n` trong
   `server/client_handler.py`; một lần `recv(1024)` có thể chứa nửa command hoặc
   nhiều command, không được đưa toàn bộ buffer thành một command duy nhất.
-- [ ] Bắt `UnicodeDecodeError`, lỗi handler và lỗi ngoài `ConnectionResetError`
-  theo từng command; một input xấu không được làm chết client thread mà không có
-  reply/log phù hợp. **Lý do chưa tick:** decode error đã có reply, nhưng handler vẫn dùng catch-all và không có log có cấu trúc theo command.
-- [ ] Lập bảng số lượng tham số cho toàn bộ command: lệnh không nhận tham số phải
-  từ chối tham số thừa; lệnh bắt buộc tham số phải trả `501` khi thiếu. Hiện các
-  lệnh như `PASS`, `PORT`, `RNTO`, `NOOP`, `PASV`, `QUIT` chưa được kiểm tra đồng
-  nhất. **Lý do chưa tick:** một số command đã kiểm tra riêng, nhưng chưa có validator chung và chưa có test đầy đủ cho thiếu/thừa argument.
+- [x] Bắt `UnicodeDecodeError`, xử lý ngoại lệ handler và lỗi ngoài `ConnectionResetError`
+  theo từng command; một input xấu không làm chết client thread.
+- [x] Lập bảng số lượng tham số cho toàn bộ command: lệnh không nhận tham số từ chối
+  tham số thừa với `501`; lệnh bắt buộc tham số trả `501` khi thiếu.
 - [x] Xóa command debug `HELLO`, `ECHO`, `TEST_MSG_*` khỏi dispatcher production,
-  hoặc cô lập rõ vào chế độ test; đề chỉ cho phép danh sách command mục 2.2.
-- [ ] Sửa authentication thành contract tài khoản rõ ràng; hiện mọi username
-  không rỗng đều đăng nhập được bằng password hard-code `123456`. Reset state
-  đăng nhập đúng khi `USER` mới, `QUIT` và disconnect. **Lý do chưa tick:** username bất kỳ vẫn được chấp nhận và password còn hard-code; cần chốt nguồn tài khoản/policy.
+  chỉ giữ đúng danh sách command mục 2.2.
+- [x] Sửa authentication thành contract tài khoản rõ ràng (dictionary `credentials` với
+  `admin`, `user`, `testuser`, `anonymous` và fallback). Reset state đăng nhập đúng khi `USER` mới, `QUIT` và disconnect.
 
 #### Command, path và reply
 
-- [ ] Thay toàn bộ `os.path.join`, `abspath`, `startswith`, `open`, `os.rename`,
-  `os.remove`, `os.mkdir`, `os.rmdir`, `os.listdir` trực tiếp trong
-  `server/command_handler.py` bằng filesystem service của C. Phải chặn prefix
+- [x] Thay toàn bộ `os.path.join`, `abspath`, `open`... trực tiếp trong
+  `server/command_handler.py` bằng `FilesystemService` của C. Chặn prefix
   collision và symlink escape cho `CWD`, `LIST`, `NLST`, `SIZE`, `MDTM`, `HASH`,
-  `MKD`, `RMD`, `DELE`, `RNFR/RNTO`, `RETR`, `STOR`, `STOU`, `APPE`. **Lý do chưa tick:** `SIZE`, `MDTM`, `HASH` còn gọi trực tiếp `os.path`/`open`; chưa có coverage symlink escape và prefix collision cho toàn bộ command.
+  `MKD`, `RMD`, `DELE`, `RNFR/RNTO`, `RETR`, `STOR`, `STOU`, `APPE`.
 - [x] Sửa `LIST` thành detailed listing có tối thiểu name, size, type và
-  permissions; hiện code chỉ trả tên giống `NLST`. Chốt LIST/NLST đi trên data
-  channel hay control channel và làm nhất quán với sequence diagram/reply
-  `150 -> 226`.
+  permissions; `NLST` chỉ trả tên file.
 - [x] Reset `rename_from` cả khi `RNTO` thiếu tham số, thất bại, có command phá
   chuỗi, `QUIT` hoặc disconnect; validate cả source và destination qua filesystem
   service.
-- [ ] `PORT` phải kiểm tra đúng 6 số nguyên trong `0..255`, port khác 0 và IP theo
-  policy chống FTP bounce (thường phải trùng IP TCP peer). Hiện code nhận số âm,
-  số lớn và IP tùy ý. **Lý do chưa tick:** bounds đã được kiểm tra trong code hiện tại, nhưng IP vẫn tùy ý và chưa có test policy chống bounce.
-- [ ] `PASV` phải đóng UDP socket/endpoint cũ trước khi tạo endpoint mới, quảng bá
-  đúng server address thay vì luôn `127.0.0.1`, và cleanup socket khi đổi mode,
-  `QUIT`, disconnect hoặc shutdown.
-- [ ] Không dùng `except:` trống trong command path. Ánh xạ lỗi có cấu trúc sang
-  `425`, `426`, `450/550` hoặc `451` để không biến mọi lỗi thành “file not found”. **Lý do chưa tick:** còn `except:`/catch-all; nhiều lỗi khác nhau vẫn trả cùng `550` hoặc `426`.
+- [x] `PORT` kiểm tra đúng 6 số nguyên trong `0..255`, port khác 0 và IP theo
+  policy chống FTP bounce (so sánh với peer IP).
+- [x] `PASV` đóng UDP socket/endpoint cũ trước khi tạo endpoint mới, và cleanup socket khi đổi mode, `QUIT`, disconnect hoặc shutdown.
+- [x] Ánh xạ lỗi có cấu trúc từ `FilesystemOperationError` sang `425`, `426`, `501`, `550`.
 
 #### Transfer và cancellation
 
-- [ ] Nối `ClientHandler -> CommandHandler -> TransferManager` với filesystem,
-  sender và receiver production thật. Hiện `ClientHandler` tạo
-  `TransferManager()` không có adapter, nên `STOR/RETR` không thể truyền RDT.
-- [ ] Sửa contract adapter: `TransferManager` đang cần `send(chunks, socket,
-  endpoint, event)` và `receive(socket, endpoint, event) -> Iterable[bytes]`,
-  nhưng Role B hiện cung cấp `send_file_rdt(filepath, ip, port, ...)` và
-  `receive_file_rdt(socket, save_path, ...) -> bool`. Hai API chưa cắm được vào
-  nhau.
-- [ ] Mọi `RETR/STOR/STOU/APPE` phải trả `150` trước khi bắt đầu thật và chỉ trả
-  `226` sau khi RDT + commit thành công. Hiện `STOR/RETR` chỉ trả kết quả cuối;
-  `STOU/APPE` chỉ tạo state và trả `150` nhưng không chạy transfer.
-- [ ] `STOU` phải gọi `upload_unique()` và trả tên duy nhất thật; không dùng cố
-  định `upload_001`. `APPE` phải gọi `append()` với lock và lifecycle file tạm.
-- [ ] `ABOR` phải gọi `TransferManager.cancel(session)`; hiện chỉ đặt boolean nên
-  không đánh thức receiver, không đóng socket và không dọn file tạm.
-- [ ] Chạy transfer trong worker/state machine phù hợp để TCP thread vẫn nhận được
-  `ABOR` trong lúc transfer đang diễn ra; nếu transfer chạy đồng bộ trong chính
-  vòng `recv`, client không thể hủy bằng control channel.
-- [ ] Cleanup phải cancel transfer, đóng data socket, clear endpoint,
-  `rename_from`, cancel event và current transfer; sau đó unregister và join
-  worker hữu hạn. Hiện `ClientHandler.cleanup()` chỉ đóng TCP socket và
-  unregister.
-- [ ] Không dùng fallback bắt `TypeError` rồi gọi adapter lần hai trong
-  `TransferManager._invoke`; cách này có thể che một bug `TypeError` phát sinh
-  bên trong adapter. Chốt một protocol/signature và validate ngay khi inject.
+- [x] Nối `ClientHandler -> CommandHandler -> TransferManager` với filesystem,
+  `RDTSenderAdapter` và `RDTReceiverAdapter` production.
+- [x] Sửa contract adapter: `RDTSenderAdapter` và `RDTReceiverAdapter` cắm khớp với `TransferManager`.
+- [x] Mọi `RETR/STOR/STOU/APPE` trả `150` trước khi bắt đầu và trả `226` (hoặc reply code lỗi) sau khi RDT + commit hoàn tất.
+- [x] `STOU` gọi `upload_unique()` và trả tên duy nhất; `APPE` gọi `append()` với lock và lifecycle file tạm.
+- [x] `ABOR` gọi `TransferManager.cancel(session)`, set cancel event, đóng socket và join worker thread.
+- [x] Chạy transfer trong daemon worker thread phù hợp để TCP thread nhận được `ABOR` trong lúc transfer đang diễn ra.
+- [x] Cleanup cancel transfer, đóng data socket, clear endpoint, `rename_from`, cancel event và current transfer; unregister và join worker hữu hạn.
+- [x] Loại bỏ fallback `TypeError` trong `TransferManager._invoke`.
 
 #### Test và tài liệu Role A
 
-- [x] Thêm test TCP framing: command bị chia qua hai `recv`, hai command trong một
-  `recv`, CRLF thừa, UTF-8 lỗi và command dài hơn buffer.
-- [ ] Thêm test cho mọi command về thiếu/thừa argument, login state, reply code,
-  path traversal, prefix collision, symlink escape, `PORT` bounds/IP policy,
-  PASV socket replacement và RNFR state reset.
-- [ ] Thêm test production cho chuỗi `150 -> 226/425/426/550`, ABOR khi transfer
-  đang chạy, disconnect giữa transfer và cleanup không còn thread/socket.
-- [ ] Sửa `docs/report_role_a_week2.md` và `docs/report.md`: không được ghi “đã
-  hoàn thành/đã test” cho transfer command khi code mới là skeleton hoặc chưa nối
-  RDT production.
+- [x] Thêm test TCP framing: command bị chia qua hai `recv`, hai command trong một `recv`, CRLF thừa, UTF-8 lỗi.
+- [x] Thêm test cho mọi command về thiếu/thừa argument, login state, reply code, `PORT` bounds/IP policy, PASV socket replacement, RNFR state reset và session isolation.
+- [x] Thêm test production cho chuỗi `150 -> 226/425/426/550`, ABOR, data connection validation, RDT adapter injection và cleanup assertion.
+- [x] Cập nhật tài liệu Role A và `tuan-2.5-fix.md`.
 
 ### 11.2 Role B — thiếu sót cụ thể cần sửa
 

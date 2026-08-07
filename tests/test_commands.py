@@ -530,5 +530,98 @@ class TestTypeModeCommands(unittest.TestCase):
         self.assertTrue(resp.startswith("501"), resp)
 
 
+class TestRoleAValidationAndRDTAdapter(unittest.TestCase):
+    """Test argument validation, PORT anti-bounce, data connection requirements, and RDT adapter integration."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.session = Session(ftp_root=self.test_dir)
+        self.session.is_logged_in = True
+        self.handler = CommandHandler()
+
+    def tearDown(self):
+        if getattr(self.session, "data_socket", None):
+            try:
+                self.session.data_socket.close()
+            except Exception:
+                pass
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_argument_validation(self):
+        # No-args commands with extra argument -> 501
+        for cmd_str in ["PWD extra", "NOOP extra", "QUIT extra", "PASV extra", "CDUP extra", "ABOR extra"]:
+            resp = self.handler.handle(CommandParser.parse(cmd_str), self.session)
+            self.assertTrue(resp.startswith("501"), f"Expected 501 for '{cmd_str}', got: {resp}")
+
+        # Required-args commands missing argument -> 501
+        for cmd_str in ["CWD", "MKD", "RMD", "DELE", "RNFR", "RNTO", "SIZE", "MDTM", "HASH"]:
+            resp = self.handler.handle(CommandParser.parse(cmd_str), self.session)
+            self.assertTrue(resp.startswith("501"), f"Expected 501 for '{cmd_str}', got: {resp}")
+
+    def test_port_validation_and_antibounce(self):
+        # Invalid PORT formats or bounds
+        for invalid_port in ["PORT 127,0,0,1", "PORT 127,0,0,1,0,0", "PORT 127,0,0,1,300,100", "PORT 127,0,0,1,-5,10"]:
+            resp = self.handler.handle(CommandParser.parse(invalid_port), self.session)
+            self.assertTrue(resp.startswith("501"), f"Expected 501 for '{invalid_port}', got: {resp}")
+
+        # Anti-FTP bounce test: peer IP is remote 192.168.1.50, PORT IP is 10.0.0.1
+        self.session.peer_ip = "192.168.1.50"
+        bounce_resp = self.handler.handle(CommandParser.parse("PORT 10,0,0,1,19,136"), self.session)
+        self.assertTrue(bounce_resp.startswith("501"), f"Expected 501 for FTP bounce, got: {bounce_resp}")
+
+    def test_transfer_requires_data_connection(self):
+        # No data socket / endpoint set -> must return 425
+        self.session.data_socket = None
+        self.session.data_host = None
+        self.session.data_port = None
+
+        for transfer_cmd in ["RETR file.txt", "STOR file.txt", "STOU", "APPE file.txt"]:
+            resp = self.handler.handle(CommandParser.parse(transfer_cmd), self.session)
+            self.assertTrue(resp.startswith("425"), f"Expected 425 for '{transfer_cmd}', got: {resp}")
+
+    def test_rdt_adapter_import_and_instantiation(self):
+        from server.rdt_adapter import RDTSenderAdapter, RDTReceiverAdapter
+        sender = RDTSenderAdapter()
+        receiver = RDTReceiverAdapter()
+        self.assertIsNotNone(sender)
+        self.assertIsNotNone(receiver)
+
+    def test_session_isolation_and_transfer_id(self):
+        session1 = Session(ftp_root=self.test_dir)
+        session2 = Session(ftp_root=self.test_dir)
+        session1.is_logged_in = True
+        session2.is_logged_in = True
+
+        tid1 = session1.new_transfer_id()
+        tid2 = session2.new_transfer_id()
+
+        self.assertNotEqual(tid1, tid2)
+
+        # Session states are completely independent
+        session1.data_host = "192.168.1.10"
+        session2.data_host = "10.0.0.5"
+        self.assertNotEqual(session1.data_host, session2.data_host)
+
+    def test_cleanup_assertion(self):
+        from server.client_handler import ClientHandler
+        class DummyServer:
+            def next_session_id(self): return "S000001"
+            def unregister_client(self, c): pass
+
+        import socket
+        dummy_sock, _ = socket.socketpair()
+        try:
+            handler = ClientHandler(dummy_sock, ("127.0.0.1", 12345), DummyServer())
+            handler.session.is_logged_in = True
+            handler.cleanup()
+            self.assertIsNone(handler.session.data_socket)
+            self.assertIsNone(handler.session.data_host)
+            self.assertIsNone(handler.session.data_port)
+            self.assertIsNone(handler.session.rename_from)
+        finally:
+            dummy_sock.close()
+
+
 if __name__ == "__main__":
     unittest.main()
+
