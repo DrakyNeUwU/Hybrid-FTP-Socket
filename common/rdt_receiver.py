@@ -1,6 +1,6 @@
 import socket
-from common.rdt_header import RDTHeader
-from common.file_utils import write_file_from_chunks
+from common.RDTHeader import RDTHeader
+from common.file_handler import write_file_from_chunks
 
 def receive_file_rdt(udp_socket: socket.socket, save_path: str,progress_cb=None, is_cancelled=lambda: False):
     udp_socket.settimeout(1.0)

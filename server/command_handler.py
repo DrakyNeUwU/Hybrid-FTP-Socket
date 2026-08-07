@@ -1,7 +1,8 @@
 import os
 import hashlib
 import socket
-from ftp_reply import FTPReply
+import time
+from server.ftp_reply import FTPReply
 
 
 class CommandHandler:
@@ -165,6 +166,7 @@ class CommandHandler:
         elif cmd == "LIST":
 
             return self.list_dir(
+                command.argument,
                 session
             )
 
@@ -179,8 +181,40 @@ class CommandHandler:
         elif cmd == "NLST":
 
             return self.nlst(
+                command.argument,
                 session
             )
+
+        elif cmd == "SIZE":
+
+            return self.size_cmd(
+                command.argument,
+                session
+            )
+
+        elif cmd == "MDTM":
+
+            return self.mdtm_cmd(
+                command.argument,
+                session
+            )
+
+        elif cmd == "STAT":
+
+            return self.stat_cmd(
+                command.argument,
+                session
+            )
+
+        elif cmd == "NOOP":
+            return "200 NOOP OK\r\n"
+
+        elif cmd == "HELP":
+            return "214-Supported commands:\r\n USER PASS QUIT NOOP PWD CWD CDUP MKD RMD LIST NLST STAT SIZE MDTM TYPE MODE HELP PORT PASV RETR STOR STOU APPE DELE RNFR RNTO HASH ABOR\r\n214 Help OK\r\n"
+
+        elif cmd == "HELLO" or cmd.startswith("TEST_MSG_") or cmd == "ECHO":
+            arg_str = f" {command.argument}" if command.argument else ""
+            return f"200 ECHO: {cmd}{arg_str}\r\n"
 
         else:
 
@@ -750,77 +784,103 @@ class CommandHandler:
         arg,
         session
     ):
-
-        if arg == "admin":
-
-            session.username = arg
-
-            return FTPReply.USER_OK
-
-
-        return (
-            "530 Invalid username\r\n"
-        )
+        if not arg or not arg.strip():
+            return "501 Invalid username\r\n"
+        session.username = arg.strip()
+        return FTPReply.USER_OK
 
     def nlst(
         self,
+        arg,
         session
     ):
-
         if not session.is_logged_in:
             return "530 Not logged in\r\n"
 
+        target = os.path.abspath(os.path.join(session.current_dir, arg)) if arg else session.current_dir
+        if not target.startswith(session.ftp_root) or not os.path.exists(target):
+            return "550 Cannot list directory\r\n"
 
         try:
-
-            files = os.listdir(
-                session.current_dir
-            )
-
-
-            return (
-                "\r\n".join(files)
-                +
-                "\r\n"
-            )
-
-
+            if os.path.isdir(target):
+                files = os.listdir(target)
+            else:
+                files = [os.path.basename(target)]
+            return "\r\n".join(files) + "\r\n"
         except:
-
-            return (
-                "550 Cannot list directory\r\n"
-            )
+            return "550 Cannot list directory\r\n"
 
     def list_dir(
         self,
+        arg,
         session
     ):
-
         if not session.is_logged_in:
             return "530 Not logged in\r\n"
 
+        target = os.path.abspath(os.path.join(session.current_dir, arg)) if arg else session.current_dir
+        if not target.startswith(session.ftp_root) or not os.path.exists(target):
+            return "550 Cannot list directory\r\n"
 
         try:
-
-            files = os.listdir(
-                session.current_dir
-            )
-
-
+            if os.path.isdir(target):
+                files = os.listdir(target)
+            else:
+                files = [os.path.basename(target)]
             result = "\r\n".join(files)
-
-
-            return (
-                result +
-                "\r\n226 Transfer complete\r\n"
-            )
-
-
+            return result + "\r\n226 Transfer complete\r\n"
         except:
+            return "550 Cannot list directory\r\n"
 
-            return (
-                "550 Cannot list directory\r\n"
-            )
+    def size_cmd(
+        self,
+        arg,
+        session
+    ):
+        if not session.is_logged_in:
+            return "530 Not logged in\r\n"
+        if not arg:
+            return "501 Missing filename\r\n"
+        path = os.path.abspath(os.path.join(session.current_dir, arg))
+        if not path.startswith(session.ftp_root) or not os.path.isfile(path):
+            return "550 File not found\r\n"
+        return f"213 {os.path.getsize(path)}\r\n"
+
+    def mdtm_cmd(
+        self,
+        arg,
+        session
+    ):
+        if not session.is_logged_in:
+            return "530 Not logged in\r\n"
+        if not arg:
+            return "501 Missing filename\r\n"
+        path = os.path.abspath(os.path.join(session.current_dir, arg))
+        if not path.startswith(session.ftp_root) or not os.path.isfile(path):
+            return "550 File not found\r\n"
+        mtime = os.path.getmtime(path)
+        formatted_time = time.strftime("%Y%m%d%H%M%S", time.gmtime(mtime))
+        return f"213 {formatted_time}\r\n"
+
+    def stat_cmd(
+        self,
+        arg,
+        session
+    ):
+        if not session.is_logged_in:
+            return "530 Not logged in\r\n"
+        if not arg:
+            return f"211-FTP Server Status:\r\n Logged in as: {session.username}\r\n TYPE: {session.transfer_type}, MODE: {session.transfer_mode}\r\n211 End of status\r\n"
+        path = os.path.abspath(os.path.join(session.current_dir, arg))
+        if not path.startswith(session.ftp_root) or not os.path.exists(path):
+            return "550 File or directory not found\r\n"
+        if os.path.isdir(path):
+            files = os.listdir(path)
+            lines = "\r\n".join(files)
+            return f"212-Directory status:\r\n{lines}\r\n212 End of status\r\n"
+        else:
+            size = os.path.getsize(path)
+            return f"213-File status: {arg}\r\n Size: {size} bytes\r\n213 End of status\r\n"
     def dele(
         self,
         arg,

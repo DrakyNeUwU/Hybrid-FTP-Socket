@@ -1,11 +1,11 @@
 import threading
 import socket
 
-from command_parser import CommandParser
-from command_handler import CommandHandler
-from session import Session
-from ftp_reply import FTPReply
-from transfer_manager import TransferManager
+from server.command_parser import CommandParser
+from server.command_handler import CommandHandler
+from server.session import Session
+from server.ftp_reply import FTPReply
+from server.transfer_manager import TransferManager
 
 
 class ClientHandler(threading.Thread):
@@ -22,21 +22,19 @@ class ClientHandler(threading.Thread):
         self.socket = sock
         self.addr = addr
         self.server = server
-
+        self.session_id = server.next_session_id() if server else "S000000"
 
         # mỗi client một session riêng
         self.session = Session(
             ftp_root="./ftp_root"
         )
-
+        self.session.session_id = self.session_id
 
         self.transfer_manager = TransferManager()
 
         self.handler = CommandHandler(
             self.transfer_manager
         )
-
-
 
     def run(self):
 
@@ -81,32 +79,30 @@ class ClientHandler(threading.Thread):
                 if command.name == "QUIT":
                     break
 
-
-
         except ConnectionResetError:
 
             pass
-
 
         finally:
 
             self.cleanup()
 
-
-
-    def send(self,response):
-
-        self.socket.sendall(
-            response.encode()
-        )
-
-
+    def send(self, response):
+        try:
+            self.socket.sendall(
+                response.encode()
+            )
+        except OSError:
+            pass
 
     def cleanup(self):
-
+        if self.server:
+            try:
+                self.server.unregister_client(self)
+            except:
+                pass
         try:
             self.socket.close()
-
         except:
             pass
 

@@ -19,6 +19,8 @@ def read_file_bytes(path: str) -> bytes:
     with open(path, "rb") as f:
         return f.read()
 
+read_file = read_file_bytes
+
 def write_file(path: str, data: bytes) -> int:
     parent_dir = os.path.dirname(path)
     if parent_dir:
@@ -38,6 +40,7 @@ def write_file_from_chunks(path: str, chunks) -> int:
     return total_written
 
 def append_to_file(path: str, data: bytes) -> int:
+    parent_dir = os.path.dirname(path)
     if parent_dir:
         os.makedirs(parent_dir, exist_ok=True)
     with open(path, "ab") as f:
