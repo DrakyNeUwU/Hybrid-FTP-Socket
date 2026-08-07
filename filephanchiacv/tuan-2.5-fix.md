@@ -275,3 +275,182 @@ Commit theo mẫu `[role][module] short imperative description`; mỗi commit ch
 7. **C chủ trì:** chạy multi-client, full regression và thu evidence.
 
 Không tối ưu Selective Repeat/sliding window trước khi toàn bộ checklist core ở trên đạt.
+
+## 11. Kết quả kiểm tra lại Role A và Role B — 07/08/2026
+
+Phần này ghi các thiếu sót tìm thấy khi đối chiếu code production với
+`Project1_SocketProgramming_2026.md` và `tuan-2-chi-tiet.md`. Các mục dưới đây
+chưa được xem là hoàn thành chỉ vì unit test đơn giản đang pass.
+
+### 11.1 Role A — thiếu sót cụ thể cần sửa
+
+#### TCP parser và vòng đời command
+
+- [ ] Thêm buffer theo từng client và tách command bằng `\r\n` trong
+  `server/client_handler.py`; một lần `recv(1024)` có thể chứa nửa command hoặc
+  nhiều command, không được đưa toàn bộ buffer thành một command duy nhất.
+- [ ] Bắt `UnicodeDecodeError`, lỗi handler và lỗi ngoài `ConnectionResetError`
+  theo từng command; một input xấu không được làm chết client thread mà không có
+  reply/log phù hợp.
+- [ ] Lập bảng số lượng tham số cho toàn bộ command: lệnh không nhận tham số phải
+  từ chối tham số thừa; lệnh bắt buộc tham số phải trả `501` khi thiếu. Hiện các
+  lệnh như `PASS`, `PORT`, `RNTO`, `NOOP`, `PASV`, `QUIT` chưa được kiểm tra đồng
+  nhất.
+- [ ] Xóa command debug `HELLO`, `ECHO`, `TEST_MSG_*` khỏi dispatcher production,
+  hoặc cô lập rõ vào chế độ test; đề chỉ cho phép danh sách command mục 2.2.
+- [ ] Sửa authentication thành contract tài khoản rõ ràng; hiện mọi username
+  không rỗng đều đăng nhập được bằng password hard-code `123456`. Reset state
+  đăng nhập đúng khi `USER` mới, `QUIT` và disconnect.
+
+#### Command, path và reply
+
+- [ ] Thay toàn bộ `os.path.join`, `abspath`, `startswith`, `open`, `os.rename`,
+  `os.remove`, `os.mkdir`, `os.rmdir`, `os.listdir` trực tiếp trong
+  `server/command_handler.py` bằng filesystem service của C. Phải chặn prefix
+  collision và symlink escape cho `CWD`, `LIST`, `NLST`, `SIZE`, `MDTM`, `HASH`,
+  `MKD`, `RMD`, `DELE`, `RNFR/RNTO`, `RETR`, `STOR`, `STOU`, `APPE`.
+- [ ] Sửa `LIST` thành detailed listing có tối thiểu name, size, type và
+  permissions; hiện code chỉ trả tên giống `NLST`. Chốt LIST/NLST đi trên data
+  channel hay control channel và làm nhất quán với sequence diagram/reply
+  `150 -> 226`.
+- [ ] Reset `rename_from` cả khi `RNTO` thiếu tham số, thất bại, có command phá
+  chuỗi, `QUIT` hoặc disconnect; validate cả source và destination qua filesystem
+  service.
+- [ ] `PORT` phải kiểm tra đúng 6 số nguyên trong `0..255`, port khác 0 và IP theo
+  policy chống FTP bounce (thường phải trùng IP TCP peer). Hiện code nhận số âm,
+  số lớn và IP tùy ý.
+- [ ] `PASV` phải đóng UDP socket/endpoint cũ trước khi tạo endpoint mới, quảng bá
+  đúng server address thay vì luôn `127.0.0.1`, và cleanup socket khi đổi mode,
+  `QUIT`, disconnect hoặc shutdown.
+- [ ] Không dùng `except:` trống trong command path. Ánh xạ lỗi có cấu trúc sang
+  `425`, `426`, `450/550` hoặc `451` để không biến mọi lỗi thành “file not found”.
+
+#### Transfer và cancellation
+
+- [ ] Nối `ClientHandler -> CommandHandler -> TransferManager` với filesystem,
+  sender và receiver production thật. Hiện `ClientHandler` tạo
+  `TransferManager()` không có adapter, nên `STOR/RETR` không thể truyền RDT.
+- [ ] Sửa contract adapter: `TransferManager` đang cần `send(chunks, socket,
+  endpoint, event)` và `receive(socket, endpoint, event) -> Iterable[bytes]`,
+  nhưng Role B hiện cung cấp `send_file_rdt(filepath, ip, port, ...)` và
+  `receive_file_rdt(socket, save_path, ...) -> bool`. Hai API chưa cắm được vào
+  nhau.
+- [ ] Mọi `RETR/STOR/STOU/APPE` phải trả `150` trước khi bắt đầu thật và chỉ trả
+  `226` sau khi RDT + commit thành công. Hiện `STOR/RETR` chỉ trả kết quả cuối;
+  `STOU/APPE` chỉ tạo state và trả `150` nhưng không chạy transfer.
+- [ ] `STOU` phải gọi `upload_unique()` và trả tên duy nhất thật; không dùng cố
+  định `upload_001`. `APPE` phải gọi `append()` với lock và lifecycle file tạm.
+- [ ] `ABOR` phải gọi `TransferManager.cancel(session)`; hiện chỉ đặt boolean nên
+  không đánh thức receiver, không đóng socket và không dọn file tạm.
+- [ ] Chạy transfer trong worker/state machine phù hợp để TCP thread vẫn nhận được
+  `ABOR` trong lúc transfer đang diễn ra; nếu transfer chạy đồng bộ trong chính
+  vòng `recv`, client không thể hủy bằng control channel.
+- [ ] Cleanup phải cancel transfer, đóng data socket, clear endpoint,
+  `rename_from`, cancel event và current transfer; sau đó unregister và join
+  worker hữu hạn. Hiện `ClientHandler.cleanup()` chỉ đóng TCP socket và
+  unregister.
+- [ ] Không dùng fallback bắt `TypeError` rồi gọi adapter lần hai trong
+  `TransferManager._invoke`; cách này có thể che một bug `TypeError` phát sinh
+  bên trong adapter. Chốt một protocol/signature và validate ngay khi inject.
+
+#### Test và tài liệu Role A
+
+- [ ] Thêm test TCP framing: command bị chia qua hai `recv`, hai command trong một
+  `recv`, CRLF thừa, UTF-8 lỗi và command dài hơn buffer.
+- [ ] Thêm test cho mọi command về thiếu/thừa argument, login state, reply code,
+  path traversal, prefix collision, symlink escape, `PORT` bounds/IP policy,
+  PASV socket replacement và RNFR state reset.
+- [ ] Thêm test production cho chuỗi `150 -> 226/425/426/550`, ABOR khi transfer
+  đang chạy, disconnect giữa transfer và cleanup không còn thread/socket.
+- [ ] Sửa `docs/report_role_a_week2.md` và `docs/report.md`: không được ghi “đã
+  hoàn thành/đã test” cho transfer command khi code mới là skeleton hoặc chưa nối
+  RDT production.
+
+### 11.2 Role B — thiếu sót cụ thể cần sửa
+
+#### Header và validation
+
+- [ ] Thêm `transfer_id` vào `RDTHeader` để phân biệt datagram của nhiều transfer;
+  cập nhật byte-level table, network byte order và test round-trip/giới hạn từng
+  field.
+- [ ] Chốt flag hợp lệ và tổ hợp flag hợp lệ. `FLAG_DATA = 0` hiện không thể được
+  nhận diện bằng phép kiểm tra bit; `START` đã khai báo nhưng sender không gửi và
+  receiver không xử lý.
+- [ ] Validate datagram chính xác: `header.length` không vượt chunk/datagram,
+  không lớn hơn số byte payload thật, không có trailing data ngoài contract và
+  packet ngắn phải bị drop an toàn.
+- [ ] Chốt checksum bao phủ header quan trọng + payload, hoặc giải thích rõ nếu
+  chỉ bao phủ payload. Sender phải kiểm tra checksum/length/flags của ACK; hiện
+  ACK giả hoặc ACK hỏng vẫn có thể được chấp nhận.
+
+#### Stop-and-Wait và protocol correctness
+
+- [ ] Receiver chỉ gửi ACK sau khi phân loại sequence. Hiện
+  `common/rdt_receiver.py` gửi ACK trước khi kiểm tra `expected_seq`, vì vậy gói
+  future/out-of-order cũng được ACK và sender có thể bỏ qua dữ liệu chưa ghi.
+- [ ] Sender chỉ nhận ACK từ đúng UDP peer, đúng `seq_num/ack_num`, đúng
+  `transfer_id`, đúng flag, length và checksum. Hiện địa chỉ trả về từ
+  `recvfrom()` bị bỏ qua.
+- [ ] Receiver khóa đúng peer + transfer sau START; drop packet từ peer/transfer
+  khác và không gửi ACK gây nhiễu.
+- [ ] Xử lý mất ACK của FIN: receiver không được thoát theo cách khiến FIN gửi lại
+  không còn ai ACK. Cần FIN/ACK closing state với timeout hữu hạn hoặc handshake
+  tương đương.
+- [ ] Receiver phải có inactivity timeout/retry budget hữu hạn. Hiện
+  `socket.timeout` chỉ `continue`, nên có thể chạy vô hạn khi sender chết hoặc
+  mất FIN.
+- [ ] ABORT phải có state rõ ràng ở cả hai phía, được xác nhận nếu contract yêu
+  cầu, và mọi đường thoát phải cleanup bằng `try/finally`. Hiện receiver gặp
+  ABORT trả `False` nhưng không tự đóng/dọn socket nhất quán.
+- [ ] Quy định giới hạn sequence number và test wrap-around; hiện sequence tăng
+  theo `enumerate()` đến khi `struct.pack('!I')` lỗi với file đủ lớn.
+- [ ] Không `list(read_file_chunks(filepath))` toàn bộ file trong RAM. Sender phải
+  stream chunk và dùng look-ahead/metadata để đánh FIN, bảo đảm file lớn vẫn
+  truyền được.
+- [ ] Progress callback phải có contract thống nhất; sender gọi
+  `(transferred_bytes, total_size)` nhưng receiver chỉ gọi `(len(payload))`.
+
+#### Fault injection, integration và tài liệu Role B
+
+- [ ] Chuyển các test trong `tests/test_rdt.py` từ kiểm tra biến giả sang gọi
+  sender/receiver production; các test hiện tại không chứng minh retransmit,
+  duplicate handling, reorder hoặc max-retry của code thật.
+- [ ] Bổ sung fault proxy deterministic cho từng ca riêng: mất DATA, mất ACK (đặc
+  biệt ACK của FIN), delay, duplicate, reorder, corrupt header, corrupt payload,
+  ACK sai peer/sequence/transfer, hết retry và ABORT. Dùng port động thay vì cố
+  định `8888/9996/9997/9999` để tránh xung đột và test flaky.
+- [ ] Test sender/receiver production với file nhỏ hơn chunk, đúng một chunk,
+  đúng bội chunk, lớn hơn nhiều chunk, file rỗng và binary; mọi ca phải join
+  thread hữu hạn, so SHA-256 và kiểm tra không còn socket/file tạm.
+- [ ] Viết adapter đúng contract của `TransferManager` và test tích hợp qua
+  `RETR/STOR` thật; test RDT độc lập chưa chứng minh hệ thống Hybrid FTP chạy
+  end-to-end.
+- [ ] Cập nhật `docs/report.md` với header thực tế, sender/receiver state machine,
+  FIN closing state, timeout/retry, peer/transfer validation và cancellation;
+  cập nhật `docs/genai-log-b.md` bằng nội dung thật thay cho template.
+
+### 11.3 Bằng chứng kiểm tra hiện tại
+
+- Lệnh `wsl python3 -m pytest -q` chưa chạy được vì WSL2 thiếu package `pytest`.
+- Lệnh `wsl python3 -m unittest discover -s tests -v` chạy 27 test: 21 pass,
+  1 fail và 5 lỗi import. Ca fail là
+  `TestRDTFaultInjection.test_loss_and_corruption_recovery`: sender hết 10 lần
+  retry ở packet FIN cuối và trả `False`.
+- Năm lỗi import đến từ các module test cần `pytest`, không phải bằng chứng code
+  production pass: `test_cli_display`, `test_dir_manager`, `test_file_handler`,
+  `test_filesystem_service`, `test_threaded_server`.
+- Các test Role A hiện pass trong lần chạy `unittest`, nhưng mới kiểm tra happy
+  path cơ bản; chưa bao phủ framing TCP, RDT integration, cancellation thật,
+  path/symlink attack và cleanup giữa transfer.
+
+### 11.4 Exit gate bổ sung sau audit
+
+- [ ] Cài dependency test theo README/AGENTS và chạy
+  `python -m pytest -v` trên Linux/WSL2; collection phải sạch và toàn bộ suite
+  pass ít nhất 3 lần liên tiếp (fault test không flaky).
+- [ ] Có một test end-to-end đi qua đúng code production:
+  `TCP command -> TransferManager -> RDT adapter -> UDP socket -> filesystem`,
+  không gọi tắt helper test.
+- [ ] Có trace/evidence cho ACK của FIN bị mất, out-of-order không được ACK sai,
+  ABOR giữa transfer và receiver timeout; tất cả kết thúc hữu hạn, hash đúng và
+  không còn worker/socket/file tạm.
