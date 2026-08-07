@@ -1,4 +1,5 @@
 import os
+import threading
 class Session:
 
     def __init__(self, ftp_root="./ftp_root"):
@@ -19,4 +20,5 @@ class Session:
         self.data_socket = None
         self.data_mode = None
         self.transfer_cancelled = False
+        self.transfer_cancel_event = None
         self.current_transfer = None
