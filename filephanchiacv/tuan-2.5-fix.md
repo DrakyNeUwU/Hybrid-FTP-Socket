@@ -21,15 +21,15 @@
 
 ### Role A — việc của A
 
-- [ ] Sửa import package trong `server/` và chạy được `python -m server.threaded_server`.
+- [x] Sửa import package trong `server/`; `server.threaded_server` import được từ repository root. Việc chạy server thực tế vẫn cần kiểm tra trên Linux/WSL2.
 - [ ] Hoàn thiện `TransferManager.upload()` và `download()`; không còn `pass`.
 - [ ] Hoàn thiện `RETR`, `STOR`, `STOU`, `APPE`, `HASH`, `ABOR` qua RDT thật.
-- [ ] Bổ sung `NOOP`, `STAT`, `SIZE`, `MDTM`, `HELP`.
+- [x] Bổ sung `NOOP`, `STAT`, `SIZE`, `MDTM`, `HELP`.
 - [ ] Đảm bảo reply `150 → 226`; lỗi trả `425`/`426`/`550` đúng nguyên nhân.
 - [ ] Dùng filesystem service của C cho mọi client path.
 - [ ] Sửa `PORT`, `PASV`, RNFR/RNTO, session isolation và cleanup.
-- [ ] Viết test cho parser, session và command; không để file test rỗng.
-- [ ] Cập nhật `docs/genai-log-a.md` và phần TCP trong `docs/report.md`.
+- [x] Viết test cơ bản cho parser, session và command; các file test không còn rỗng. Coverage transfer/security vẫn thiếu.
+- [x] Cập nhật `docs/genai-log-a.md` và phần TCP trong `docs/report.md`; cần chỉnh lại các claim transfer nếu chưa có E2E evidence.
 
 ### Role B — việc của B
 
@@ -145,9 +145,9 @@ sender.send(chunks, data_socket, endpoint, cancel_event) -> int | bool
 
 ### Role A
 
-- [ ] Sửa import trong `server/threaded_server.py`, `client_handler.py`, `command_handler.py`.
-- [ ] Không dùng `sys.path` để che lỗi package nếu có thể dùng import chuẩn.
-- [ ] `server.threaded_server` import được từ repository root.
+- [x] Sửa import trong `server/threaded_server.py`, `client_handler.py`, `command_handler.py`.
+- [x] Không dùng `sys.path` để che lỗi package trong các module Role A hiện tại.
+- [x] `server.threaded_server` import được từ repository root; chưa xác nhận startup/stop sạch trên Linux/WSL2.
 
 ### Role B
 
@@ -203,32 +203,32 @@ sender.send(chunks, data_socket, endpoint, cancel_event) -> int | bool
 
 ### Parser và command
 
-- [ ] Input rỗng, whitespace, command lạ, thiếu/thừa argument không làm chết thread.
-- [ ] Có đủ: `USER`, `PASS`, `QUIT`, `NOOP`, `PWD`, `CWD`, `CDUP`, `MKD`, `RMD`, `LIST`, `NLST`, `STAT`, `SIZE`, `MDTM`, `TYPE`, `MODE`, `HELP`, `PORT`, `PASV`, `RETR`, `STOR`, `STOU`, `APPE`, `DELE`, `RNFR`, `RNTO`, `HASH`, `ABOR`.
-- [ ] `MODE B/C` trả `502` nếu chưa hỗ trợ thật.
-- [ ] `LIST` là detailed listing; `NLST` là tên file; hỗ trợ optional path.
+- [x] Input lỗi cơ bản, command lạ và UTF-8 lỗi không làm chết client thread; test framing đã có. Ma trận thiếu/thừa argument chưa đầy đủ.
+- [x] Có đủ dispatcher cho toàn bộ command: `USER`, `PASS`, `QUIT`, `NOOP`, `PWD`, `CWD`, `CDUP`, `MKD`, `RMD`, `LIST`, `NLST`, `STAT`, `SIZE`, `MDTM`, `TYPE`, `MODE`, `HELP`, `PORT`, `PASV`, `RETR`, `STOR`, `STOU`, `APPE`, `DELE`, `RNFR`, `RNTO`, `HASH`, `ABOR`.
+- [x] `MODE B/C` trả `502` nếu chưa hỗ trợ thật.
+- [x] `LIST` là detailed listing; `NLST` là tên file; hỗ trợ optional path.
 
 ### Session và endpoint
 
-- [ ] Mỗi client có login, cwd, TYPE, MODE, endpoint, RNFR, transfer ID và cancel state riêng.
-- [ ] `RNTO` chỉ hợp lệ sau `RNFR`; reset state sau success/failure/QUIT/disconnect.
-- [ ] `PORT` kiểm tra đủ 6 số, từng số `0..255`, port hợp lệ và policy IP.
-- [ ] `PASV` dùng UDP endpoint, đóng endpoint cũ khi đổi mode.
-- [ ] Không dùng string-prefix để bảo vệ FTP root.
+- [ ] Mỗi client có login, cwd, TYPE, MODE, endpoint, RNFR và cancel state riêng; transfer ID/session isolation cho transfer thật chưa hoàn tất.
+- [x] `RNTO` chỉ hợp lệ sau `RNFR`; reset state sau success/failure/QUIT/disconnect.
+- [ ] `PORT` kiểm tra đủ 6 số, từng số `0..255`, port hợp lệ; policy IP chống FTP bounce chưa hoàn tất.
+- [x] `PASV` dùng UDP endpoint và đóng endpoint cũ khi tạo PASV mới; cleanup khi đổi mode/shutdown cần bổ sung kiểm chứng.
+- [ ] Không dùng trực tiếp path API ngoài filesystem service để bảo vệ FTP root; `SIZE`, `MDTM`, `HASH` vẫn còn thao tác filesystem trực tiếp.
 
 ### Transfer và cleanup
 
 - [ ] `TransferManager` gọi RDT B + filesystem C.
 - [ ] `STOU` không dùng tên cố định.
 - [ ] `ABOR` đánh thức/dừng worker, đóng data socket và dọn file tạm.
-- [ ] `ClientHandler` có session ID và unregister khi cleanup.
+- [x] `ClientHandler` có session ID và unregister khi cleanup.
 - [ ] QUIT/disconnect/shutdown không để thread/socket/session stale.
 
 ### Test Role A
 
-- [ ] `tests/test_command_parser.py` có test thật.
-- [ ] `tests/test_session.py` có test thật.
-- [ ] `tests/test_commands.py` có test thật.
+- [x] `tests/test_command_parser.py` có test thật.
+- [x] `tests/test_session.py` có test thật.
+- [x] `tests/test_commands.py` có test thật.
 - [ ] Có test happy path, invalid argument/state/path, reply, isolation, disconnect và cleanup.
 
 ## 6. Phase 3 — Tích hợp A + B + C
@@ -318,7 +318,7 @@ chưa được xem là hoàn thành chỉ vì unit test đơn giản đang pass.
 
 #### TCP parser và vòng đời command
 
-- [ ] Thêm buffer theo từng client và tách command bằng `\r\n` trong
+- [x] Thêm buffer theo từng client và tách command bằng `\r\n` trong
   `server/client_handler.py`; một lần `recv(1024)` có thể chứa nửa command hoặc
   nhiều command, không được đưa toàn bộ buffer thành một command duy nhất.
 - [ ] Bắt `UnicodeDecodeError`, lỗi handler và lỗi ngoài `ConnectionResetError`
@@ -328,7 +328,7 @@ chưa được xem là hoàn thành chỉ vì unit test đơn giản đang pass.
   từ chối tham số thừa; lệnh bắt buộc tham số phải trả `501` khi thiếu. Hiện các
   lệnh như `PASS`, `PORT`, `RNTO`, `NOOP`, `PASV`, `QUIT` chưa được kiểm tra đồng
   nhất.
-- [ ] Xóa command debug `HELLO`, `ECHO`, `TEST_MSG_*` khỏi dispatcher production,
+- [x] Xóa command debug `HELLO`, `ECHO`, `TEST_MSG_*` khỏi dispatcher production,
   hoặc cô lập rõ vào chế độ test; đề chỉ cho phép danh sách command mục 2.2.
 - [ ] Sửa authentication thành contract tài khoản rõ ràng; hiện mọi username
   không rỗng đều đăng nhập được bằng password hard-code `123456`. Reset state
@@ -341,11 +341,11 @@ chưa được xem là hoàn thành chỉ vì unit test đơn giản đang pass.
   `server/command_handler.py` bằng filesystem service của C. Phải chặn prefix
   collision và symlink escape cho `CWD`, `LIST`, `NLST`, `SIZE`, `MDTM`, `HASH`,
   `MKD`, `RMD`, `DELE`, `RNFR/RNTO`, `RETR`, `STOR`, `STOU`, `APPE`.
-- [ ] Sửa `LIST` thành detailed listing có tối thiểu name, size, type và
+- [x] Sửa `LIST` thành detailed listing có tối thiểu name, size, type và
   permissions; hiện code chỉ trả tên giống `NLST`. Chốt LIST/NLST đi trên data
   channel hay control channel và làm nhất quán với sequence diagram/reply
   `150 -> 226`.
-- [ ] Reset `rename_from` cả khi `RNTO` thiếu tham số, thất bại, có command phá
+- [x] Reset `rename_from` cả khi `RNTO` thiếu tham số, thất bại, có command phá
   chuỗi, `QUIT` hoặc disconnect; validate cả source và destination qua filesystem
   service.
 - [ ] `PORT` phải kiểm tra đúng 6 số nguyên trong `0..255`, port khác 0 và IP theo
@@ -387,7 +387,7 @@ chưa được xem là hoàn thành chỉ vì unit test đơn giản đang pass.
 
 #### Test và tài liệu Role A
 
-- [ ] Thêm test TCP framing: command bị chia qua hai `recv`, hai command trong một
+- [x] Thêm test TCP framing: command bị chia qua hai `recv`, hai command trong một
   `recv`, CRLF thừa, UTF-8 lỗi và command dài hơn buffer.
 - [ ] Thêm test cho mọi command về thiếu/thừa argument, login state, reply code,
   path traversal, prefix collision, symlink escape, `PORT` bounds/IP policy,
