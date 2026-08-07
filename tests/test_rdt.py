@@ -1,68 +1,367 @@
-# File: tests/test_rdt.py
+import socket
+import struct
+import threading
+import time
 import unittest
-import sys  
+import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from common.RDTHeader import RDTHeader
 
-class TestRDTLogic(unittest.TestCase):
-    # 1. Mất data
-    def test_loss_data_packet(self):
-        # khi Sender gửi nhưng Data bị drop hoàn toàn
-        packet_sent = True
-        data_lost = True
-        received = False if data_lost else True
-        self.assertFalse(received)
+def make_data_packet(transfer_id: int, seq: int, payload: bytes, is_fin: bool = False) -> bytes:
+    flags = RDTHeader.FLAG_FIN if is_fin else RDTHeader.FLAG_DATA
+    hdr = RDTHeader(
+        transfer_id=transfer_id, seq_num=seq, ack_num=0,
+        flags=flags, length=len(payload)
+    )
+    hdr.checksum = hdr.compute_checksum(payload)
+    return hdr.serialize() + payload
 
-    # 2. Mất ACK 
-    def test_loss_ack_packet(self):
-        # Receiver đã nhận gói nhưng ACK gửi về bị drop
-        ack_lost = True
-        sender_received_ack = False if ack_lost else True
-        self.assertFalse(sender_received_ack)
 
-    # 3. Delayed Packet 
-    def test_delayed_packet(self):
-        import time
-        timeout = 0.1
-        start_time = time.time()
-        time.sleep(0.15) # khi packet đến sau khoảng timeout
-        elapsed = time.time() - start_time
-        is_timeout = elapsed > timeout
-        self.assertTrue(is_timeout)
+def make_ack_packet(transfer_id: int, ack_seq: int) -> bytes:
+    hdr = RDTHeader(
+        transfer_id=transfer_id, seq_num=0, ack_num=ack_seq,
+        flags=RDTHeader.FLAG_ACK, length=0
+    )
+    hdr.checksum = hdr.compute_checksum(b"")
+    return hdr.serialize()
 
-    # 4. Duplicate Packet 
-    def test_duplicate_packet_detection(self):
-        last_expected_seq = 1
-        received_seq = 0 # Gói cũ gửi lại
-        is_duplicate = (received_seq < last_expected_seq)
-        self.assertTrue(is_duplicate)
+class TestRDTHeader(unittest.TestCase):
 
-    # 5. Packet lỗi checksum 
+    def test_serialize_deserialize_roundtrip(self):
+        hdr = RDTHeader(transfer_id=42, seq_num=7, ack_num=6,
+                        flags=RDTHeader.FLAG_DATA, length=100)
+        hdr.checksum = hdr.compute_checksum(b"x" * 100)
+        raw = hdr.serialize()
+        self.assertEqual(len(raw), RDTHeader.size)
+        hdr2 = RDTHeader.deserialize(raw)
+        self.assertEqual(hdr2.transfer_id, 42)
+        self.assertEqual(hdr2.seq_num, 7)
+        self.assertEqual(hdr2.ack_num, 6)
+        self.assertEqual(hdr2.flags, RDTHeader.FLAG_DATA)
+        self.assertEqual(hdr2.length, 100)
+        self.assertEqual(hdr2.checksum, hdr.checksum)
+
+    def test_checksum_valid(self):
+        payload = b"Hello World"
+        hdr = RDTHeader(transfer_id=1, seq_num=0, ack_num=0,
+                        flags=RDTHeader.FLAG_DATA, length=len(payload))
+        hdr.checksum = hdr.compute_checksum(payload)
+        self.assertTrue(hdr.verify_checksum(payload))
+
     def test_corrupted_checksum(self):
-        header = RDTHeader(seq_num=1, ack_num=0, flags=RDTHeader.FLAG_DATA, length=5)
-        header.checksum = 123456 # Checksum sai
         payload = b"Hello"
-        self.assertFalse(header.verify_checksum(payload))
+        hdr = RDTHeader(transfer_id=1, seq_num=1, ack_num=0,
+                        flags=RDTHeader.FLAG_DATA, length=5)
+        hdr.checksum = hdr.compute_checksum(payload)
+        hdr.checksum ^= 0xDEAD  # flip bits
+        self.assertFalse(hdr.verify_checksum(payload))
 
-    # 6. Out of order
-    def test_out_of_order_packet(self):
-        expected_seq = 1
-        received_seq = 2 # Nhận nhảy cóc
-        is_out_of_order = (received_seq != expected_seq)
-        self.assertTrue(is_out_of_order)
+    def test_corrupted_payload_detected(self):
+        payload = b"Original"
+        hdr = RDTHeader(transfer_id=1, seq_num=0, ack_num=0,
+                        flags=RDTHeader.FLAG_DATA, length=len(payload))
+        hdr.checksum = hdr.compute_checksum(payload)
+        self.assertFalse(hdr.verify_checksum(b"Corrupted"))
 
-    # 7. lố retransmit 
-    def test_max_retransmit_exceeded(self):
-        max_retries = 5
-        retries = 0
-        ack_received = False # Mất mạng
+    def test_deserialize_too_short_raises(self):
+        with self.assertRaises(ValueError):
+            RDTHeader.deserialize(b"\x00" * (RDTHeader.size - 1))
+
+    def test_flag_bitmask_combinations(self):
+        combined = RDTHeader.FLAG_DATA | RDTHeader.FLAG_FIN
+        self.assertTrue(combined & RDTHeader.FLAG_DATA)
+        self.assertTrue(combined & RDTHeader.FLAG_FIN)
+        self.assertFalse(combined & RDTHeader.FLAG_ACK)
+        self.assertFalse(combined & RDTHeader.FLAG_ABORT)
+
+    def test_flag_data_not_zero(self):
+        self.assertNotEqual(RDTHeader.FLAG_DATA, 0)
+
+    def test_checksum_different_seq_gives_different_hash(self):
+        payload = b"same payload"
+        hdr0 = RDTHeader(transfer_id=1, seq_num=0, ack_num=0,
+                         flags=RDTHeader.FLAG_DATA, length=len(payload))
+        hdr1 = RDTHeader(transfer_id=1, seq_num=1, ack_num=0,
+                         flags=RDTHeader.FLAG_DATA, length=len(payload))
+        self.assertNotEqual(
+            hdr0.compute_checksum(payload),
+            hdr1.compute_checksum(payload),
+            "Checksum phải cover seq_num trong header"
+        )
+    def test_is_valid_flags_accepts_known_combinations(self):
+        self.assertTrue(RDTHeader.is_valid_flags(RDTHeader.FLAG_DATA))
+        self.assertTrue(RDTHeader.is_valid_flags(RDTHeader.FLAG_FIN))
+        self.assertTrue(RDTHeader.is_valid_flags(RDTHeader.FLAG_DATA | RDTHeader.FLAG_FIN))
+        self.assertTrue(RDTHeader.is_valid_flags(RDTHeader.FLAG_ACK))
+        self.assertTrue(RDTHeader.is_valid_flags(RDTHeader.FLAG_START))
+        self.assertTrue(RDTHeader.is_valid_flags(RDTHeader.FLAG_ABORT))
+
+    def test_is_valid_flags_rejects_zero(self):
+        self.assertFalse(RDTHeader.is_valid_flags(0))
+
+    def test_is_valid_flags_rejects_unknown_combo(self):
+        self.assertFalse(RDTHeader.is_valid_flags(RDTHeader.FLAG_DATA | RDTHeader.FLAG_ACK))
+    def test_validate_length_exact(self):
+        hdr = RDTHeader(transfer_id=1, seq_num=0, ack_num=0,
+                        flags=RDTHeader.FLAG_DATA, length=5)
+        packet = hdr.serialize() + b"hello"  # 20 + 5 = 25 bytes
+        self.assertTrue(hdr.validate_length(packet))
+
+    def test_validate_length_overflow(self):
+        hdr = RDTHeader(transfer_id=1, seq_num=0, ack_num=0,
+                        flags=RDTHeader.FLAG_DATA, length=100)
+        packet = hdr.serialize() + b"short"  # length=100 nhưng chỉ 5 bytes payload
+        self.assertFalse(hdr.validate_length(packet))
+
+    def test_validate_length_zero(self):
+        hdr = RDTHeader(transfer_id=1, seq_num=0, ack_num=0,
+                        flags=RDTHeader.FLAG_ACK, length=0)
+        packet = hdr.serialize()
+        self.assertTrue(hdr.validate_length(packet))
+
+class _UDPPair:
+    def __init__(self):
+        self.sender_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.receiver_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sender_sock.bind(("127.0.0.1", 0))
+        self.receiver_sock.bind(("127.0.0.1", 0))
+        self.sender_addr = self.sender_sock.getsockname()
+        self.receiver_addr = self.receiver_sock.getsockname()
+
+    def close(self):
+        self.sender_sock.close()
+        self.receiver_sock.close()
+
+
+class TestRDTSendReceiveIntegration(unittest.TestCase):
+    def _run_transfer(self, payload_data: bytes) -> bytes:
+        from common.rdt_sender import send_chunks_rdt
+        from common.rdt_receiver import receive_chunks_rdt
+
+        pair = _UDPPair()
+        transfer_id = 0xABCD1234
+        received: list[bytes] = []
+        errors: list[str] = []
+        ready = threading.Event()   
+
+        def _receiver():
+            ready.set()  
+            try:
+                for chunk in receive_chunks_rdt(
+                    pair.receiver_sock,
+                    transfer_id_hint=transfer_id,
+                    timeout_s=1.0,
+                    max_timeouts=5,
+                ):
+                    received.append(chunk)
+            except RuntimeError as e:
+                errors.append(str(e))
+
+        rec_thread = threading.Thread(target=_receiver, daemon=True)
+        rec_thread.start()
+        ready.wait(timeout=2.0)
+
+        chunks = [payload_data[i:i+512] for i in range(0, max(1, len(payload_data)), 512)]
+        if not payload_data:
+            chunks = [b""]
+
+        try:
+            send_chunks_rdt(
+                iter(chunks),
+                "127.0.0.1",
+                pair.receiver_addr[1],
+                transfer_id,
+                udp_socket=pair.sender_sock,
+                timeout_s=0.3,
+                retry_limit=5,
+            )
+        except RuntimeError as e:
+            errors.append(str(e))
+
+        rec_thread.join(timeout=6)
+        pair.close()
+
+        if errors:
+            self.fail(f"Transfer errors: {errors}")
+        return b"".join(received)
+
+    def test_small_payload(self):
+        data = b"Hello RDT World"
+        self.assertEqual(self._run_transfer(data), data)
+
+    def test_empty_payload(self):
+        result = self._run_transfer(b"")
+        self.assertEqual(result, b"")
+
+    def test_multi_chunk(self):
+        data = bytes(range(256)) * 10  
+        self.assertEqual(self._run_transfer(data), data)
+
+    def test_chunk_boundary(self):
+        data = b"A" * 1024
+        self.assertEqual(self._run_transfer(data), data)
+
+
+class TestRDTProtocolLogic(unittest.TestCase):
+
+    def test_checksum_covers_header_fields(self):
+        p = b"data"
+        h0 = RDTHeader(transfer_id=1, seq_num=0, ack_num=0,
+                       flags=RDTHeader.FLAG_DATA, length=len(p))
+        h1 = RDTHeader(transfer_id=1, seq_num=1, ack_num=0,
+                       flags=RDTHeader.FLAG_DATA, length=len(p))
+        self.assertNotEqual(h0.compute_checksum(p), h1.compute_checksum(p))
+
+    def test_ack_validation_requires_matching_seq(self):
+        ack_pkt = make_ack_packet(transfer_id=1, ack_seq=3)
+        hdr = RDTHeader.deserialize(ack_pkt)
+        expected_seq = 5
+        self.assertNotEqual(hdr.ack_num, expected_seq)
+
+    def test_abort_flag_detection(self):
+        hdr = RDTHeader(transfer_id=1, seq_num=0, ack_num=0,
+                        flags=RDTHeader.FLAG_ABORT, length=0)
+        hdr.checksum = hdr.compute_checksum(b"")
+        raw = hdr.serialize()
+        received = RDTHeader.deserialize(raw)
+        self.assertTrue(received.flags & RDTHeader.FLAG_ABORT)
+        self.assertFalse(received.flags & RDTHeader.FLAG_DATA)
         
-        while retries < max_retries and not ack_received:
-            retries += 1
-            
-        self.assertEqual(retries, max_retries)
-        self.assertFalse(ack_received) # Báo lỗi
+    def test_duplicate_not_yielded_twice(self):
+        from common.rdt_receiver import receive_chunks_rdt
+        pair = _UDPPair()
+        received: list[bytes] = []
+        done = threading.Event()
 
-if __name__ == '__main__':
+        def _recv():
+            try:
+                for chunk in receive_chunks_rdt(
+                    pair.receiver_sock,
+                    transfer_id_hint=77,
+                    timeout_s=0.2,
+                    max_timeouts=4,
+                ):
+                    received.append(chunk)
+            except RuntimeError:
+                pass
+            finally:
+                done.set()
+
+        t = threading.Thread(target=_recv, daemon=True)
+        t.start()
+        time.sleep(0.02)
+
+        pkt = make_data_packet(77, 0, b"X", is_fin=True)
+        pair.sender_sock.sendto(pkt, pair.receiver_addr)
+        time.sleep(0.02)
+        pair.sender_sock.sendto(pkt, pair.receiver_addr)  
+        done.wait(timeout=3)
+        t.join(timeout=3)
+        pair.close()
+
+        self.assertEqual(received, [b"X"], f"Phải yield đúng 1 lần, thực tế: {received}")
+
+    def test_out_of_order_dropped_then_recovered(self):
+        from common.rdt_receiver import receive_chunks_rdt
+        pair = _UDPPair()
+        received: list[bytes] = []
+        done = threading.Event()
+
+        def _recv():
+            try:
+                for chunk in receive_chunks_rdt(
+                    pair.receiver_sock,
+                    transfer_id_hint=88,
+                    timeout_s=0.2,
+                    max_timeouts=6,
+                ):
+                    received.append(chunk)
+            except RuntimeError:
+                pass
+            finally:
+                done.set()
+
+        t = threading.Thread(target=_recv, daemon=True)
+        t.start()
+        time.sleep(0.02)
+        pair.sender_sock.sendto(make_data_packet(88, 1, b"B"), pair.receiver_addr)
+        time.sleep(0.02)
+        pair.sender_sock.sendto(make_data_packet(88, 0, b"A"), pair.receiver_addr)
+        time.sleep(0.02)
+        pair.sender_sock.sendto(make_data_packet(88, 1, b"B", is_fin=True), pair.receiver_addr)
+
+        done.wait(timeout=3)
+        t.join(timeout=3)
+        pair.close()
+
+        self.assertEqual(received, [b"A", b"B"])
+
+    def test_max_retry_limit_raises_runtime_error(self):
+        from common.rdt_sender import send_chunks_rdt
+        dummy = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        dummy.bind(("127.0.0.1", 0))
+        dead_port = dummy.getsockname()[1]
+
+        try:
+            with self.assertRaises(RuntimeError):
+                send_chunks_rdt(
+                    iter([b"test-retry"]),
+                    "127.0.0.1",
+                    dead_port,
+                    transfer_id=12345,
+                    timeout_s=0.05,
+                    retry_limit=3,
+                )
+        finally:
+            dummy.close()
+
+    def test_sender_rejects_corrupted_ack(self):
+        from common.rdt_sender import send_chunks_rdt
+        from common.rdt_receiver import receive_chunks_rdt
+
+        pair = _UDPPair()
+        transfer_id = 0xCAFE0001
+        received: list[bytes] = []
+        done = threading.Event()
+
+        def _recv():
+            try:
+                for chunk in receive_chunks_rdt(
+                    pair.receiver_sock,
+                    transfer_id_hint=transfer_id,
+                    timeout_s=0.3,
+                    max_timeouts=5,
+                ):
+                    received.append(chunk)
+            except RuntimeError:
+                pass
+            finally:
+                done.set()
+
+        t = threading.Thread(target=_recv, daemon=True)
+        t.start()
+        time.sleep(0.02)
+        try:
+            send_chunks_rdt(
+                iter([b"ack-test"]),
+                "127.0.0.1",
+                pair.receiver_addr[1],
+                transfer_id,
+                udp_socket=pair.sender_sock,
+                timeout_s=0.3,
+                retry_limit=8,
+            )
+        except RuntimeError:
+            pass
+
+        done.wait(timeout=3)
+        t.join(timeout=3)
+        pair.close()
+        self.assertEqual(b"".join(received), b"ack-test")
+
+
+if __name__ == "__main__":
     unittest.main()
