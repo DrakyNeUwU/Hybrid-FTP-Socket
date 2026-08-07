@@ -9,35 +9,20 @@ from common.RDTHeader import RDTHeader
 
 
 DEFAULT_TIMEOUT_S: float = 1.0
-DEFAULT_MAX_TIMEOUTS: int = 10   # 10 × 1 s inactivity → hủy
-
-# B-08: buffer đủ cho header (20) + payload tối đa (1024) + slack
-_RECV_BUF: int = RDTHeader.size + 1024 + 64  # = 1108 bytes
+DEFAULT_MAX_TIMEOUTS: int = 10  
+_RECV_BUF: int = RDTHeader.size + 1024 + 64 
 
 ProgressCallback = Callable[[str, int, int | None], None]
 
 
 
 class RDTReceiverAdapter:
-    """Wraps receive_chunks_rdt như một TransferManager-compatible RDT receiver.
-
-    Usage::
-
-        adapter = RDTReceiverAdapter()
-        manager = TransferManager(filesystem, receiver=adapter)
-
-    TransferManager calls::
-
-        adapter.receive(data_socket, endpoint, context) -> Iterable[bytes]
-    """
-
     def receive(
         self,
         data_socket: socket.socket,
         endpoint: object,   
         context: object,    
     ) -> Iterator[bytes]:
-        """Nhận chunks qua RDT, trả về generator để FilesystemService.store dùng."""
         transfer_id_hint: int | None = _ctx_transfer_id(context)
         timeout_s: float = getattr(context, "timeout_seconds", DEFAULT_TIMEOUT_S)
 
@@ -61,13 +46,6 @@ def receive_chunks_rdt(
     progress_cb: ProgressCallback | None = None,
     cancel_event: threading.Event | None = None,
 ) -> Iterator[bytes]:
-    """Yield payload chunks từ Stop-and-Wait RDT sender.
-
-    Caller (FilesystemService.store) chịu trách nhiệm ghi và commit atomic.
-
-    Raises:
-        RuntimeError: ABORT, cancel, hoặc inactivity timeout.
-    """
     if cancel_event is None:
         cancel_event = threading.Event()
 
@@ -186,18 +164,13 @@ def receive_file_rdt(
     progress_cb=None,
     is_cancelled=None,
 ) -> bool:
-    """Legacy API giữ cho tests hiện có chạy được.
-
-    Production code nên dùng :class:`RDTReceiverAdapter` + TransferManager.
-    Socket KHÔNG đóng tại đây — caller (test/thread) chịu trách nhiệm close.
-    """
     import os
     from common.file_handler import write_file_from_chunks
 
     cancel_event: threading.Event
     if is_cancelled is not None:
         class _PollEvent(threading.Event):
-            def is_set(self) -> bool:  # type: ignore[override]
+            def is_set(self) -> bool:  
                 return bool(is_cancelled())
         cancel_event = _PollEvent()
     else:
@@ -244,6 +217,35 @@ def _send_ack(
     except OSError:
         pass
 
+def _fin_grace(
+    sock: socket.socket,
+    peer: tuple,
+    transfer_id: int,
+    fin_seq: int,
+    timeout_s: float,
+    grace_attempts: int = 3,
+) -> None:
+    fin_timeout = min(timeout_s, 0.2)
+    sock.settimeout(fin_timeout)
+    for _ in range(grace_attempts):
+        try:
+            data, addr = sock.recvfrom(_RECV_BUF)
+            if addr != peer or len(data) < RDTHeader.size:
+                continue
+            try:
+                hdr = RDTHeader.deserialize(data)
+            except ValueError:
+                continue
+            if (
+                hdr.transfer_id == transfer_id
+                and hdr.seq_num == fin_seq
+                and (hdr.flags & RDTHeader.FLAG_FIN)
+            ):
+                _send_ack(sock, peer, transfer_id, fin_seq)
+        except socket.timeout:
+            continue  
+        except OSError:
+            break
 
 def _fin_grace(
     sock: socket.socket,
