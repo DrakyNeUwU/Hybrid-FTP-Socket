@@ -95,3 +95,82 @@ AI đưa ra các kịch bản kiểm thử cho:
 
 **Refinement:**
 Đã thực hiện kiểm thử thực tế trên Linux bằng Telnet, sửa các lỗi phát sinh (IndentationError, Session constructor, import, reply code, path handling) cho đến khi các command hoạt động đúng.
+
+---
+
+## [07/08/2026] - TCP Framing Buffer (tuần 2.5)
+**Prompt:**
+Sửa `ClientHandler` để buffer đầu vào TCP đúng chuẩn: mỗi lần `recv()` có thể nhận nửa command hoặc nhiều command cùng lúc, cần tách bằng `\r\n`.
+
+**Raw output:**
+AI đề xuất thêm `self.buffer = b""` vào `__init__`, trong vòng lặp `run()` cộng dồn dữ liệu vào buffer rồi dùng `split(b"\r\n", 1)` để tách từng command hoàn chỉnh.
+
+**Refinement:**
+Đã tích hợp vào `client_handler.py`. Bổ sung bắt `UnicodeDecodeError` cho từng command để không crash thread khi client gửi byte không hợp lệ. Kiểm thử bằng unit test mô phỏng hai command trong một `recv()` và command bị split giữa hai `recv()`.
+
+---
+
+## [07/08/2026] - Filesystem Service Integration (tuần 2.5)
+**Prompt:**
+Thay toàn bộ `os.path.join`, `os.listdir`, `os.mkdir`, `os.rmdir`, `os.remove`, `os.rename` trong `command_handler.py` bằng `FilesystemService` của Role C để đảm bảo chặn path traversal, symlink escape và prefix collision.
+
+**Raw output:**
+AI đề xuất thêm helper `_fs(session)` trong `CommandHandler` trả về `transfer_manager.filesystem` khi có `TransferManager`, hoặc tạo `_FallbackFilesystem` theo `session.ftp_root` khi chạy unit test không có `TransferManager`.
+
+**Refinement:**
+Đã thêm `_FallbackFilesystem` và `_FallbackTransferManager` làm shim test-only. Tất cả lệnh `CWD`, `MKD`, `RMD`, `DELE`, `RNFR/RNTO`, `LIST`, `NLST`, `SIZE`, `MDTM`, `HASH`, `RETR`, `STOR`, `STOU`, `APPE` đều đi qua `_fs(session)`. Chạy 110 test pass xác nhận không regression.
+
+---
+
+## [07/08/2026] - LIST Detailed Format (tuần 2.5)
+**Prompt:**
+Sửa lệnh `LIST` để trả Unix-style detailed listing có name, size, type (`d`/`-`), permissions và modified time; phân biệt rõ với `NLST` chỉ trả tên.
+
+**Raw output:**
+AI đề xuất dùng kết quả từ `filesystem_service.list_directory()` (trả dict có `name`, `size`, `type`, `permissions`, `modified`) và format theo chuẩn `drwxr-xr-x  1 ftp ftp       SIZE  Mon DD HH:MM NAME`.
+
+**Refinement:**
+Đã sửa `list_dir()` để parse dict từ `FilesystemService` và định dạng đúng. Bổ sung fallback cho `SimpleNamespace` trong trường hợp test dùng shim. Thêm 5 unit test kiểm tra prefix `d`/`-`, size và format `150/226`.
+
+---
+
+## [07/08/2026] - PASV/PORT/ABOR/Cleanup (tuần 2.5)
+**Prompt:**
+Sửa `PASV` đóng socket cũ trước khi tạo mới, `PORT` validate đủ 6 số 0–255 và port > 0, `ABOR` gọi `TransferManager.cancel()`, `cleanup()` dọn data socket và reset toàn bộ state.
+
+**Raw output:**
+AI đề xuất code cụ thể cho từng hàm với try/except rõ ràng và cleanup trong `finally`.
+
+**Refinement:**
+Đã tích hợp vào `client_handler.py` và `command_handler.py`. `rename_from` được reset khi bất kỳ command nào khác `RNTO` được gọi sau `RNFR`, kể cả `QUIT` và `disconnect`. Kiểm thử bằng unit test `TestRenameFromReset`.
+
+---
+
+## [07/08/2026] - Transfer Threading (tuần 2.5)
+**Prompt:**
+Sửa `STOR`, `RETR`, `STOU`, `APPE` để trả `150` ngay lập tức rồi chạy RDT trong thread riêng, gửi `226`/`426` sau khi xong.
+
+**Raw output:**
+AI đề xuất helper `_start_transfer_thread()` tạo `threading.Thread(daemon=True)`, gọi `session.send_reply()` từ trong thread sau khi transfer xong.
+
+**Refinement:**
+Đã implement và tích hợp. `session.send_reply` được inject từ `ClientHandler.send` khi khởi tạo. TCP command thread tiếp tục nhận lệnh (kể cả `ABOR`) trong khi transfer thread chạy ngầm. Xác nhận bằng test `test_transfer_manager.py` pass.
+
+---
+
+## [07/08/2026] - Auth Reset, PORT/PASV Fix, RNTO Reset (tuần 2.5 — audit)
+**Prompt:**
+Sau audit, tìm thấy các lỗi còn thiếu trong checklist 11.1: (1) `USER` mới không reset login state; (2) password sai không clear username; (3) PORT dùng `except:` trống; (4) PASV luôn quảng bá `127.0.0.1` thay vì IP server thật; (5) RNTO thiếu arg không reset `rename_from`; (6) `_start_transfer_thread` dùng `result.reply_code` khi result là falsy nhưng `None`; (7) `abor` crash khi `transfer_manager` là None. Sửa tất cả và thêm test đầy đủ.
+
+**Raw output:**
+AI đề xuất:
+- `user()`: thêm `session.is_logged_in = False; session.rename_from = None` trước khi set username mới.
+- `password()`: thêm check `if session.is_logged_in: return "230 Already logged in"`; khi sai pass thêm `session.username = None`.
+- `port_cmd()`: build danh sách `nums[]` với `int()`, validate từng số, thêm kiểm tra `port <= 0 or port > 65535`, catch `(ValueError, IndexError)` thay vì `except:`.
+- `pasv()`: thêm `session.data_socket = None` sau khi close, dùng `socket.gethostbyname(socket.gethostname())` để lấy IP thật, format 227 với IP thật.
+- `rnto()`: khi `not arg`, set `session.rename_from = None` trước khi return 501.
+- `_start_transfer_thread`: phân biệt ba trường hợp `result` truthy, falsy-non-None, và `None`.
+- `abor()`: dùng `tm = self.transfer_manager or getattr(self, '_tm', None)` để tránh crash khi None.
+
+**Refinement:**
+Tất cả sửa đổi được tích hợp. Bổ sung 20 unit test mới trong `tests/test_commands.py` cho: PORT validation (valid, too few, out of range, negative, port zero, non-numeric, no arg), auth reset (new USER clears login, wrong password clears username, PASS before USER returns 503), RNTO empty arg resets state, PASV socket replacement (creates socket, replaces old one), TYPE/MODE validation (valid A/I, invalid Z, mode B/C returns 502, invalid X). Tổng: **48 tests pass**.

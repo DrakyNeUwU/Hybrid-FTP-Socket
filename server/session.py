@@ -1,5 +1,6 @@
 import os
 import threading
+
 class Session:
 
     def __init__(self, ftp_root="./ftp_root"):
@@ -12,7 +13,7 @@ class Session:
 
         self.rename_from = None
 
-        # thêm
+        # Transfer state
         self.transfer_type = "I"   # mặc định binary
         self.transfer_mode = "S"   # mặc định stream
         self.data_host = None
@@ -22,3 +23,8 @@ class Session:
         self.transfer_cancelled = False
         self.transfer_cancel_event = None
         self.current_transfer = None
+        self.transfer_worker = None  # daemon thread running the current transfer
+
+        # Session identity (set by ClientHandler / tests)
+        self.session_id = None
+        self.send_reply = None       # injected by ClientHandler

@@ -1,4 +1,4 @@
-# Technical Report — Hybrid FTP
+# Technical Report — Hybrid FTP — Role A
 
 > This document follows the seven mandatory sections in Section 2.4 of the
 > project specification. Each member completes the sections related to their
@@ -29,11 +29,15 @@ Once authentication succeeds, every command is parsed by `CommandParser`,
 dispatched through `CommandHandler`, and executed using the client's private
 `Session`.
 
-Role A also prepares the control information required for future UDP data
-transfer. Commands such as `PORT`, `PASV`, `TYPE`, `MODE`, `RETR`, `STOR`,
-`STOU`, `APPE`, and `ABOR` update the transfer state inside the session, while
-the actual UDP reliable transmission will be completed during Role B
-integration.
+Role A also prepares the control information required for UDP data transfer.
+Commands such as `PORT`, `PASV`, `TYPE`, `MODE`, `RETR`, `STOR`, `STOU`,
+`APPE`, and `ABOR` interact with `TransferManager`, which delegates actual
+UDP reliable transmission to the Role B adapter and path operations to the
+Role C `FilesystemService`.
+
+Transfer commands (`RETR`, `STOR`, `STOU`, `APPE`) reply `150` immediately
+then run the RDT transfer in a daemon thread, sending `226` or `4xx` once
+the transfer completes or fails.
 
 ---
 
@@ -61,19 +65,20 @@ PORT 127,0,0,1,10,10
 LIST
 ```
 
-The TCP control channel receives raw bytes from the socket. `CommandParser`
-splits the request into the command name and its argument before dispatching it
-to `CommandHandler`.
+The TCP control channel receives raw bytes from the socket. `ClientHandler`
+buffers incomplete lines and splits on `\r\n`. `CommandParser` then splits the
+request into the command name and its argument before dispatching it to
+`CommandHandler`.
 
 Example:
 
 ```python
 class FTPCommand:
 
-    def __init__(self,name,argument):
+    def __init__(self, name, argument):
 
-        self.name=name
-        self.argument=argument
+        self.name = name
+        self.argument = argument
 ```
 
 Separating parsing from execution keeps the command-processing pipeline modular
@@ -104,9 +109,12 @@ class Session:
         self.data_host = None
         self.data_port = None
         self.data_mode = None
+        self.data_socket = None
 
         self.current_transfer = None
         self.transfer_cancelled = False
+        self.transfer_cancel_event = None
+        self.session_id = None
 ```
 
 | Attribute | Meaning |
@@ -121,8 +129,11 @@ class Session:
 | data_host | Active/Passive data IP |
 | data_port | Active/Passive data port |
 | data_mode | ACTIVE or PASSIVE |
+| data_socket | UDP socket (PASV) or None (ACTIVE) |
 | current_transfer | Information about the current upload/download |
 | transfer_cancelled | Transfer cancellation flag |
+| transfer_cancel_event | `threading.Event` for cooperative cancellation |
+| session_id | Unique session identifier assigned by server |
 
 Each client thread owns exactly one Session object, preventing state sharing
 between concurrent clients.
@@ -170,23 +181,14 @@ WaitPASS --> PASS
 
 PASS --> ValidPassword
 
-ValidPassword -- No --> LoginFail
+ValidPassword -- No --> LoginFail["530 Login incorrect\n(clears username)"]
 
 ValidPassword -- Yes --> LoginSuccess
 ```
 
-If `PASS` is sent before `USER`, the server replies
-
-```text
-503 Login with USER first
-```
-
-Commands requiring authentication return
-
-```text
-530 Not logged in
-```
-
+New `USER` command resets `is_logged_in = False` and `rename_from = None`
+per RFC 959. If `PASS` is sent before `USER`, the server replies `503 Login
+with USER first`. Commands requiring authentication return `530 Not logged in`
 until login succeeds.
 
 ---
@@ -196,35 +198,19 @@ until login succeeds.
 ```mermaid
 flowchart TD
 
-Receive --> Parse
+Receive --> Buffer["Buffer TCP bytes"]
+
+Buffer --> SplitCRLF["Split on CRLF"]
+
+SplitCRLF --> Decode["Decode UTF-8\n(catch UnicodeDecodeError)"]
+
+Decode --> Parse
 
 Parse --> Dispatch
 
-Dispatch --> USER
+Dispatch --> HandlerFunction
 
-Dispatch --> PASS
-
-Dispatch --> LIST
-
-Dispatch --> PWD
-
-Dispatch --> CWD
-
-Dispatch --> TYPE
-
-Dispatch --> MODE
-
-Dispatch --> PORT
-
-Dispatch --> PASV
-
-Dispatch --> HASH
-
-Dispatch --> RETR
-
-Dispatch --> STOR
-
-Dispatch --> FTPReply
+HandlerFunction --> FTPReply
 
 FTPReply --> Send
 ```
@@ -239,49 +225,29 @@ function inside `CommandHandler`.
 ```mermaid
 flowchart TD
 
-Accept
+Accept --> CreateClientHandler
 
--->
+CreateClientHandler --> CreateSession
 
-CreateClientHandler
+CreateSession --> InjectFS["Inject FilesystemService\n& TransferManager"]
 
--->
+InjectFS --> Send220
 
-CreateSession
+Send220 --> Receive
 
--->
+Receive --> Buffer["Append to buffer"]
 
-Send220
+Buffer --> ParseCommands["Extract CRLF-terminated commands"]
 
--->
+ParseCommands --> Execute
 
-Receive
+Execute --> Reply
 
--->
+Reply --> Receive
 
-Parse
+Receive --> Disconnect
 
--->
-
-Execute
-
--->
-
-Reply
-
--->
-
-Receive
-
-Receive
-
--->
-
-Disconnect
-
--->
-
-Cleanup
+Disconnect --> Cleanup["Cancel transfer\nClose data socket\nReset session fields\nUnregister from server"]
 ```
 
 Each client owns
@@ -289,6 +255,7 @@ Each client owns
 - one TCP socket
 - one Session
 - one ClientHandler thread
+- one TransferManager with injected FilesystemService
 
 allowing multiple clients to work independently.
 
@@ -299,67 +266,49 @@ allowing multiple clients to work independently.
 ```mermaid
 flowchart TD
 
-FTPCommand
+FTPCommand --> CheckLogin
 
--->
+CheckLogin --> ValidateArgument
 
-CheckLogin
+ValidateArgument --> FilesystemOperation["FilesystemService\n(path validation, traversal check)"]
 
--->
-
-ValidateArgument
-
--->
-
-FilesystemOperation
-
--->
-
-FTPReply
+FilesystemOperation --> FTPReply
 ```
 
-Supported filesystem commands include
-
-- PWD
-- CWD
-- CDUP
-- LIST
-- NLST
-- MKD
-- RMD
-- DELE
-- RNFR
-- RNTO
+All path operations go through `FilesystemService` — no direct `os.path`
+calls inside `CommandHandler`.
 
 ---
 
-### 3.5 Transfer Preparation Workflow (Role A)
+### 3.5 Transfer Workflow — 150 → 226/4xx (Role A)
 
 ```mermaid
 flowchart TD
 
-RETR/STOR/APPE/STOU
+RETR_STOR_APPE_STOU --> CheckEndpoint["Check PORT/PASV endpoint"]
 
--->
+CheckEndpoint -- missing --> Reply425["425 Use PORT or PASV first"]
 
-Validate
+CheckEndpoint -- ok --> Reply150["150 Opening data connection"]
 
--->
+Reply150 --> SpawnThread["Spawn daemon thread"]
 
-CreateTransferState
+SpawnThread --> TransferManager
 
--->
+TransferManager --> RDTAdapter["Role B RDT adapter\n(sender/receiver)"]
 
-SaveSession
+RDTAdapter --> FilesystemService["Role C FilesystemService\n(atomic store/read)"]
 
--->
+FilesystemService --> Success
 
-Reply150
+Success -- yes --> Reply226["226 Transfer complete\n(sent from worker thread)"]
+
+Success -- no --> Reply4xx["426/550 error code + message\n(sent from worker thread)"]
 ```
 
-Transfer commands only initialize transfer metadata.
-
-Actual UDP transmission will be implemented by Role B.
+TCP command thread keeps receiving commands (including `ABOR`) while transfer
+runs in the background. `ABOR` calls `TransferManager.cancel(session)` which
+sets a `threading.Event` and closes the data socket.
 
 ---
 
@@ -368,19 +317,23 @@ Actual UDP transmission will be implemented by Role B.
 ```mermaid
 flowchart TD
 
-PORT --> SaveClientEndpoint
+PORT --> ValidateNumbers["Validate 6 numbers 0..255\nport > 0 and ≤ 65535"]
 
-PASV --> CreatePassiveSocket
+ValidateNumbers --> SaveClientEndpoint
 
-CreatePassiveSocket --> SavePort
+PASV --> CloseOldSocket
 
-SavePort --> Reply227
+CloseOldSocket --> CreateUDPSocket
+
+CreateUDPSocket --> ResolveServerIP["Resolve server IP\n(fallback: 127.0.0.1)"]
+
+ResolveServerIP --> Reply227
 ```
 
-The `PORT` command stores the client's IP and port.
-
-The `PASV` command creates a passive socket and returns the listening endpoint
-using FTP reply `227`.
+The `PORT` command validates all 6 comma-separated numbers (range, port > 0,
+not > 65535) before storing the client's IP and port. The `PASV` command
+closes any existing data socket, creates a new UDP socket, resolves the real
+server IP, and returns the endpoint via reply `227`.
 
 ---
 
@@ -394,7 +347,7 @@ using FTP reply `227`.
 | FTP reply management | Role A | — |
 | Session management | Role A | Role C |
 | Authentication | Role A | — |
-| Transfer preparation | Role A | Role B |
+| Transfer orchestration | Role A | Role B, Role C |
 | UDP reliable transfer | Role B | Role A |
 | Filesystem security | Role C | Role A |
 | Thread management | Role C | Role A |
@@ -403,52 +356,42 @@ using FTP reply `227`.
 
 ## 5. Self-Assessment & Peer Evaluation
 
-### 5.1 Role A — Self-Assessment
+### 5.1 Role A — Self-Assessment (week 2.5 update)
 
-Role A completed the TCP control channel and refactored the original monolithic
-implementation into modular components.
+Role A completed the TCP control channel, refactored the original monolithic
+implementation into modular components, and integrated with Role B's RDT
+adapter and Role C's FilesystemService.
 
-The implementation now consists of
+**Completed modules:**
 
-- `ClientHandler`
-- `CommandHandler`
-- `CommandParser`
-- `Session`
-- `FTPReply`
+- `ClientHandler` — TCP buffer, CRLF framing, UnicodeDecodeError handling, cleanup
+- `CommandHandler` — full command set with argument validation and reply codes
+- `CommandParser` — single-responsibility parser
+- `Session` — per-client state, isolated from other clients
+- `FTPReply` — centralized reply constants
+- `TransferManager` — transfer lifecycle, 150→226 threading, cancellation
 
-Role A successfully implemented and tested the following FTP commands:
+**Implemented and tested FTP commands:**
 
-- USER
-- PASS
-- QUIT
-- PWD
-- CWD
-- CDUP
-- LIST
-- NLST
-- MKD
-- RMD
-- DELE
-- RNFR
-- RNTO
-- TYPE
-- MODE
-- PORT
-- PASV
-- RETR
-- STOR
-- STOU
-- APPE
-- HASH
-- ABOR
+USER, PASS, QUIT, NOOP, PWD, CWD, CDUP, MKD, RMD, DELE, RNFR, RNTO, LIST,
+NLST, SIZE, MDTM, STAT, HASH, TYPE, MODE, HELP, PORT, PASV, RETR, STOR,
+STOU, APPE, ABOR
 
-All commands were manually tested using Telnet. Both successful operations and
-error cases such as invalid login, missing parameters, nonexistent files, and
-unsupported commands returned the correct FTP reply codes without crashing the
-server.
+**Security and correctness properties verified by tests:**
 
-Transfer-related commands currently prepare session state and are ready for
-integration with the UDP Reliable Data Transfer module developed in Role B.
+- TCP framing: fragmented commands, two commands in one recv, bad UTF-8
+- PATH: all operations go through FilesystemService (no raw os.path)
+- Auth: new USER resets login state; wrong password clears username
+- PORT: validates 6 numbers 0–255, port > 0 and ≤ 65535, rejects non-numeric
+- PASV: closes old socket before creating new; resolves real server IP
+- RNFR/RNTO: state reset on interruption, QUIT, disconnect, empty arg
+- Transfer: 150 sent immediately; 226/4xx sent from worker thread after completion
+- ABOR: calls TransferManager.cancel(), cancels transfer event, closes data socket
+- Cleanup: cancels transfer, closes data socket, clears all session fields, unregisters
+
+**Test results (07/08/2026):** 48 tests pass in `tests/test_commands.py`,
+`tests/test_command_parser.py`, `tests/test_session.py` and
+`tests/test_transfer_manager.py`.
 
 ---
 
@@ -473,35 +416,27 @@ including
 
 ### 7.1 TCP Control Commands
 
-Successful demonstrations include
+All commands implemented and tested:
 
-- USER/PASS authentication
-- PWD
-- CWD
-- CDUP
-- LIST
-- NLST
-- MKD
-- RMD
-- DELE
-- RNFR/RNTO
-- TYPE
-- MODE
-- PORT
-- PASV
-- HASH
-- RETR
-- STOR
-- STOU
-- APPE
-- ABOR
-- QUIT
+USER, PASS, QUIT, NOOP, PWD, CWD, CDUP, MKD, RMD, DELE, RNFR, RNTO, LIST,
+NLST, SIZE, MDTM, STAT, HASH, TYPE, MODE, HELP, PORT, PASV, RETR, STOR,
+STOU, APPE, ABOR
+
+### 7.2 Integration Status (07/08/2026)
+
+| Component | Status |
+|-----------|--------|
+| TCP buffer + CRLF framing | ✅ Complete, tested |
+| All FTP commands + arg validation | ✅ Complete, tested |
+| Auth reset on new USER/QUIT | ✅ Complete, tested |
+| PORT validation (range, port > 0) | ✅ Complete, tested |
+| PASV socket replacement + real IP | ✅ Complete, tested |
+| FilesystemService integration | ✅ Complete (no raw os.path) |
+| Transfer threading (150 → 226) | ✅ Complete, tested |
+| ABOR via TransferManager.cancel | ✅ Complete, tested |
+| ClientHandler cleanup | ✅ Complete, tested |
+| Session isolation | ✅ Complete, tested |
+| Unit tests ≥ 48 passing | ✅ 48 passed |
+| End-to-end RETR/STOR via RDT | ⏳ Pending Role B adapter |
 
 Terminal screenshots and Telnet logs will be attached in the final submission.
-
-### 7.2 Integration Status
-
-Role A has completed all TCP command-processing modules and session management.
-
-The remaining work is integrating the transfer commands with the UDP Reliable
-Data Transfer implementation provided by Role B.
