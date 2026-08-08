@@ -9,6 +9,7 @@ from server.ftp_reply import FTPReply
 from server.transfer_manager import TransferManager
 from server.rdt_adapter import RDTSenderAdapter, RDTReceiverAdapter
 from common.filesystem_service import FilesystemService
+from server.logging_utils import redact_command, safe_log
 
 class ClientHandler(threading.Thread):
 
@@ -19,10 +20,19 @@ class ClientHandler(threading.Thread):
         self.server = server
         self.session_id = server.next_session_id() if server else "S000000"
 
-        self.session = Session(ftp_root="./ftp_root")
+        self.session = Session(ftp_root=getattr(server, "ftp_root", "./ftp_root"))
         self.session.session_id = self.session_id
         self.session.send_reply = self.send
         self.session.peer_ip = addr[0] if (addr and isinstance(addr, tuple)) else None
+        try:
+            local_address = sock.getsockname() if sock else None
+            self.session.server_ip = getattr(server, "advertised_host", None) or (
+                local_address[0]
+                if isinstance(local_address, tuple) and local_address
+                else "127.0.0.1"
+            )
+        except OSError:
+            self.session.server_ip = "127.0.0.1"
 
         os.makedirs(self.session.ftp_root, exist_ok=True)
         self.filesystem_service = FilesystemService(self.session.ftp_root)
@@ -56,6 +66,12 @@ class ClientHandler(threading.Thread):
 
                     try:
                         command = CommandParser.parse(raw_command)
+                        safe_log(
+                            f"Command session={self.session_id} "
+                            f"ip={self.session.peer_ip} "
+                            f"transfer_id={self.session.transfer_id or '-'} "
+                            f"command={redact_command(raw_command)}"
+                        )
                         response = self.handler.handle(command, self.session)
                         if response:
                             self.send(response)
@@ -73,6 +89,11 @@ class ClientHandler(threading.Thread):
             self.cleanup()
 
     def send(self, response):
+        reply_code = response.split(" ", 1)[0].strip() if response else "-"
+        safe_log(
+            f"Reply session={self.session_id} ip={self.session.peer_ip} "
+            f"transfer_id={self.session.transfer_id or '-'} code={reply_code}"
+        )
         try:
             self.socket.sendall(response.encode("utf-8"))
         except OSError:
@@ -104,6 +125,18 @@ class ClientHandler(threading.Thread):
         if self.server:
             try: self.server.unregister_client(self)
             except Exception: pass
+        active_count = "-"
+        get_active_count = getattr(self.server, "get_active_client_count", None)
+        if callable(get_active_count):
+            active_count = get_active_count()
+        safe_log(
+            f"Client disconnected session={self.session_id} "
+            f"ip={self.session.peer_ip} "
+            f"active={active_count}"
+        )
+        get_active_sessions = getattr(self.server, "get_active_sessions", None)
+        if callable(get_active_sessions):
+            safe_log(f"Active sessions={get_active_sessions()}")
         
         try: self.socket.close()
         except Exception: pass

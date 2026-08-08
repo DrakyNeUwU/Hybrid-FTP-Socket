@@ -40,6 +40,10 @@ class RDTHeader:
         return flags in cls._VALID_FLAG_SETS
 
     def serialize(self) -> bytes:
+        if not self.is_valid_flags(self.flags):
+            raise ValueError(f"Invalid RDT flags: {self.flags:#x}")
+        if not 0 <= self.length <= 0xFFFF:
+            raise ValueError("RDT payload length out of range")
         return struct.pack(
             self.format,
             self.transfer_id,
@@ -61,7 +65,7 @@ class RDTHeader:
 
     def validate_length(self, packet_data: bytes) -> bool:
         available = len(packet_data) - self.size
-        return 0 <= self.length <= available
+        return 0 <= self.length == available
 
     def compute_checksum(self, payload: bytes = b"") -> int:
         header_fields = struct.pack(

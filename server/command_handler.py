@@ -4,6 +4,7 @@ import socket
 import threading
 from common.filesystem_service import FilesystemOperationError, FilesystemService
 from server.ftp_reply import FTPReply
+from server.logging_utils import safe_log
 
 
 class CommandHandler:
@@ -280,10 +281,15 @@ class CommandHandler:
                 if ip != peer_ip and ip not in ("127.0.0.1", "localhost"):
                     return "501 Security error: PORT IP bounce prevented\r\n"
 
+            self._close_data_socket(session)
+            udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            udp.bind(("0.0.0.0", 0))
+            session.data_socket = udp
             session.data_host = ip
             session.data_port = port
             session.data_mode = "ACTIVE"
-            return "200 PORT command successful\r\n"
+            server_port = udp.getsockname()[1]
+            return f"200 PORT command successful (server UDP port {server_port})\r\n"
         except (ValueError, IndexError):
             return "501 Invalid PORT\r\n"
 
@@ -292,23 +298,19 @@ class CommandHandler:
             return "530 Not logged in\r\n"
         if arg:
             return "501 Syntax error in parameters\r\n"
-        # Close old data socket before creating a new one
-        if getattr(session, "data_socket", None):
-            try:
-                session.data_socket.close()
-            except OSError:
-                pass
-            session.data_socket = None
+        self._close_data_socket(session)
 
         try:
             udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             udp.bind(("0.0.0.0", 0))
             session.data_socket = udp
             port = udp.getsockname()[1]
-            try:
-                server_ip = socket.gethostbyname(socket.gethostname())
-            except OSError:
-                server_ip = "127.0.0.1"
+            server_ip = getattr(session, "server_ip", None)
+            if not server_ip or server_ip == "0.0.0.0":
+                try:
+                    server_ip = socket.gethostbyname(socket.gethostname())
+                except OSError:
+                    server_ip = "127.0.0.1"
             session.data_host = server_ip
             session.data_port = port
             session.data_mode = "PASSIVE"
@@ -413,8 +415,19 @@ class CommandHandler:
     def help_cmd(self, arg, session):
         return "214-Supported commands:\r\n USER PASS QUIT NOOP PWD CWD CDUP MKD RMD LIST NLST STAT SIZE MDTM TYPE MODE HELP PORT PASV RETR STOR STOU APPE DELE RNFR RNTO HASH ABOR\r\n214 Help OK\r\n"
 
+    @staticmethod
+    def _close_data_socket(session):
+        data_socket = getattr(session, "data_socket", None)
+        if data_socket is not None:
+            try:
+                data_socket.close()
+            except OSError:
+                pass
+        session.data_socket = None
+
     def _start_transfer_thread(self, session, action_name, action_func, arg=None):
         transfer_id = session.new_transfer_id()
+        data_mode = getattr(session, "data_mode", None) or "-"
         if isinstance(session.current_transfer, dict):
             session.current_transfer["transfer_id"] = transfer_id
 
@@ -435,23 +448,43 @@ class CommandHandler:
                     )
 
                 if result:
+                    safe_log(
+                        f"Transfer session={session.session_id} transfer_id={transfer_id} "
+                        f"operation={action_name} mode={data_mode} result=success "
+                        f"bytes={getattr(result, 'bytes_transferred', 0)}"
+                    )
                     if session.send_reply:
                         session.send_reply("226 Transfer complete\r\n")
                 elif result is not None:
                     code = getattr(result, "reply_code", 426)
                     err = getattr(result, "error", "Transfer failed")
+                    safe_log(
+                        f"Transfer session={session.session_id} transfer_id={transfer_id} "
+                        f"operation={action_name} mode={data_mode} result=failed "
+                        f"code={code} error={err}"
+                    )
                     if session.send_reply:
                         session.send_reply(f"{code} {err}\r\n")
                 else:
+                    safe_log(
+                        f"Transfer session={session.session_id} transfer_id={transfer_id} "
+                        f"operation={action_name} mode={data_mode} result=failed code=426"
+                    )
                     if session.send_reply:
                         session.send_reply("426 No RDT adapter configured\r\n")
-            except Exception:
+            except Exception as error:
+                safe_log(
+                    f"Transfer session={session.session_id} transfer_id={transfer_id} "
+                    f"operation={action_name} mode={data_mode} result=failed "
+                    f"code=426 error={error}"
+                )
                 if session.send_reply:
                     session.send_reply("426 Transfer failed\r\n")
 
         t = threading.Thread(target=run_transfer, daemon=True)
         t.start()
         session.transfer_worker = t
+        return transfer_id
 
     @staticmethod
     def _transfer_in_progress(session):
@@ -475,8 +508,8 @@ class CommandHandler:
         if tm is None:
             return "502 No transfer manager configured\r\n"
         session.current_transfer = {"type": "RETR", "file": arg}
-        self._start_transfer_thread(session, "RETR", tm.download, arg)
-        return "150 Opening data connection\r\n"
+        transfer_id = self._start_transfer_thread(session, "RETR", tm.download, arg)
+        return f"150 Opening data connection; transfer_id={transfer_id}\r\n"
 
     def stor(self, arg, session):
         if not session.is_logged_in:
@@ -491,8 +524,8 @@ class CommandHandler:
         if tm is None:
             return "502 No transfer manager configured\r\n"
         session.current_transfer = {"type": "STOR", "file": arg}
-        self._start_transfer_thread(session, "STOR", tm.upload, arg)
-        return "150 Opening data connection\r\n"
+        transfer_id = self._start_transfer_thread(session, "STOR", tm.upload, arg)
+        return f"150 Opening data connection; transfer_id={transfer_id}\r\n"
 
     def stou(self, arg, session):
         if not session.is_logged_in:
@@ -505,8 +538,8 @@ class CommandHandler:
         if tm is None:
             return "502 No transfer manager configured\r\n"
         session.current_transfer = {"type": "STOU"}
-        self._start_transfer_thread(session, "STOU", tm.upload_unique)
-        return "150 Opening data connection\r\n"
+        transfer_id = self._start_transfer_thread(session, "STOU", tm.upload_unique)
+        return f"150 Opening data connection; transfer_id={transfer_id}\r\n"
 
     def appe(self, arg, session):
         if not session.is_logged_in:
@@ -521,8 +554,8 @@ class CommandHandler:
         if tm is None:
             return "502 No transfer manager configured\r\n"
         session.current_transfer = {"type": "APPE", "file": arg}
-        self._start_transfer_thread(session, "APPE", tm.append, arg)
-        return "150 Opening data connection\r\n"
+        transfer_id = self._start_transfer_thread(session, "APPE", tm.append, arg)
+        return f"150 Opening data connection; transfer_id={transfer_id}\r\n"
 
     def abor_cmd(self, arg, session):
         if arg:

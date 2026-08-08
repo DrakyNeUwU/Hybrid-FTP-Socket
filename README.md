@@ -3,6 +3,25 @@
 Ứng dụng FTP lai (Hybrid FTP): control channel qua TCP, data channel qua UDP
 với tầng Reliable Data Transfer (RDT) tự cài đặt.
 
+## Chạy demo trên hai máy cùng LAN
+
+Trên máy chạy server, thay `192.168.x.x` bằng IPv4 LAN của máy đó. `--host
+0.0.0.0` cho phép nhận kết nối từ mạng; `--advertise-host` bảo đảm PASV trả về
+đúng IP mà máy client có thể kết nối.
+
+```bash
+python -m server.threaded_server --host 0.0.0.0 --port 2121 --advertise-host 192.168.x.x
+```
+
+Trên máy client cùng mạng, chạy:
+
+```bash
+python -m client.demo_transfer demo.bin --remote demo-lan.bin --mode PASV --host 192.168.x.x --port 2121
+```
+
+Mở firewall cho TCP/UDP port 2121 nếu hệ điều hành hỏi. Lưu output và SHA-256
+vào `docs/evidence/` sau khi demo thành công.
+
 ## Cấu trúc thư mục
 
 ```

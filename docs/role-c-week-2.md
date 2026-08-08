@@ -65,3 +65,67 @@ sequenceDiagram
 Active/PASV endpoint negotiation remains owned by Role A/B. Role C receives the
 selected endpoint through their agreed transfer API and must not open a second
 TCP data connection.
+
+## Week 2 Evidence and Requirement Mapping
+
+| Requirement area | Role C integration contribution | Evidence |
+|---|---|---|
+| Filesystem safety | `FilesystemService` owns root validation, atomic commit and cleanup | Filesystem/transfer tests; API contract |
+| TCP → UDP → filesystem | Keeps validated path and atomic lifecycle behind `TransferManager` | `tests/test_e2e_transfer.py` passes Active/PASV STOR + RETR |
+| File integrity | Server file and downloaded client file are compared by SHA-256 | End-to-end test; manual Active demo reported success |
+| Session cleanup | Server owns session registry and handler shutdown path | `FTPServer.stop()` workflow and existing server tests |
+| Concurrent clients | Three PASV sessions transfer distinct files in parallel | `test_three_pasv_clients_transfer_independently`: pass in 5.34s |
+
+## Week 2 Manual Demo Evidence
+
+On 08/08/2026, the Active demo command completed:
+
+```powershell
+python -m client.demo_transfer .\demo.bin --remote demo-active.bin --mode ACTIVE
+```
+
+Observed result:
+
+```text
+220 Hybrid FTP Server Ready
+Success: ACTIVE upload + download for demo-active.bin
+```
+
+This proves one localhost Active upload/download workflow. The user also
+confirmed the corresponding localhost PASV manual demo passed. On the same
+date, automated evidence verified three concurrent PASV clients. Each used its
+own session, remote filename, and download directory; the source, server, and
+downloaded SHA-256 values matched for every client. The saved output is
+`docs/evidence/week-2.5-three-client.log`.
+
+The complete localhost end-to-end group was then rerun: Active, PASV, three
+concurrent clients, ABOR while waiting for UDP, and TCP disconnect while waiting
+for UDP all passed (`5 passed in 18.03s`). The saved output is
+`docs/evidence/week-2.5-e2e-transfer.log`.
+
+Saved integrity evidence is available in:
+
+- `docs/evidence/week-2.5-active-sha256.txt`
+- `docs/evidence/week-2.5-pasv-sha256.txt`
+
+Each file records matching SHA-256 values for the source, FTP-root copy, and
+downloaded client copy.
+
+## Limitations and Next Work
+
+- Save Active/PASV manual command output and the three SHA-256 values.
+- Run the same transfer workflow from a different machine on the LAN.
+- PASV server-log, progress, and success screenshots were saved under
+  `docs/evidence/screenshots/` on 08/08/2026 (user confirmation). Active/full
+  pytest screenshots are optional supporting evidence for final submission.
+- `LIST`/`NLST` đã được chốt là textual result trên TCP control theo đề gốc;
+  không cần UDP/RDT cho listing. Xem `docs/api-contract.md` §6.1.
+- For LAN, start the server with `--host 0.0.0.0` and its real IPv4 through
+  `--advertise-host`; use the same IPv4 in the client `--host` option.
+- CLI demo now renders upload/download progress from the RDT callback; server
+  logs redact PASS and record session/transfer lifecycle and active sessions.
+- RETR now includes the validated total size in RDT START, so download progress
+  has a real 0→100% total instead of treating every chunk as complete.
+- Full WSL2 verification is complete: `python3 -m pytest -q` collected 189
+  tests and reported `189 passed in 106.91s` on 08/08/2026. Output is stored
+  in `docs/evidence/week-2.5-pytest.log`.

@@ -188,3 +188,374 @@ shutdown while a client remains connected.
 - **Document ownership:** `docs/report.md` was not modified. Role C notes are
   kept separately in `docs/role-c-week-2.md` for review before integration into
   the shared report.
+
+## August 8, 2026 — Week 2.5 Integration Review and Evidence Update
+
+**Exact prompt:**
+> "bạn thêm lịch sử genai-log-c của tôi nhé, và cập nhật tuần 2.5-fix, review lại tuần này coi còn gì không"
+
+**English translation:**
+> "Please add my history to genai-log-c, update week 2.5-fix, and review this
+> week to see what is still missing."
+
+**Raw GenAI output:**
+
+The review identified that Role C's filesystem work was largely implemented,
+but the shared A–B–C integration gates were still open. It also identified a
+contract mismatch between `TransferManager` and the RDT adapters, which had to
+be recorded as an integration issue rather than claimed as complete.
+
+**Review and refinement:**
+
+- Role C ownership remains the filesystem boundary: atomic `.part` handling,
+  root confinement, path locks, unique STOU names, and cleanup.
+- `docs/api-contract.md` remains the source of truth; Role C does not redefine
+  the RDT wire format or FTP command grammar.
+- The status was updated to distinguish unit/fault-test evidence from missing
+  FTP server Active/PASV evidence.
+- Remaining Role C evidence is explicitly listed: symlink/path-security test,
+  multi-client test, concurrent append, server shutdown, and source/destination
+  SHA-256 comparison through the real FTP workflow.
+
+**Evidence recorded:**
+
+- `docs/project-status.md`
+- `docs/code-change-history.md`
+- `filephanchiacv/tuan-2.5-fix.md`
+- Existing Role C implementation and tests in `common/`, `server/`, and `tests/`
+
+## August 8, 2026 — Manual Active Transfer Demo Evidence
+
+**Exact prompt:**
+> "PS C:\\Code\\Code\\socket> python -m client.demo_transfer .\\demo.bin --remote demo-active.bin --mode ACTIVE ... Success: ACTIVE upload + download for demo-active.bin Vậy là xog r hả"
+
+**English translation:**
+> "The Active demo returned success for upload and download. Is it finished?"
+
+**Raw GenAI output:**
+
+The response confirmed that Active transfer completed and asked for PASV plus
+SHA-256 checks before claiming the full weekly demo was complete.
+
+**Review and refinement:**
+
+- Recorded the manual Active result as demo evidence, not as proof that every
+  integration exit gate is complete.
+- Kept manual PASV demo, multi-client, ABOR/disconnect, and cross-machine
+  testing explicitly pending.
+- Updated the Week 2 Role C evidence in the same format as the report parts:
+  requirement/evidence, implementation boundary, limitations, and next work.
+
+## August 8, 2026 — Manual PASV Transfer Confirmation
+
+**Exact prompt:**
+> "1. PASV demo đã ok , mấy phần kia phần nào làm 1 mình tôi đc nhỉ"
+
+**English translation:**
+> "The PASV demo is okay. Which remaining parts can I do on my own?"
+
+**Evidence update:**
+
+The user confirmed the localhost PASV manual demo passed. The checklist/status
+now treats manual Active and PASV as complete, while retaining the need to save
+the terminal output, screenshots, and SHA-256 values for final submission.
+
+## August 8, 2026 — WSL2 Full Test Repair and Verification
+
+**Exact prompt:**
+> The user pasted a WSL2 `pytest -v` result showing 183 passed and three
+> failures: one `ClientHandler` socket-address failure and two stale ECHO-based
+> threaded-server tests.
+
+**Raw GenAI output:**
+
+The diagnosis separated one production robustness bug from two obsolete tests.
+The fix made `ClientHandler` tolerate a non-IP `socketpair()` address and
+replaced debug ECHO expectations with the real FTP `NOOP` command.
+
+**Review and refinement:**
+
+- The server did not regain debug commands; tests were corrected to preserve the
+  project command specification.
+- The socket fallback only affects test/non-IP sockets and preserves normal TCP
+  server IP discovery.
+- WSL2 verification after the fix: `python3 -m pytest -q` reported
+  **186 passed in 104.09s**. The saved log is
+  `docs/evidence/week-2.5-pytest.log`.
+
+## August 8, 2026 — Saved Active/PASV Hash Evidence
+
+**Exact prompt:**
+> "ok chạy xog r a"
+
+**Raw GenAI output:**
+
+The evidence folder was inspected. Both Active and PASV SHA-256 files contain
+matching source, server, and downloaded-client hashes. The saved pytest log
+contains only progress output, so it is not treated as a complete terminal
+artifact until it includes the final pass summary.
+
+**Evidence:**
+
+- `docs/evidence/week-2.5-active-sha256.txt`
+- `docs/evidence/week-2.5-pasv-sha256.txt`
+
+## August 8, 2026 — Three Concurrent PASV Clients
+
+**Exact prompt:**
+> "nói chung bây giờ , mình cần làm những task còn lại của role c" followed by
+> "ok" to begin the multi-client task.
+
+**Raw GenAI output:**
+
+The proposed next Role C task was an automated three-client transfer test. The
+first version of the client reused one repository download directory, so the
+review added an optional `download_dir` argument and assigned each test client
+a separate temporary directory.
+
+**Review and refinement:**
+
+- The test uses three real TCP sessions, synchronizes them before transfer, and
+  runs PASV upload then download in parallel.
+- It asserts the server has four live control clients before release (three
+  workers plus the fixture client), waits for all workers with a finite timeout,
+  and compares SHA-256 at source, FTP root, and each download directory.
+- This is evidence for independent concurrent transfers; it does not claim to
+  prove ABOR/disconnect cleanup or cross-machine networking.
+
+**Affected files:**
+
+- `client/ftp_client.py`
+- `tests/test_e2e_transfer.py`
+- `docs/evidence/week-2.5-three-client.log`
+- `docs/role-c-week-2.md`, `docs/project-status.md`,
+  `docs/code-change-history.md`, `filephanchiacv/tuan-2.5-fix.md`
+
+**Verification:**
+
+```text
+python3 -m pytest tests/test_e2e_transfer.py::TestEndToEndPasvTransfer::test_three_pasv_clients_transfer_independently -v
+1 passed in 5.34s
+```
+
+The wider end-to-end regression was also run and saved in
+`docs/evidence/week-2.5-e2e-transfer.log`:
+
+```text
+python3 -m pytest tests/test_e2e_transfer.py -v
+3 passed in 15.47s
+```
+
+## August 8, 2026 — ABOR and Disconnect During a Waiting Upload
+
+**Exact prompt:**
+> "ok làm tiếp thoi, cái nào cần tôi thủ công thì bảo nhé"
+
+**Raw GenAI output:**
+
+The review found that RDT cancellation/timeout raises `RuntimeError`, while
+`TransferManager` only converted `OSError`, `TypeError`, and `ValueError` into
+an FTP result. The change added `RuntimeError` to the same failure mapping so
+the command worker returns a structured `426` instead of relying on its generic
+exception fallback.
+
+**Review and refinement:**
+
+- Added a production PASV `STOR` test that sends no UDP data, waits until a
+  `.part` file exists, then issues `ABOR` through the real TCP control socket.
+- Added the same waiting-upload setup but closes the control socket instead.
+- Both tests assert temporary-file removal and preservation of the existing
+  target; the disconnect test also waits for the server active-client count to
+  return to the fixture's one remaining client.
+- No manual step is required for this result because automated tests exercise
+  the actual TCP command, UDP wait, RDT adapter, transfer manager, and
+  filesystem cleanup path.
+
+**Affected files:**
+
+- `server/transfer_manager.py`
+- `tests/test_e2e_transfer.py`
+- `docs/api-contract.md`, `docs/role-c-week-2.md`, `docs/project-status.md`,
+  `docs/code-change-history.md`, `filephanchiacv/tuan-2.5-fix.md`
+
+**Verification:**
+
+```text
+python3 -m pytest tests/test_e2e_transfer.py -v
+5 passed in 18.03s
+
+python3 -m pytest -q
+189 passed in 113.94s
+```
+
+Logs: `docs/evidence/week-2.5-e2e-transfer.log` and
+`docs/evidence/week-2.5-pytest.log`.
+
+## August 8, 2026 — LAN Demo Launcher
+
+**Exact prompt:**
+> "vậy làm tiếp thôi"
+
+**Raw GenAI output:**
+
+The remaining evidence requires two physical machines, so the server entry
+point was made configurable instead of hard-coding localhost. PASV needs a
+separate advertised IP when the TCP listener binds `0.0.0.0`; otherwise a
+remote client may receive an unusable endpoint.
+
+**Review and refinement:**
+
+- Added backward-compatible `FTPServer.advertised_host` and command-line
+  `--host`, `--port`, `--ftp-root`, `--advertise-host` arguments.
+- `ClientHandler` uses the configured advertised host only when supplied;
+  localhost tests keep the previous socket-derived address.
+- This prepares a LAN demo but cannot prove two-machine routing in one local
+  WSL2 environment; that final run is explicitly manual evidence.
+
+**Affected files:**
+
+- `server/threaded_server.py`
+- `server/client_handler.py`
+- `README.md`
+- `docs/api-contract.md`, `docs/project-status.md`,
+  `docs/code-change-history.md`, `filephanchiacv/tuan-2.5-fix.md`
+
+**Verification:**
+
+```text
+python3 -m server.threaded_server --help
+python3 -m pytest tests/test_threaded_server.py tests/test_e2e_transfer.py -q
+10 passed in 21.56s
+```
+
+## August 8, 2026 — Week 2.5 Checklist Consolidation
+
+**Exact prompt:**
+> "cái tuan-2.5-fix đang bị nhiều cái checklist, lằng quằng nhiều cái quá,
+> format lại là checklist của role a, b ,c thôi, dependency, definition of
+> done. Reeview tổng"
+
+**Raw GenAI output:**
+
+The old file contained several historical phases and audits beside current
+tasks, leaving completed and obsolete items mixed with pending work. It was
+replaced with one current checklist grouped by Role A, Role B, Role C,
+dependencies, and Definition of Done.
+
+**Review and refinement:**
+
+- Completion claims are linked to concrete evidence: full WSL2 pytest (189
+  passed), E2E (5 passed), hash files, and concurrent-client log.
+- Only three unresolved categories remain: shared `LIST/NLST` design,
+  two-machine LAN evidence, and unified progress/logging.
+- Historical detail was preserved in `docs/code-change-history.md`, rather
+  than duplicated in the operational checklist.
+
+**Affected files:**
+
+- `filephanchiacv/tuan-2.5-fix.md`
+- `docs/code-change-history.md`
+- `docs/genai-log-c.md`
+
+## August 8, 2026 — LIST/NLST Transport Clarification
+
+**Exact prompt:**
+> "cái quyết định chung list/nlst đó là sao" and "trong file requirement như
+> thế nào nhỉ" followed by "v đi"
+
+**Raw GenAI output:**
+
+The requirement was read directly. It states that every approved command and
+every reply use the TCP control channel, while UDP carries actual file payload.
+LIST/NLST return directory metadata, so their current TCP textual result is
+aligned with the requirement and does not need an RDT transfer.
+
+**Manual refinement:**
+
+- Recorded the decision in `docs/api-contract.md` §6.1.
+- Removed LIST/NLST from the remaining dependency and Definition of Done items.
+- Kept Role A as command/reply owner and Role C as validated listing provider.
+
+**Evidence:**
+
+- `filephanchiacv/Project1_SocketProgramming_2026.md` §1.1–1.2 and §2.2–2.3
+- Full WSL2 pytest: 189 passed in 113.94s
+
+## August 8, 2026 — Real CLI Progress and Server Lifecycle Logging
+
+**Exact prompt:**
+> "à vậy phần nào role C, cứ làm tiếp đi"
+
+**Raw GenAI output:**
+
+The review found that progress rendering existed only as a UI helper and server
+logging did not yet show all information needed for the demo checklist. The
+implementation normalized the core RDT callback, connected it to `FTPClient`
+and `demo_transfer`, and added thread-safe lifecycle logs.
+
+**Manual refinement:**
+
+- PASS arguments are redacted before logging.
+- Server logs connection IP, command, reply, session ID, transfer ID, active
+  session snapshot, transfer mode, byte count and result.
+- A mock-server cleanup regression was found during full pytest and fixed by
+  treating active-session APIs as optional for minimal test doubles.
+
+**Affected files:**
+
+- `server/logging_utils.py`, `server/threaded_server.py`,
+  `server/client_handler.py`, `server/command_handler.py`
+- `common/rdt_receiver.py`, `client/ftp_client.py`,
+  `client/demo_transfer.py`, `tests/test_e2e_transfer.py`
+
+**Verification:**
+
+```text
+Focused command/server/E2E/CLI tests: 62 passed in 22.16s
+Full WSL2 pytest: 189 passed in 102.50s
+```
+
+Evidence: `docs/evidence/week-2.5-cli-logging.log` and
+`docs/evidence/week-2.5-pytest.log`.
+
+## August 8, 2026 — Correct Download Progress Total
+
+**Exact prompt:**
+> The user pasted the manual PASV progress/server logs. Upload rose normally,
+> but every download chunk displayed 100%.
+
+**Raw GenAI output:**
+
+The server RDT sender did not receive the validated file size for RETR, so it
+sent zero in the RDT START metadata. The receiver therefore had no total and
+the CLI used the current chunk count as a fallback total.
+
+**Manual refinement:**
+
+- Added optional `total_bytes` to the shared `TransferContext`.
+- `TransferManager.download()` obtains the validated size from
+  `FilesystemService`; `RDTSenderAdapter` passes it to RDT START.
+- Added an E2E assertion requiring every download progress callback to report
+  the source file's actual size.
+
+**Verification:**
+
+```text
+E2E: 5 passed in 17.61s
+Full WSL2 pytest: 189 passed in 106.91s
+```
+
+The old manual progress log remains valid for successful PASV transfer and hash,
+but a new screenshot is needed to show the corrected download display.
+
+## August 8, 2026 — PASV Progress Screenshot Evidence
+
+**Exact prompt:**
+> "ok xog r á, đã lưu"
+
+**Evidence update:**
+
+The user confirmed that the corrected PASV server-log, progress, and success
+screenshots were saved under `docs/evidence/screenshots/`. This closes the
+localhost visual-evidence item. LAN remains pending because it requires a
+second machine/network path.

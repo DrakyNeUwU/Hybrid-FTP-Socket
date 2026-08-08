@@ -62,10 +62,10 @@ class TestThreadedServer:
         banner = s.recv(1024).decode('utf-8')
         assert "220" in banner
 
-        # 2. Gửi lệnh ECHO
-        s.sendall(b"HELLO SERVER\r\n")
+        # 2. Gửi FTP command hợp lệ
+        s.sendall(b"NOOP\r\n")
         response = s.recv(1024).decode('utf-8')
-        assert "200 ECHO: HELLO SERVER" in response
+        assert "200 NOOP OK" in response
 
         # 3. Gửi QUIT
         s.sendall(b"QUIT\r\n")
@@ -93,13 +93,12 @@ class TestThreadedServer:
                 if "220" not in banner:
                     errors.append(f"Client {client_id}: Banner error")
 
-                # Gửi message chứa client_id riêng biệt
-                msg = f"TEST_MSG_{client_id}"
-                cs.sendall(f"{msg}\r\n".encode('utf-8'))
+                # Gửi FTP command không thay đổi session state.
+                cs.sendall(b"NOOP\r\n")
 
                 resp = cs.recv(1024).decode('utf-8')
-                if f"200 ECHO: {msg}" not in resp:
-                    errors.append(f"Client {client_id}: Echo mismatch -> {resp}")
+                if "200 NOOP OK" not in resp:
+                    errors.append(f"Client {client_id}: NOOP mismatch -> {resp}")
 
                 # Chờ nhẹ 0.1s để giữ kết nối đồng thời
                 time.sleep(0.1)

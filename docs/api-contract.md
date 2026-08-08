@@ -137,6 +137,7 @@ class TransferContext:
     chunk_size: int
     timeout_seconds: float
     retry_limit: int
+    total_bytes: int | None
 
 @dataclass(frozen=True)
 class TransferResult:
@@ -180,6 +181,24 @@ commit finish.
 - Status: `Needs change`; current handler creates a UDP socket for PASV but always
   advertises `127.0.0.1`, does not replace old socket safely, and Active/PASV is not
   end-to-end verified.
+
+## 6.1 LIST/NLST transport decision
+
+`LIST` and `NLST` are commands and their textual results are sent on the TCP
+control channel. This follows the project requirement: every approved command
+is transmitted over TCP control, every reply uses TCP control, and UDP is
+reserved for actual file payload. The listing is metadata/command output, not a
+file payload.
+
+- `LIST [path]`: TCP reply contains the detailed name, size, type and
+  permissions listing.
+- `NLST [path]`: TCP reply contains the plain name-only listing.
+- No UDP endpoint, RDT transfer ID, `150`, or `226` lifecycle is required for
+  a listing beyond the existing textual command reply.
+- Owner: A handles command/reply; C supplies the validated filesystem listing.
+
+**Status:** Existing and aligned with
+`filephanchiacv/Project1_SocketProgramming_2026.md` §2.2–2.3.
 
 ## 7. RDT packet contract
 
@@ -228,8 +247,10 @@ ProgressCallback = Callable[[str, int, int | None], None]
 # transfer_id, acknowledged_or_committed_bytes, total_bytes
 ```
 
-Current sender/receiver callback shapes differ (`(transferred,total)` vs
-`(len(payload))`): `Needs change`.
+Core sender/receiver callbacks now use the same shape. Legacy file-helper
+callbacks retain their older shapes for compatibility, while `FTPClient` uses
+the normalized callback to report upload/download progress in the demo CLI.
+**Status:** Existing; verified by CLI/server/E2E tests.
 
 ## 9. Socket, file and worker ownership
 
@@ -251,8 +272,10 @@ Every command/transfer event logs timestamp, client IP, session ID, transfer ID,
 operation, mode, result and byte count; password and file contents are never logged.
 Registry/log locks protect shared structures only. Session fields are owned by one
 client thread except `cancel_event`, which is the explicitly synchronized A/B/C
-handoff. Current server has timestamp/redaction/session snapshots, but command and
-transfer IDs are not consistently logged: `Needs change`.
+handoff. Server logging now records connected client IP, redacted command,
+reply, session ID, transfer ID, active-session snapshot, transfer mode, byte
+count and result. The demo client renders real upload/download progress.
+**Status:** Existing; screenshots remain manual evidence.
 
 ## 11. Contract change procedure
 
@@ -269,3 +292,10 @@ transfer IDs are not consistently logged: `Needs change`.
 | Date | Change | Decision/reviewers | Evidence |
 |---|---|---|---|
 | 2026-08-07 | Initial contract audit | Pending A/B/C confirmation | Source inspection; no code changed |
+| 2026-08-08 | Implemented `TransferContext` and canonical adapters | A/B implementation; C filesystem boundary preserved | 52 Role A + 21 protocol + 14 fault tests pass |
+| 2026-08-08 | Verified unchanged contract on WSL2 | A/C test repair; no API/header change | `python3 -m pytest -q`: 186 passed in 104.09s; saved evidence log |
+| 2026-08-08 | RDT runtime failures now map to structured FTP `426` | C integration; no wire/API signature change | Production PASV ABOR and disconnect cleanup tests pass; full pytest: 189 passed in 113.94s |
+| 2026-08-08 | Added configurable PASV advertised host for LAN demo | C integration; `FTPServer.advertised_host` is optional and backward compatible | `python3 -m server.threaded_server --help`; threaded + E2E: 10 passed in 21.56s |
+| 2026-08-08 | Clarified LIST/NLST transport | A/B/C requirement decision: textual listing stays on TCP control; UDP is file payload only | Requirement §1.1–1.2, §2.2–2.3; existing command tests and full pytest 189 passed |
+| 2026-08-08 | Normalized progress and server lifecycle logging | C integration; legacy file-helper callbacks remain backward compatible | Command/server/E2E/CLI: 62 passed; full pytest: 189 passed in 102.50s |
+| 2026-08-08 | Added `TransferContext.total_bytes` for RETR progress | A/C/B compatible optional field; sender places it in RDT START | E2E progress-total assertion: 5 passed in 17.61s; full pytest: 189 passed in 106.91s |
