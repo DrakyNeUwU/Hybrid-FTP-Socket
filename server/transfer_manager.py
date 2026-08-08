@@ -7,8 +7,9 @@ path/file work to :class:`common.filesystem_service.FilesystemService`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import os
+import socket
 import threading
 from collections.abc import Iterable
 from typing import Any, Callable
@@ -18,6 +19,8 @@ from common.filesystem_service import (
     FilesystemService,
     TransferCancelledError,
 )
+from common.rdt_context import Endpoint, TransferContext
+from common.RDTHeader import RDTHeader
 
 
 @dataclass(frozen=True)
@@ -71,17 +74,18 @@ class TransferManager:
         """Receive bytes, atomically commit them, and return a structured result."""
 
         event = self._event_for(session, cancel_event)
+        context = self._context_for(session, "STOR", data_socket, endpoint, event)
         try:
             service, cwd, client_path = self._target(service_path=filepath, session=session)
             if chunks is None:
-                chunks = self._receive(data_socket, endpoint, event)
+                chunks = self._receive(data_socket, endpoint, context)
             result = service.store(cwd, client_path, chunks, event)
             return TransferResult(True, 226, result.bytes_written, result.path)
         except TransferCancelledError as error:
             return self._failure(error)
         except FilesystemOperationError as error:
             return self._failure(error)
-        except (OSError, TypeError, ValueError) as error:
+        except (OSError, RuntimeError, TypeError, ValueError) as error:
             return TransferResult(False, 426, error=str(error))
         finally:
             self._finish(session, event)
@@ -99,15 +103,16 @@ class TransferManager:
         """Append received chunks through the filesystem service atomically."""
 
         event = self._event_for(session, cancel_event)
+        context = self._context_for(session, "APPE", data_socket, endpoint, event)
         try:
             service, cwd, client_path = self._target(service_path=filepath, session=session)
             if chunks is None:
-                chunks = self._receive(data_socket, endpoint, event)
+                chunks = self._receive(data_socket, endpoint, context)
             result = service.append(cwd, client_path, chunks, event)
             return TransferResult(True, 226, result.bytes_written, result.path)
         except (TransferCancelledError, FilesystemOperationError) as error:
             return self._failure(error)
-        except (OSError, TypeError, ValueError) as error:
+        except (OSError, RuntimeError, TypeError, ValueError) as error:
             return TransferResult(False, 426, error=str(error))
         finally:
             self._finish(session, event)
@@ -124,15 +129,16 @@ class TransferManager:
         """Store an upload under a server-generated unique filename."""
 
         event = self._event_for(session, cancel_event)
+        context = self._context_for(session, "STOU", data_socket, endpoint, event)
         try:
             service = self._service_for(session)
             if chunks is None:
-                chunks = self._receive(data_socket, endpoint, event)
+                chunks = self._receive(data_socket, endpoint, context)
             result = service.store_unique(session.current_dir, chunks, event)
             return TransferResult(True, 226, result.bytes_written, result.path)
         except (TransferCancelledError, FilesystemOperationError) as error:
             return self._failure(error)
-        except (OSError, TypeError, ValueError) as error:
+        except (OSError, RuntimeError, TypeError, ValueError) as error:
             return TransferResult(False, 426, error=str(error))
         finally:
             self._finish(session, event)
@@ -149,10 +155,18 @@ class TransferManager:
         """Read a validated file and send it through the RDT adapter."""
 
         event = self._event_for(session, cancel_event)
+        context = self._context_for(session, "RETR", data_socket, endpoint, event)
         try:
             service, cwd, client_path = self._target(service_path=filepath, session=session)
             chunks = service.read_chunks(cwd, client_path)
-            transferred = self._send(chunks, data_socket, endpoint, event)
+            context = replace(context, total_bytes=service.size(cwd, client_path))
+            if getattr(session, "data_mode", None) == "PASSIVE":
+                peer = self._wait_for_passive_peer(data_socket, session, context)
+                context = replace(
+                    context,
+                    endpoint=Endpoint(peer[0], peer[1], "PASSIVE"),
+                )
+            transferred = self._send(chunks, data_socket, context.endpoint, context)
             if transferred is False:
                 return TransferResult(False, 426, error="RDT sender failed")
             count = transferred if isinstance(transferred, int) else 0
@@ -161,7 +175,7 @@ class TransferManager:
             return self._failure(error)
         except FilesystemOperationError as error:
             return self._failure(error)
-        except (OSError, TypeError, ValueError) as error:
+        except (OSError, RuntimeError, TypeError, ValueError) as error:
             return TransferResult(False, 426, error=str(error))
         finally:
             self._finish(session, event)
@@ -209,17 +223,68 @@ class TransferManager:
             client_path = service_path
         return service, cwd, client_path
 
-    def _receive(self, data_socket: Any, endpoint: Any, event: threading.Event):
+    def _receive(self, data_socket: Any, endpoint: Any, context: TransferContext):
         if self.receiver is None:
             raise ValueError("No RDT receiver configured")
         method = getattr(self.receiver, "receive", self.receiver)
-        return self._invoke(method, data_socket, endpoint, event)
+        return self._invoke(method, data_socket, context.endpoint, context)
 
-    def _send(self, chunks: Iterable[bytes], data_socket: Any, endpoint: Any, event: threading.Event):
+    def _send(self, chunks: Iterable[bytes], data_socket: Any, endpoint: Any, context: TransferContext):
         if self.sender is None:
             raise ValueError("No RDT sender configured")
         method = getattr(self.sender, "send", self.sender)
-        return self._invoke(method, chunks, data_socket, endpoint, event)
+        return self._invoke(method, chunks, data_socket, context.endpoint, context)
+
+    @staticmethod
+    def _wait_for_passive_peer(data_socket: Any, session: Any,
+                               context: TransferContext) -> tuple[str, int]:
+        """Read the client's authenticated UDP readiness probe for PASV RETR."""
+        if data_socket is None:
+            raise ValueError("Passive transfer has no UDP socket")
+        data_socket.settimeout(context.timeout_seconds)
+        expected_ip = getattr(session, "peer_ip", None)
+        for _ in range(context.max_timeouts):
+            if context.cancel_event.is_set():
+                raise TransferCancelledError()
+            try:
+                packet, address = data_socket.recvfrom(RDTHeader.size + 64)
+            except socket.timeout:
+                continue
+            except OSError as error:
+                raise ValueError("Passive UDP socket closed") from error
+            if expected_ip and address[0] != expected_ip:
+                continue
+            try:
+                header = RDTHeader.deserialize(packet)
+            except ValueError:
+                continue
+            if (
+                header.flags == RDTHeader.FLAG_START
+                and header.seq_num == 0
+                and header.validate_length(packet)
+                and header.verify_checksum(packet[RDTHeader.size:])
+            ):
+                return address[0], address[1]
+        raise ValueError("Passive client did not provide a UDP readiness probe")
+
+    @staticmethod
+    def _context_for(session: Any, operation: str, data_socket: Any,
+                     endpoint: tuple[str, int] | Endpoint | None,
+                     event: threading.Event) -> TransferContext:
+        if isinstance(endpoint, Endpoint):
+            resolved = endpoint
+        elif endpoint is not None:
+            mode = getattr(session, "data_mode", "PASSIVE") or "PASSIVE"
+            resolved = Endpoint(endpoint[0], endpoint[1], mode)
+        else:
+            resolved = Endpoint("127.0.0.1", 0, "PASSIVE")
+        return TransferContext(
+            transfer_id=str(getattr(session, "transfer_id", "unknown")),
+            operation=operation,
+            session_id=str(getattr(session, "session_id", "unknown")),
+            endpoint=resolved,
+            cancel_event=event,
+        )
 
     @staticmethod
     def _invoke(method: Callable, *args):
@@ -243,3 +308,13 @@ class TransferManager:
         if getattr(session, "transfer_cancel_event", None) is event:
             session.transfer_cancel_event = None
         session.current_transfer = None
+        data_socket = getattr(session, "data_socket", None)
+        if data_socket is not None:
+            try:
+                data_socket.close()
+            except OSError:
+                pass
+        session.data_socket = None
+        session.data_host = None
+        session.data_port = None
+        session.data_mode = None

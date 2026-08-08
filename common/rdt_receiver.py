@@ -6,10 +6,14 @@ from collections.abc import Iterator
 from typing import Callable
 
 from common.RDTHeader import RDTHeader
+from common.rdt_context import normalize_transfer_id
 
 
 DEFAULT_TIMEOUT_S: float = 1.0
-DEFAULT_MAX_TIMEOUTS: int = 10  
+# Keep receiver failure bounded when the sender disappears.  Five one-second
+# waits are long enough for normal retransmission but short enough for callers
+# to observe a finite failure promptly.
+DEFAULT_MAX_TIMEOUTS: int = 5
 _RECV_BUF: int = RDTHeader.size + 1024 + 64 
 
 ProgressCallback = Callable[[str, int, int | None], None]
@@ -68,7 +72,7 @@ def receive_chunks_rdt(
             timeout_count += 1
             if timeout_count >= max_timeouts:
                 raise RuntimeError(
-                    f"[RDT] Không nhận gói sau {max_timeouts * timeout_s:.0f}s. Hủy."
+                    f"[RDT] No packet received after {max_timeouts * timeout_s:.0f}s"
                 )
             continue
         except OSError as exc:
@@ -79,7 +83,7 @@ def receive_chunks_rdt(
             continue
 
         if peer_addr is not None and addr != peer_addr:
-            print(f"[RDT][Security] Gói từ {addr}, mong {peer_addr}. Bỏ qua.")
+            print(f"[RDT][Security] Packet from {addr} ignored")
             continue
 
         try:
@@ -90,20 +94,23 @@ def receive_chunks_rdt(
         if transfer_id is None:
             transfer_id = header.transfer_id
         elif header.transfer_id != transfer_id:
-            print(
-                f"[RDT][Security] transfer_id {header.transfer_id}"
-                f" != {transfer_id}. Bỏ qua."
-            )
+            print(f"[RDT][Security] transfer_id {header.transfer_id} != {transfer_id}")
             continue
 
         if header.flags & RDTHeader.FLAG_ABORT:
-            print("[RDT][Abort] Nhận tín hiệu hủy từ sender.")
+            if not header.verify_checksum(b""):
+                continue
+            print("[RDT][Abort] Sender cancelled transfer")
             raise RuntimeError("Transfer aborted by sender")
 
         if header.flags & RDTHeader.FLAG_START:
+            if header.flags != RDTHeader.FLAG_START or header.seq_num != 0:
+                continue
             start_payload = data[RDTHeader.size: RDTHeader.size + header.length]
+            if not header.validate_length(data):
+                continue
             if not header.verify_checksum(start_payload):
-                print("[RDT][START] Checksum START lỗi. Bỏ qua.")
+                print("[RDT][START] Invalid checksum")
                 continue
 
             if peer_addr is None:
@@ -121,15 +128,14 @@ def receive_chunks_rdt(
             continue  
 
         if not header.validate_length(data):
-            print(
-                f"[RDT][Length] header.length={header.length} "
-                f"vượt quá dữ liệu thật ({len(data) - RDTHeader.size} bytes). Bỏ qua."
-            )
+            print(f"[RDT][Length] Invalid payload length seq={header.seq_num}")
+            continue
+        if not RDTHeader.is_valid_flags(header.flags):
             continue
         payload = data[RDTHeader.size: RDTHeader.size + header.length]
 
         if not header.verify_checksum(payload):
-            print(f"[RDT][Checksum] Lỗi checksum seq={header.seq_num}. Bỏ qua.")
+            print(f"[RDT][Checksum] Invalid checksum seq={header.seq_num}")
             continue
 
         if peer_addr is None:
@@ -150,19 +156,19 @@ def receive_chunks_rdt(
                 return
 
         elif header.seq_num < expected_seq:
-            print(f"[RDT][Dup] Gói cũ seq={header.seq_num}, re-ACK.")
+            print(f"[RDT][Dup] Duplicate seq={header.seq_num}, re-ACK")
             _send_ack(udp_socket, peer_addr, transfer_id, header.seq_num)
 
         else:
-            print(
-                f"[RDT][OOO] seq={header.seq_num} nhưng đợi seq={expected_seq}. Bỏ qua."
-            )
+            print(f"[RDT][OOO] Got seq={header.seq_num}, expected={expected_seq}")
 
 def receive_file_rdt(
     udp_socket: socket.socket,
     save_path: str,
     progress_cb=None,
     is_cancelled=None,
+    transfer_id: int | None = None,
+    progress_callback: ProgressCallback | None = None,
 ) -> bool:
     import os
     from common.file_handler import write_file_from_chunks
@@ -181,10 +187,17 @@ def receive_file_rdt(
         def adapted_cb(tid: str, committed: int, total: int | None) -> None:
             progress_cb(committed)
 
+    def combined_cb(tid: str, committed: int, total: int | None) -> None:
+        if progress_callback is not None:
+            progress_callback(tid, committed, total)
+        if progress_cb is not None:
+            progress_cb(committed)
+
     try:
         chunks_gen = receive_chunks_rdt(
             udp_socket,
-            progress_cb=adapted_cb,
+            transfer_id_hint=transfer_id,
+            progress_cb=combined_cb if (progress_callback or progress_cb) else None,
             cancel_event=cancel_event,
         )
         write_file_from_chunks(save_path, chunks_gen)
@@ -225,36 +238,6 @@ def _fin_grace(
     timeout_s: float,
     grace_attempts: int = 3,
 ) -> None:
-    fin_timeout = min(timeout_s, 0.2)
-    sock.settimeout(fin_timeout)
-    for _ in range(grace_attempts):
-        try:
-            data, addr = sock.recvfrom(_RECV_BUF)
-            if addr != peer or len(data) < RDTHeader.size:
-                continue
-            try:
-                hdr = RDTHeader.deserialize(data)
-            except ValueError:
-                continue
-            if (
-                hdr.transfer_id == transfer_id
-                and hdr.seq_num == fin_seq
-                and (hdr.flags & RDTHeader.FLAG_FIN)
-            ):
-                _send_ack(sock, peer, transfer_id, fin_seq)
-        except socket.timeout:
-            continue  
-        except OSError:
-            break
-
-def _fin_grace(
-    sock: socket.socket,
-    peer: tuple,
-    transfer_id: int,
-    fin_seq: int,
-    timeout_s: float,
-    grace_attempts: int = 3,
-) -> None:
   
     sock.settimeout(timeout_s)
     for _ in range(grace_attempts):
@@ -281,7 +264,4 @@ def _ctx_transfer_id(context: object) -> int | None:
     raw = getattr(context, "transfer_id", None)
     if raw is None:
         return None
-    if isinstance(raw, str):
-        import hashlib
-        return int(hashlib.sha256(raw.encode()).hexdigest()[:8], 16)
-    return int(raw) & 0xFFFFFFFF
+    return normalize_transfer_id(raw)

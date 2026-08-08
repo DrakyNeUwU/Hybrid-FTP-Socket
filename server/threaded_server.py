@@ -1,3 +1,4 @@
+import argparse
 import socket
 import threading
 import sys
@@ -7,45 +8,8 @@ import time
 
 
 from server.client_handler import ClientHandler
+from server.logging_utils import redact_command as _redact_command, safe_log
 
-
-
-
-
-
-log_lock = threading.Lock()
-
-
-
-def safe_log(msg):
-
-    timestamp = time.strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-
-    line = f"[{timestamp}] {msg}"
-
-
-    with log_lock:
-
-        print(
-            line,
-            flush=True
-        )
-
-
-
-def _redact_command(command):
-
-    verb, separator, _ = command.partition(" ")
-
-
-    if separator and verb.upper()=="PASS":
-
-        return f"{verb} ********"
-
-
-    return command
 
 
 
@@ -67,11 +31,15 @@ class FTPServer:
     def __init__(
         self,
         host="0.0.0.0",
-        port=2121
+        port=2121,
+        ftp_root="./ftp_root",
+        advertised_host=None,
     ):
 
         self.host = host
         self.port = port
+        self.ftp_root = ftp_root
+        self.advertised_host = advertised_host
 
 
         self.server_socket = None
@@ -122,6 +90,8 @@ class FTPServer:
             )
         )
 
+        self.port = self.server_socket.getsockname()[1]
+
 
         self.server_socket.listen(5)
 
@@ -160,6 +130,13 @@ class FTPServer:
                 self.register_client(
                     handler
                 )
+
+                safe_log(
+                    f"Client connected session={handler.session_id} "
+                    f"ip={client_addr[0]}:{client_addr[1]} "
+                    f"active={self.get_active_client_count()}"
+                )
+                safe_log(f"Active sessions={self.get_active_sessions()}")
 
 
                 handler.start()
@@ -303,20 +280,30 @@ class FTPServer:
 
 
 
-if __name__=="__main__":
+def main(argv=None):
+    """Start the FTP server with optional LAN-friendly endpoint settings."""
 
-
-    server = FTPServer(
-        host="127.0.0.1",
-        port=2121
+    parser = argparse.ArgumentParser(description="Hybrid FTP TCP control server")
+    parser.add_argument("--host", default="127.0.0.1", help="TCP bind address")
+    parser.add_argument("--port", type=int, default=2121, help="TCP control port")
+    parser.add_argument("--ftp-root", default="./ftp_root", help="FTP root directory")
+    parser.add_argument(
+        "--advertise-host",
+        default=None,
+        help="IP address advertised in PASV replies; required when binding 0.0.0.0 for LAN clients",
     )
-
-
+    args = parser.parse_args(argv)
+    server = FTPServer(
+        host=args.host,
+        port=args.port,
+        ftp_root=args.ftp_root,
+        advertised_host=args.advertise_host,
+    )
     try:
-
         server.start()
-
-
     except KeyboardInterrupt:
-
         server.stop()
+
+
+if __name__ == "__main__":
+    main()

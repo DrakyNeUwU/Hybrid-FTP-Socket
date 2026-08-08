@@ -17,6 +17,7 @@ Thumbs.db
 # Project-specific: dữ liệu test transfer, không commit file test lớn
 tests/sample_files/*
 !tests/sample_files/.gitkeep
+client/downloads/
 
 # Logs
 *.log

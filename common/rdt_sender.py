@@ -6,6 +6,7 @@ from collections.abc import Iterable, Iterator
 from typing import Callable
 
 from common.RDTHeader import RDTHeader
+from common.rdt_context import normalize_transfer_id
 
 DEFAULT_TIMEOUT_S: float = 0.5
 DEFAULT_RETRY_LIMIT: int = 10
@@ -28,6 +29,7 @@ class RDTSenderAdapter:
         timeout_s: float = getattr(context, "timeout_seconds", DEFAULT_TIMEOUT_S)
         retry_limit: int = getattr(context, "retry_limit", DEFAULT_RETRY_LIMIT)
         cancel_event: threading.Event | None = getattr(context, "cancel_event", None)
+        total_bytes: int | None = getattr(context, "total_bytes", None)
 
         try:
             return send_chunks_rdt(
@@ -39,6 +41,7 @@ class RDTSenderAdapter:
                 timeout_s=timeout_s,
                 retry_limit=retry_limit,
                 cancel_event=cancel_event,
+                total_bytes=total_bytes,
             )
         except RuntimeError as exc:
             raise RuntimeError(str(exc)) from exc
@@ -94,10 +97,7 @@ def send_chunks_rdt(
                     udp_socket.sendto(packet, (resolved_ip, dest_port))
                     ack_data, addr = udp_socket.recvfrom(RDTHeader.size + 64)
                     if addr[0] != resolved_ip or addr[1] != dest_port:
-                        print(
-                            f"[RDT][Security] ACK từ {addr}, "
-                            f"mong {(resolved_ip, dest_port)}. Bỏ qua."
-                        )
+                        print(f"[RDT][Security] ACK from {addr} ignored")
                         continue
 
                     try:
@@ -106,18 +106,16 @@ def send_chunks_rdt(
                         continue
 
                     if not ack_hdr.verify_checksum(b""):
-                        print(
-                            f"[RDT][Security] ACK checksum lỗi seq={seq_num}. Bỏ qua."
-                        )
+                        print(f"[RDT][Security] Invalid ACK checksum seq={seq_num}")
                         continue
                     if ack_hdr.length != 0:
-                        print(
-                            f"[RDT][Security] ACK length={ack_hdr.length} != 0. Bỏ qua."
-                        )
+                        print(f"[RDT][Security] Invalid ACK length seq={seq_num}")
                         continue
                     if (
-                        (ack_hdr.flags & RDTHeader.FLAG_ACK)
+                        RDTHeader.is_valid_flags(ack_hdr.flags)
+                        and ack_hdr.flags == RDTHeader.FLAG_ACK
                         and ack_hdr.transfer_id == transfer_id
+                        and ack_hdr.seq_num == 0
                         and ack_hdr.ack_num == seq_num
                     ):
                         ack_received = True
@@ -127,14 +125,11 @@ def send_chunks_rdt(
                         break
 
                 except socket.timeout:
-                    print(
-                        f"[RDT][Timeout] Gửi lại seq={seq_num} "
-                        f"(lần {attempt}/{retry_limit})"
-                    )
+                    print(f"[RDT][Timeout] Retry seq={seq_num} ({attempt}/{retry_limit})")
 
             if not ack_received:
                 raise RuntimeError(
-                    f"[RDT] Quá {retry_limit} lần thử gói seq={seq_num}. Hủy."
+                    f"[RDT] Retry limit {retry_limit} exceeded for seq={seq_num}"
                 )
 
         return transferred_bytes
@@ -150,6 +145,7 @@ def send_file_rdt(
     is_cancelled=None,
     max_retries: int = DEFAULT_RETRY_LIMIT,
     transfer_id: int | None = None,
+    udp_socket: socket.socket | None = None,
 ) -> bool:
     import random
     import os
@@ -180,6 +176,7 @@ def send_file_rdt(
             dest_ip,
             dest_port,
             transfer_id,
+            udp_socket=udp_socket,
             retry_limit=max_retries,
             progress_cb=adapted_cb,
             cancel_event=cancel_event,
@@ -252,7 +249,4 @@ def _ctx_transfer_id(context: object) -> int:
     raw = getattr(context, "transfer_id", None)
     if raw is None:
         return random.randint(1, 0xFFFFFFFF)
-    if isinstance(raw, str):
-        import hashlib
-        return int(hashlib.sha256(raw.encode()).hexdigest()[:8], 16)
-    return int(raw) & 0xFFFFFFFF
+    return normalize_transfer_id(raw)
