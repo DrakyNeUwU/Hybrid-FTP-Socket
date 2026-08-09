@@ -3,7 +3,8 @@
 **Trạng thái:** Hoàn thành  
 **Mục tiêu:** Mô tả header, serialization, ACK/retry, FIN/ABORT và bằng chứng kiểm thử cho tầng truyền dữ liệu UDP/RDT.  
 **Requirement:** RQ-04, RQ-06, RQ-10, RQ-12. **Owner:** B. **Reviewer:** A/C.  
-**Source:** `../../role-b-week-2.md`, `../../api-contract.md`.  
+**Source:** `../../api-contract.md`, `../../requirement-checklist.md`, and
+`../../evidence/final-week-rdt-gbn-verification.md`.
 **Code:** `common/RDTHeader.py`, `common/rdt_sender.py`, `common/rdt_receiver.py`.
 
 ## 5.1 Kiến trúc tầng dữ liệu

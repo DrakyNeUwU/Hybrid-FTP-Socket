@@ -3,7 +3,9 @@
 **Trạng thái:** Hoàn thành (snapshot tuần cuối, 09/08/2026)  
 **Mục tiêu:** Trình bày checklist chính thức và mapping owner.  
 **Requirement:** toàn bộ yêu cầu đề §1–§4.5. **Owner:** A. **Reviewer:** B/C.  
-**Source:** [`../../requirement-checklist.md`](../../requirement-checklist.md), đề gốc §2.1–§2.4, [`../../report_role_a_week2.md`](../../report_role_a_week2.md).  
+**Source:** [`../../requirement-checklist.md`](../../requirement-checklist.md),
+`../../../planning/Project1_SocketProgramming_2026.md` §2.1–§2.4, and
+`../../evidence/final-week-rdt-gbn-verification.md`.
 **Code:** toàn repo theo matrix.
 
 ## 2.1 Requirement → Owner mapping

@@ -1,88 +1,46 @@
 # 11. Contribution and Peer Evaluation
 
-**Trạng thái:** Scope A và C đã ghi; phần trăm và sign-off chờ cả nhóm (B-F02/B-F03).
-**Mục tiêu:** Map engineering components, commits and agreed percentages totaling 100%.
-**Requirement:** RQ-10, RQ-11. **Owner:** A/C. **Reviewer:** all members.
-**Nguồn:** `../../../planning/Socket Role.md`, Git history, role docs, evidence.
-**Trạng thái:** Hoàn thành phần đóng góp kỹ thuật của Role B và role khác; phần trăm cuối cùng cần sign-off nhóm.
+**Trạng thái:** Scope kỹ thuật đã ghi; percentage và sign-off cuối chờ cả nhóm.
 **Owner:** A/C. **Reviewer:** all members.
-**Nguồn:** `../../../planning/Socket Role.md`, Git history, role docs, evidence.
-
-| Thành phần | Owner chính | Đóng góp Role B / Role C | Evidence |
-|---|---|---|---|
-| Filesystem boundary | C | FTP-root validation, binary I/O, metadata, atomic `.part`, APPE lock, STOU | filesystem/transfer tests |
-| Server concurrency | C | Thread-per-client, active-session registry, safe stop/unregister | threaded/E2E tests |
-| Integration | C | `TransferContext` handoff, cleanup mapping, Active/PASV E2E | transfer manager và E2E logs |
-| Reliability extension | B | RDT header/checksum, sender/receiver, retry, ACK, FIN/ABORT, fault injection recovery | `pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q` → **45 passed** |
-| Demo/evidence | C | LAN PASV/ACTIVE, SHA-256, progress/logging evidence | `docs/evidence/final-*` |
-| Report support | C | Technical drafts 01/03/06/08/09 và testing evidence | report-parts workspace |
-
-Peer evaluation percentage phải do A/B/C cùng chốt, tổng đúng 100%, gắn commit
-hash/review record và sign-off. Không suy đoán percentage chỉ từ số file hoặc
-số test.
+**Nguồn:** `../../../planning/Socket Role.md`, Git history, report-parts và evidence final-week.
 
 ## 11.1 Task assignment matrix
 
-| Module | Owner chính | Collaborators | Đóng góp / evidence |
+| Component | Owner | Collaborators | Evidence / deliverable |
 |---|---|---|---|
-| TCP control connection | A | C | buffer, CRLF framing, cleanup; command/audit tests |
-| Command parser / dispatcher / FTP reply | A | — | 28-command matrix, reply codes; `TestCommandMatrix28RoleA` |
-| Session management | A | C | per-client isolation, transfer ID; `tests/test_session.py` |
-| Authentication | A | — | credential contract, RFC 959 reset; command tests |
-| Transfer orchestration (`TransferManager`) | A | B, C | `150 → 226/4xx`, ABOR/cancel; transfer-manager tests |
-| UDP reliable transfer (RDT) | B | A | Go-Back-N window 4, START ACK/retry; final RDT verification |
-| Filesystem boundary | C | A | FTP-root validation, binary I/O, atomic `.part`, APPE lock, STOU; filesystem/transfer tests |
-| Server concurrency | C | A | thread-per-client, active-session registry, safe stop; threaded/E2E tests |
-| Integration | C | A | `TransferContext` handoff, cleanup mapping, Active/PASV E2E; transfer manager và E2E logs |
-| Demo/evidence | C | A | LAN PASV/ACTIVE, SHA-256, progress/logging; `docs/evidence/final-*` |
-| Report support | C | A | technical drafts 01/03/06/08/09, testing evidence; report-parts workspace |
-| Report parts 02/04/07/14 | A | B/C | requirement mapping, control channel, Active/PASV, compliance; report-parts workspace |
+| TCP control, parser, replies, authentication | A | C review | 28-command matrix; Role A audit 63 passed |
+| Session and transfer orchestration | A | B/C | Per-client isolation, `150 → 226/4xx`, ABOR lifecycle |
+| Active/PASV negotiation | A/B | C | PORT/PASV contract, LAN PASV/ACTIVE hashes |
+| UDP RDT | B | A/C review | Header, checksum, ACK/retry, FIN/ABORT, Go-Back-N |
+| Filesystem boundary | C | A | FTP-root safety, atomic `.part`, APPE lock, STOU |
+| Server concurrency and integration | C | A/B | Thread-per-client, session registry, cleanup, E2E |
+| CLI/logging and demo evidence | C | A | Progress, PASS redaction, LAN logs/hashes |
+| Final report integration | B | A/C sign-off | `docs/report.md`, report-parts, evidence index |
 
-## 11.2 Role B contribution summary
+## 11.2 Role summaries
 
-- Role B đã thiết kế và triển khai lớp RDT trên UDP với header, checksum, ACK, timeout/retry, FIN/ABORT và recovery cho packet loss/corruption.
-- Đóng góp chính nằm ở [common/RDTHeader.py](../../../common/RDTHeader.py), [common/rdt_sender.py](../../../common/rdt_sender.py) và [common/rdt_receiver.py](../../../common/rdt_receiver.py).
-- Bổ sung và duy trì bộ test thực tế trong [tests/test_rdt.py](../../../tests/test_rdt.py) và [tests/test_rdt_fault_injection.py](../../../tests/test_rdt_fault_injection.py).
-- Evidence đã kiểm chứng bằng lệnh `python3 -m pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q` với kết quả `45 passed in 67.09s`.
-- Các thay đổi Role B cũng được phản ánh trong [docs/report-parts/technical/05-data-channel-rdt.md](../technical/05-data-channel-rdt.md) và [docs/report-parts/submission/14-requirement-compliance.md](14-requirement-compliance.md).
+- **Role A:** TCP control channel, command parser/dispatcher, session/authentication,
+  FTP replies, 28-command compliance, MODE handling, PORT/PASV control lifecycle
+  and transfer orchestration.
+- **Role B:** RDT header and UDP sender/receiver, checksum, ACK/retry,
+  START/FIN/ABORT lifecycle, fault-injection testing and final report integration.
+- **Role C:** Filesystem sandbox and atomic lifecycle, thread/session management,
+  transfer integration, Go-Back-N window 4, CLI/logging, LAN demo and final
+  evidence collection.
 
-- `66979e1` [role-a] complete tasks A-F01 and A-F02 with mode compliance tests and section 4 report
-- `efcea63` [docs][role-a] add week 2.5 detailed changes to report and genai log
-- `7571eb6` [docs][role-a] fill report-parts owned by role a with final-week evidence
-- `bc80b9c` docs: add final LAN evidence logs, screenshots, and test binaries (evidence chung)
+## 11.3 Evidence and peer review
 
-## 11.3 Self / peer evaluation
+- Role A control/session audit: **63 passed in 5.71s**.
+- Role B RDT/fault tests: **45 passed in 67.09s**; final contract evidence is in
+  `../technical/05-data-channel-rdt.md` and `../../evidence/final-week-rdt-gbn-verification.md`.
+- Role C focused audit: **135 passed in 86.22s**; final full regression:
+  **199 passed in 96.72s**; LAN evidence is in `../../evidence/final-lan-*`.
+- A reviews command/mode behavior; B reviews RDT contract/report traceability;
+  C reviews integration, cleanup and evidence selection.
 
-- **Role A (self):** hoàn thành TCP control, 28-command compliance matrix, MODE
-  negotiation trung thực (B/C → 502), transfer lifecycle `150 → 226/4xx`,
-  anti-FTP bounce, session isolation; xem `../../report_role_a_week2.md` §5/§9.
-- **Role C (self):** filesystem boundary, concurrency, integration, Go-Back-N
-  window 4, LAN evidence; xem `docs/role-c-week-2.md`.
-- **Peer review:** A review phần mode/command của B-F01; C review integration
-  transfer; B review traceability matrix (A-F02). Kết quả audit: Role A `63 passed
-  in 5.71s`, Role C `135 passed in 86.22s`.
+## 11.4 Percentages and sign-off
 
-## 11.4 Percentages
-
-**TODO(A/C/B):** Peer evaluation percentage phải do A/B/C cùng chốt, tổng đúng
-100%, gắn commit hash/review record và sign-off. Không suy đoán percentage chỉ từ
-số file hoặc số test; chốt sau khi B tổng hợp report (B-F02) và oral dry run
-(B-F03).
-Role B đã tập trung vào phần tầng dữ liệu UDP/RDT với các nhiệm vụ chính sau:
-
-- Triển khai `common/RDTHeader.py` gồm wire format, flags và CRC-32 checksum.
-- Xây dựng `common/rdt_sender.py` cho gửi chunk với timeout/retry, ACK và xử lý FIN/ABORT.
-- Xây dựng `common/rdt_receiver.py` cho nhận chunk, validate checksum/sequence và phát ACK.
-- Hoàn thiện `tests/test_rdt.py` và `tests/test_rdt_fault_injection.py` để kiểm thử loss, corruption, ACK loss, cancel, empty file và chunk-boundary transfer.
-
-## 11.3 Self / peer evaluation
-
-- **Role A (self):** hoàn thành TCP control, 28-command compliance matrix, MODE negotiation trung thực, transfer lifecycle `150 → 226/4xx`, anti-FTP bounce, session isolation; xem `../../report_role_a_week2.md` §5.
-- **Role B (self):** hoàn thành RDT header/checksum, sender/receiver, retransmission và fault-injection recovery; phần này đã có evidence kiểm thử thực tế.
-- **Peer review:** A review phần mode/command của B-F01; C review integration transfer; B review traceability matrix (A-F02). Kết quả audit cho phần RDT là các test trên `tests/test_rdt*.py` đều pass.
-
-## 11.4 Percentages
-
-**TODO(A/C):** Chốt percentage contribution tổng đúng 100% sau khi B tổng hợp report (B-F02) và có sign-off cả nhóm (B-F03); không suy luận từ self-assessment.
-
-**DoD:** Matrix phủ mọi component và tổng percentage đúng 100%.
+**TODO(A/B/C):** Agree contribution percentages totaling exactly 100% after
+Role B completes `docs/report.md` and the team completes the oral dry run.
+Record each member's sign-off with the final report/release checklist. Do not
+infer percentages from file count or self-assessment alone.

@@ -791,3 +791,39 @@ week plan, code-change history and this log.
 
 **Verification:** Evidence links resolve to `docs/evidence/final-week-rdt-gbn-verification.md`
 and final LAN artifacts; `git diff --check` and reference search are run at handoff.
+
+## August 9, 2026 — Role-Week-2 Removal and Report-Link Repair
+
+**Exact prompt:**
+> "tôi quyết xoá week-2-role-a/b/c ròi, nên bạn format lại khúc đó giùm tôi. Cái technical 04 bạn sửa theo cái của C chứ ko theo commit, link nguồn gãy vì tôi xoá rồi nên bạn sửa nhé"
+
+**Manual refinement:**
+
+- Removed report-part links to deleted Role A/B/C Week 2 files and replaced
+  them with the requirement checklist, API contract and final evidence.
+- Documented `LIST`/`NLST` exactly as the shared contract states: textual TCP
+  replies only, without UDP/RDT or `150`/`226` transfer lifecycle.
+- Consolidated the contribution matrix so A, B and C each have one scope,
+  evidence summary and one pending sign-off/percentage section.
+
+**Verification:** Reference search and `git diff --check` are run after the
+documentation cleanup.
+
+## August 9, 2026 — Final-Week Plan Source Alignment
+
+**Exact prompt:**
+> "submission/14 chỉ giữ mapping/reference; không dùng draft lịch sử để claim trạng thái cuối.là sao nhỉ, và final-week plan cập nhật lại cho tôi nhé"
+
+**Manual refinement:**
+
+- Clarified in the plan that submission component 14 is a requirement-coverage
+  cross-check, not the source of final Done/In progress claims.
+- Redirected stale Role B/Role C Week 2 references to the surviving technical
+  report parts, status, checklist and GenAI logs.
+- Updated the proven C-F01 regression baseline to 199 tests while keeping B's
+  wire-contract review and final A/B sign-off as pending work.
+
+**Affected files:** `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md`,
+`docs/code-change-history.md`, and this log.
+
+**Verification:** Manual path/reference review and `git diff --check` passed.

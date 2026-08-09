@@ -20,10 +20,11 @@ Không tick task chỉ vì code đã có; phải có test, log, screenshot hoặ
 
 **Nguồn chuẩn:**
 
-- `Project1_SocketProgramming_2026.md` §§1–4.5 — requirement và tiêu chí nộp.
-- `Socket Role.md` — ownership gốc và format tuần 3.
-- `tuan-1-chi-tiet-socket.md`, `tuan-2-chi-tiet.md`, `tuan-2.5-fix.md` —
-  carry-over.
+- `planning/Project1_SocketProgramming_2026.md` §§1–4.5 — requirement và tiêu chí nộp.
+- `planning/Socket Role.md` — ownership gốc và format tuần 3.
+- `planning/weekly-plans/tuan-1-chi-tiet-socket.md`,
+  `planning/weekly-plans/tuan-2-chi-tiet.md`,
+  `planning/weekly-plans/tuan-2.5-fix.md` — carry-over.
 - `docs/api-contract.md`, `docs/project-status.md`, `docs/requirement-checklist.md`
   — contract/trạng thái cần cập nhật theo code cuối.
 
@@ -189,7 +190,8 @@ protocol thật, gồm START, DATA/ACK, FIN/ABORT, total bytes và mode behavior
   claim data-path B/C nếu code chưa implement.
 - [ ] Rà bảng byte-level: field, offset, length, endian, checksum coverage,
   transfer ID, flags, timeout/window policy.
-- [ ] Cập nhật `docs/api-contract.md`, `docs/role-b-week-2.md`, GenAI log B.
+- [ ] Cập nhật `docs/api-contract.md`,
+  `docs/report-parts/technical/05-data-channel-rdt.md` và GenAI log B.
 
 **Review / Success checklist**
 
@@ -214,8 +216,9 @@ ACK, retry, duplicate/out-of-order, START, FIN và ABORT hoạt động thế n�
 **Owner:** Role B  
 **Collaborators:** A duyệt control/command; C duyệt filesystem/concurrency/evidence.  
 **Dependency:** A-F02, B-F01, C-F02, C-F03.  
-**Input / prerequisite:** `docs/report.md`, `docs/report-parts/`, evidence, code
-change history, Git log.
+**Input / prerequisite:** `docs/report.md`, `docs/report-parts/technical/`,
+`docs/report-parts/submission/`, `docs/project-status.md`,
+`docs/requirement-checklist.md`, evidence, code-change history và Git log.
 **Related requirement:** §2.4 (7 report sections), §§4.2–4.5.
 
 **Goal**
@@ -230,6 +233,9 @@ và đủ thông tin cho examiner kiểm tra đóng góp.
   task assignment matrix, self/peer evaluation, GenAI appendix, demo evidence.
 - [ ] Tạo final requirement traceability: §1/§2.1/§2.2/§2.3/§2.4/§4.5 → task,
   file, test/evidence.
+- [ ] Chỉ dùng `docs/report-parts/submission/14-requirement-compliance.md` làm
+  bảng mapping/reference để đối chiếu độ phủ requirement; mọi claim trạng thái
+  cuối phải lấy từ `docs/project-status.md` và `docs/requirement-checklist.md`.
 - [ ] Chuẩn hoá kết quả test mới nhất, ngày chạy, command chạy và limitations thật.
 - [ ] Thu self-assessment của A/B/C và contribution percentage tổng chính xác 100%.
 
@@ -319,21 +325,21 @@ Go-Back-N sliding window **4 packet** có giới hạn và SHA-256 end-to-end v�
 - [x] Bảo toàn peer lock, transfer ID, cancellation, FIN grace, `.part` cleanup.
 - [x] Thêm fault injection loss/corruption/reorder/window exhaustion và binary,
   empty, chunk-boundary SHA-256 tests.
-- [x] Cập nhật contract, Role C workflow và GenAI log C; shared report diagrams
-  vẫn cần B tổng hợp/review.
+- [x] Cập nhật contract, các phần report kỹ thuật Role C (`03`, `08`) và GenAI
+  log C; shared report diagrams vẫn cần B tổng hợp/review.
 
 **Review / Success checklist**
 
-- [ ] File text, binary, empty và chunk boundary round-trip đúng SHA-256.
-- [ ] Loss/corruption/duplicate/out-of-order không ghi duplicate hoặc treo vô hạn.
-- [ ] Window bị giới hạn; không flood UDP và không giữ global/session lock khi chờ ACK.
-- [ ] ABOR/disconnect giữa transfer giữ file cũ, xóa `.part`.
+- [x] File text, binary, empty và chunk boundary round-trip đúng SHA-256.
+- [x] Loss/corruption/duplicate/out-of-order không ghi duplicate hoặc treo vô hạn.
+- [x] Window bị giới hạn; không flood UDP và không giữ global/session lock khi chờ ACK.
+- [x] ABOR/disconnect giữa transfer giữ file cũ, xóa `.part`.
 
 **Definition of Done**
 
 - [x] Unit + fault-injection + FTP integration tests pass.
 - [!] A review mode selection; B review wire contract/sign-off còn cần thực hiện.
-- [x] Không có regression Active/PASV; baseline tăng lên 192 tests.
+- [x] Không có regression Active/PASV; full final regression đạt 199 tests.
 
 **Output / Deliverable:** production RDT/data-pipeline code, test suite,
 state-machine docs và reliability evidence.
@@ -410,9 +416,10 @@ trạng thái/status/history không nói quá evidence.
 - [x] Chạy final server/client live demo trên máy LAN thứ hai (PASV và ACTIVE).
 - [x] Rà `.gitignore` và Git status: demo binaries/downloads/cache bị ignore;
   curated `docs/evidence/final-*.log` được giữ cho submission.
-- [x] Cập nhật `project-status`, `code-change-history`, `tuan-2.5-fix`,
-  role-C report, GenAI log C theo evidence cuối.
-- [ ] Tạo final release checklist để A/B sign-off.
+- [x] Cập nhật `docs/project-status.md`, `docs/code-change-history.md`, các
+  report-parts kỹ thuật/submission của Role C và GenAI log C theo evidence cuối.
+- [ ] Dùng `docs/requirement-checklist.md` làm final release checklist; A/B cần
+  sign-off các phần thuộc ownership của họ.
 
 **Review / Success checklist**
 
@@ -470,6 +477,8 @@ cách cleanup session/socket/file tạm.
 - [ ] Đủ 7 section report §2.4, không placeholder/stale claim.
 - [ ] Sequence diagram, header table, session structure và tất cả flowcharts khớp code.
 - [ ] Requirement traceability map mọi requirement → code/test/evidence.
+- [ ] `submission/14` chỉ là bảng mapping/reference; status cuối trong report phải
+  khớp `docs/project-status.md` và `docs/requirement-checklist.md`.
 - [ ] README setup/run guide, test/result docs, task matrix, self/peer evaluation hoàn chỉnh.
 - [ ] GenAI logs A/B/C có prompt, raw output và refinement trung thực.
 

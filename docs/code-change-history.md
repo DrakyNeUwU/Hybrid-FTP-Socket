@@ -88,3 +88,15 @@ log client/server và hash nguồn/đích.
 | Role owner | Problem | Files changed | Reason | Verification evidence |
 |---|---|---|---|---|
 | C | Week 2 Role C document duplicated integration/evidence material needed by report components | `docs/report-parts/technical/01,03,06,08,09`, `docs/report-parts/submission/10–13`, checklist/status/contract docs; removed `docs/role-c-week-2.md` | Move ownership-scoped technical narrative and final evidence into the report workspace; preserve one evidence-backed source per report component | Cross-check against final verification: 199 full tests, 6 expanded E2E, LAN PASV/ACTIVE SHA-256 artifacts; link and diff audit pending handoff |
+
+## 09/08/2026 — Remove role-week-2 sources and repair report references
+
+| Role owner | Problem | Files changed | Reason | Verification evidence |
+|---|---|---|---|---|
+| A/B/C documentation | Role A/B/C Week 2 documents were intentionally removed, leaving report-part source links broken; contribution matrix also duplicated merge content | Report parts 02, 04, 05, 07, 11 and 14 | Use surviving requirement, API contract and evidence files as canonical sources; make LIST/NLST documentation match the TCP-only contract; consolidate contribution ownership | Reference search and `git diff --check` run after the edit |
+
+## 09/08/2026 — Final-week plan aligned to the report workspace
+
+| Role owner | Problem | Files changed | Reason | Verification evidence |
+|---|---|---|---|---|
+| C (documentation integration) | Final-week actions still named deleted Role Week 2 files and did not distinguish the requirement-mapping draft from the current project status | `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md` | Point B/C work to the report-parts workspace; define `submission/14` as mapping/reference only, with final claims sourced from project status and the acceptance checklist | Manual path/reference review; `git diff --check` passed |
