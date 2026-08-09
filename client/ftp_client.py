@@ -73,18 +73,29 @@ class FTPClient:
 
     def download_file(self, remote_filename: str, mode: str = "PASV") -> bool:
         if mode.upper() == "PASV":
-            data_socket, _ = self._pasv_download_socket()
+            data_socket, endpoint = self._pasv_download_socket()
         else:
-            data_socket, _ = self.enter_port()
+            data_socket, endpoint = self.enter_port()
 
         try:
+            if mode.upper() == "ACTIVE":
+                # Send before RETR as well: a server worker can begin immediately
+                # after its 150 reply, while stateful firewalls need an outbound
+                # datagram before accepting the server's first START.
+                self._send_active_download_probe(data_socket, endpoint, 0)
             reply = self.command(f"RETR {remote_filename}")
             transfer_id = self._transfer_id_from_reply(reply)
+            wire_transfer_id = normalize_transfer_id(transfer_id)
+            if mode.upper() == "ACTIVE":
+                # Open the client-to-server UDP path before the server sends START.
+                # This is required by stateful firewalls/NATs for server-initiated
+                # ACTIVE downloads; it does not carry file data or change FTP flow.
+                self._send_active_download_probe(data_socket, endpoint, wire_transfer_id)
             destination = os.path.join(self.download_dir, os.path.basename(remote_filename))
             ok = receive_file_rdt(
                 data_socket,
                 destination,
-                transfer_id=normalize_transfer_id(transfer_id),
+                transfer_id=wire_transfer_id,
                 progress_callback=lambda _tid, done, total: self._notify_progress(
                     "download", remote_filename, done, total
                 ),
@@ -154,6 +165,23 @@ class FTPClient:
         probe.checksum = probe.compute_checksum(b"")
         data_socket.sendto(probe.serialize(), endpoint)
         return data_socket, endpoint
+
+    @staticmethod
+    def _send_active_download_probe(
+        data_socket: socket.socket,
+        endpoint: tuple[str, int],
+        transfer_id: int,
+    ) -> None:
+        """Create UDP state for an ACTIVE download without transferring data."""
+        probe = RDTHeader(
+            transfer_id=transfer_id,
+            seq_num=0,
+            ack_num=0,
+            flags=RDTHeader.FLAG_START,
+            length=0,
+        )
+        probe.checksum = probe.compute_checksum(b"")
+        data_socket.sendto(probe.serialize(), endpoint)
 
     def _recv_reply(self) -> str:
         return self.control_socket.recv(4096).decode("utf-8")

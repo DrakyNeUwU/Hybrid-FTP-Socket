@@ -15,7 +15,7 @@ an toàn.
 
 | Kiểm chứng | Kết quả | Evidence |
 |---|---|---|
-| Full regression WSL2 | `[x]` 189 passed in 106.91s | `docs/evidence/week-2.5-pytest.log` |
+| Full regression WSL2 | `[x]` 199 passed in 96.72s | `docs/evidence/final-week-rdt-gbn-verification.md` |
 | FTP E2E localhost | `[x]` 5 passed in 18.03s | `docs/evidence/week-2.5-e2e-transfer.log` |
 | Integrity Active/PASV | `[x]` SHA-256 nguồn/server/client khớp | `docs/evidence/week-2.5-active-sha256.txt`, `week-2.5-pasv-sha256.txt` |
 | Three PASV clients | `[x]` session/file/download riêng, hash khớp | `docs/evidence/week-2.5-three-client.log` |
@@ -58,7 +58,9 @@ pytest 189 passed.
   unregister session.
 - [x] Active/PASV localhost upload/download và SHA-256 source/server/client.
 - [x] Launcher demo LAN: `--host`, `--port`, `--ftp-root`, `--advertise-host`.
-- [ ] Chạy demo thật giữa hai máy LAN và lưu output/hash/screenshot.
+- [x] Chạy demo thật giữa hai máy LAN: PASV và ACTIVE upload/download thành
+  công; SHA-256 source/server/client khớp. Xem `docs/evidence/final-lan-*.log`
+  và `docs/evidence/final-lan-*-sha256.txt`.
 - [x] Thu screenshot PASV server log, download progress đúng 0→100% và success
   sau fix `total_bytes`; lưu tại `docs/evidence/screenshots/` theo xác nhận
   của người chạy demo. Screenshot full pytest/Active cũ tiếp tục là evidence
@@ -73,14 +75,14 @@ pytest 189 passed.
 
 | Việc | Owner chính | Phụ thuộc | Trạng thái |
 |---|---|---|---|
-| Demo hai máy LAN | C | Hai máy cùng mạng, IPv4 server, firewall mở TCP/UDP 2121 | `[ ]` Cần chạy thủ công |
-| Screenshot evidence | C | Terminal chạy demo/test | `[ ]` Cần thao tác thủ công |
+| Demo hai máy LAN | C | Hai máy cùng mạng, IPv4 server, firewall mở TCP/UDP 2121 | `[x]` PASV/ACTIVE đã thành công, hash khớp |
+| Screenshot evidence | C | Terminal chạy demo/test | `[x]` PASV screenshot/server log đã lưu; ACTIVE server screenshot là artifact bổ sung |
 
 ## Definition of Done — Tuần 2.5
 
 ### Đã đạt ở localhost
 
-- [x] Full pytest pass trên WSL2: 189 tests.
+- [x] Full pytest pass trên WSL2: 199 tests in 96.72s.
 - [x] Active/PASV upload + download thật qua TCP → UDP/RDT → filesystem.
 - [x] SHA-256 nguồn/server/client khớp.
 - [x] Ba client đồng thời, session và file độc lập.
@@ -89,18 +91,19 @@ pytest 189 passed.
 
 ### Chưa được phép gọi “hoàn thành toàn bộ”
 
-- [ ] Có log/hash/screenshot demo hai máy LAN, nếu đây là yêu cầu chấm điểm.
+- [x] Có log/hash demo hai máy LAN cho PASV và ACTIVE; screenshot PASV đã lưu.
 - [x] Screenshot PASV progress/server/success đã lưu dưới
   `docs/evidence/screenshots/`.
 
 ## Review tổng
 
-**Fact:** Core code localhost đã được kiểm chứng bằng 189 test pass và 5 E2E
-scenario pass. Role C không còn lỗi cleanup/concurrency đã biết trong các
+**Fact:** Core code đã được kiểm chứng bằng 199 test pass; PASV và ACTIVE đã
+được chạy thật qua LAN hai máy với SHA-256 source/server/download bằng nhau.
+Role C không còn lỗi cleanup/concurrency hoặc data-path đã biết trong các
 scenario đã chạy.
 
-**Chưa chứng minh:** kết nối qua LAN thật. Đây là phần còn lại thực sự; không
-phải lỗi đã biết của transfer localhost.
+**Còn lại:** A/B review evidence, report và release sign-off. ACTIVE server
+log/screenshot có thể thêm cho slide/demo nhưng không phải blocker kỹ thuật.
 
 **Lịch sử thay đổi chi tiết:** `docs/code-change-history.md`
 **Contract đang dùng:** `docs/api-contract.md`

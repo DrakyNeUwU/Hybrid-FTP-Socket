@@ -115,10 +115,22 @@ Saved integrity evidence is available in:
 Each file records matching SHA-256 values for the source, FTP-root copy, and
 downloaded client copy.
 
+## Final LAN Evidence Update — 09/08/2026
+
+The two-machine run is now complete. Server `172.18.0.48` and client
+`172.18.0.49` successfully completed both PASV and ACTIVE upload plus download.
+For each mode, source, FTP-root copy and client download share SHA-256
+`b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934`.
+See `docs/evidence/final-lan-pasv-sha256.txt`,
+`docs/evidence/final-lan-active-sha256.txt`, and the matching terminal logs.
+The final WSL2 regression is `199 passed in 96.72s`; see
+`docs/evidence/final-week-rdt-gbn-verification.md`.
+
 ## Limitations and Next Work
 
 - Save Active/PASV manual command output and the three SHA-256 values.
-- Run the same transfer workflow from a different machine on the LAN.
+- The LAN run is complete; have A/B review the evidence before final report
+  sign-off.
 - PASV server-log, progress, and success screenshots were saved under
   `docs/evidence/screenshots/` on 08/08/2026 (user confirmation). Active/full
   pytest screenshots are optional supporting evidence for final submission.
@@ -130,9 +142,9 @@ downloaded client copy.
   logs redact PASS and record session/transfer lifecycle and active sessions.
 - RETR now includes the validated total size in RDT START, so download progress
   has a real 0→100% total instead of treating every chunk as complete.
-- Full WSL2 verification is complete: `python3 -m pytest -q` collected 189
-  tests and reported `189 passed in 106.91s` on 08/08/2026. Output is stored
-  in `docs/evidence/week-2.5-pytest.log`.
+- Final WSL2 verification is complete: `python3 -m pytest -q` collected 199
+  tests and reported `199 passed in 96.72s` on 09/08/2026. Output is stored in
+  `docs/evidence/final-week-rdt-gbn-verification.md`.
 
 ## Final Week — Go-Back-N Excellent Completion
 
@@ -153,6 +165,5 @@ and FTP E2E tests `22 passed in 70.44s`; expanded FTP E2E (STOU/APPE/HASH/TYPE)
 `6 passed in 22.63s`; final WSL2 regression `192 passed in 93.06s`. See
 `docs/evidence/final-week-rdt-gbn-verification.md`.
 
-**Remaining external evidence:** run PASV and ACTIVE from the second LAN machine
-and save terminal output, screenshots and source/server/client SHA-256. This is
-not verified by localhost automation.
+**Remaining release work:** A/B review the LAN evidence and use it in the final
+report; no additional Role C transfer implementation is pending.
