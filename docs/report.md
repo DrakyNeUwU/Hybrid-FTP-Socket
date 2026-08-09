@@ -442,7 +442,7 @@ tests/test_rdt_fault_injection.py::TestRDTAdapterFaultInjection::test_adapter_cl
 tests/test_rdt_fault_injection.py::TestRDTAdapterFaultInjection::test_adapter_empty_file PASSED                   [ 97%]
 tests/test_rdt_fault_injection.py::TestRDTAdapterFaultInjection::test_adapter_packet_loss_recovery PASSED         [100%]
 
-============================================ 45 passed in 70.66s (0:01:10)=============================================
+============================================ 45 passed (0:01:10)=============================================
 ```
 
 - **Checksum Protection**: Verified by `test_data_corruption` and `test_sender_rejects_corrupted_ack`.

@@ -38,6 +38,7 @@ Việc kiểm tra checksum được thực hiện ở cả sender và receiver, 
 - Receiver chỉ chấp nhận packet đúng thứ tự, bỏ qua duplicate/out-of-order và gửi ACK cumulative cho các sequence đã nhận liên tục.
 - Khi nhận `FLAG_FIN`, receiver thực hiện grace ACK để xử lý tình huống FIN bị mất hoặc bị lặp lại.
 - Khi nhận `FLAG_ABORT`, receiver dừng transfer và báo lỗi rõ ràng, giúp hủy tiến trình truyền nhanh hơn.
+- Luồng này phù hợp với kế hoạch tuần 2: Stop-and-Wait là nền tảng, trong khi Go-Back-N window 4 chỉ là bounded enhancement cho việc truyền nhiều packet liên tiếp mà không làm thay đổi header shared contract.
 
 ## 5.4 Bằng chứng kiểm thử
 
@@ -49,7 +50,7 @@ pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q
 
 Kết quả thực tế:
 
-- `45 passed in 70.66s`
+- `45 passed in 67.09s`
 
 Các trường hợp bao phủ gồm:
 - round-trip serialization/deserialization header,

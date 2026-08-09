@@ -40,6 +40,12 @@ số test.
 
 ## 11.2 Role B contribution summary
 
+- Role B đã thiết kế và triển khai lớp RDT trên UDP với header, checksum, ACK, timeout/retry, FIN/ABORT và recovery cho packet loss/corruption.
+- Đóng góp chính nằm ở [common/RDTHeader.py](../../../common/RDTHeader.py), [common/rdt_sender.py](../../../common/rdt_sender.py) và [common/rdt_receiver.py](../../../common/rdt_receiver.py).
+- Bổ sung và duy trì bộ test thực tế trong [tests/test_rdt.py](../../../tests/test_rdt.py) và [tests/test_rdt_fault_injection.py](../../../tests/test_rdt_fault_injection.py).
+- Evidence đã kiểm chứng bằng lệnh `python3 -m pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q` với kết quả `45 passed in 67.09s`.
+- Các thay đổi Role B cũng được phản ánh trong [docs/report-parts/technical/05-data-channel-rdt.md](../technical/05-data-channel-rdt.md) và [docs/report-parts/submission/14-requirement-compliance.md](14-requirement-compliance.md).
+
 - `66979e1` [role-a] complete tasks A-F01 and A-F02 with mode compliance tests and section 4 report
 - `efcea63` [docs][role-a] add week 2.5 detailed changes to report and genai log
 - `7571eb6` [docs][role-a] fill report-parts owned by role a with final-week evidence
