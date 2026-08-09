@@ -1,25 +1,25 @@
 # Shared API Contract — Hybrid FTP
 
-**Nguồn chuẩn duy nhất cho A–B–C:** tài liệu này.  
-**Trạng thái:** contract được chốt ở mức tài liệu; phần ghi `Proposed` hoặc
-`Needs change` chưa được xem là đã triển khai.  
-**Nguồn requirement:** `docs/requirement-checklist.md` và
+**Single source of truth for A–B–C:** this document.
+**Status:** the documented contract is agreed; items marked `Proposed` or
+`Needs change` are not considered implemented.
+**Requirement source:** `docs/requirement-checklist.md` and
 `planning/reference/Project1_SocketProgramming_2026.md`.
 
-## 1. Ownership và nguyên tắc
+## 1. Ownership and principles
 
-| Role | Owner chính | Không tự ý làm thay |
+| Role | Primary owner | Must not take over |
 |---|---|---|
-| A | TCP control, parser, FTP replies, session, transfer command orchestration | Không tự resolve/write client path, không tự định nghĩa RDT packet |
-| B | UDP endpoint use, RDT packet, ACK, sequence, retry, FIN/ABORT | Không tự quyết định FTP reply hoặc filesystem commit |
-| C | FTP-root filesystem, atomic file lifecycle, locks, threaded server, CLI/logging, integration | Không tự đổi command grammar/RDT format |
+| A | TCP control, parser, FTP replies, session, transfer command orchestration | Must not resolve/write client paths or define RDT packets alone |
+| B | UDP endpoint use, RDT packet, ACK, sequence, retry, FIN/ABORT | Must not decide FTP replies or filesystem commits alone |
+| C | FTP-root filesystem, atomic file lifecycle, locks, threaded server, CLI/logging, integration | Must not change command grammar or RDT format alone |
 
-Mọi thay đổi API/header/reply/cleanup phải được A, B, C review và cập nhật trong
-file này trước khi sửa report hoặc code.
+Every API, header, reply, or cleanup change must be reviewed by A, B, and C and
+recorded here before changing the report or code.
 
 ## 2. API Role A → Role C: filesystem
 
-**Module/class hiện có:** `common.filesystem_service.FilesystemService`.  
+**Existing module/class:** `common.filesystem_service.FilesystemService`.
 **Resource owner:** C owns the service and all resolved paths/file handles;
 A owns only session command state.  **Status:** `Existing` for listed methods;
 `Needs change` where integration has not been wired.
@@ -115,9 +115,10 @@ class TransferManager:
 - Cleanup: B closes/neutralizes worker-side UDP resources; C removes `.part`; A
   clears transfer state and sends final reply.
 
-**Cần xác nhận — requirement yêu cầu production A/B/C transfer, code hiện tại
-đang có `TransferManager` gọi `send/receive` adapter nhưng `common.rdt_sender`
-và `common.rdt_receiver` expose filepath/save-path helpers khác signature.**
+**Confirmation required — the requirement expects a production A/B/C transfer.
+`TransferManager` calls send/receive adapters, while `common.rdt_sender` and
+`common.rdt_receiver` expose file-path/save-path helpers with different
+signatures.**
 
 ## 4. Context objects
 

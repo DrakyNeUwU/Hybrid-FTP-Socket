@@ -1,144 +1,34 @@
 # Code Change History — Hybrid FTP
 
-Tài liệu này ghi lại các thay đổi theo tuần để dùng làm minh chứng tiến độ.
-Các trạng thái chỉ dựa trên code/test đã có, không thay thế demo end-to-end.
+This history records evidence-backed changes. It does not replace end-to-end
+demo evidence or `docs/project-status.md`.
 
-## Tuần 1 — Nền tảng và phân chia module
+## Week 1 — Foundation and module split
 
-| Role | Công việc | Kết quả |
+| Role | Work | Result |
 |---|---|---|
-| A | Tách TCP server, command parser, command handler và session | Có cấu trúc xử lý command theo từng client |
-| B | Tạo RDT header, sender/receiver cơ bản | Có sequence, ACK, checksum và FIN |
-| C | Xây filesystem helper/service và FTP root | Có xử lý file binary và path cơ bản |
+| A | Split TCP server, parser, command handler, and session | Per-client command-processing structure |
+| B | Created basic RDT header, sender, and receiver | Sequence, ACK, checksum, and FIN support |
+| C | Built filesystem helpers/service and FTP root | Binary-safe file handling and basic path safety |
 
-## Tuần 2 — Chức năng chính
+## Week 2 — Core functions
 
-| Role | Công việc | Kết quả |
+| Role | Work | Result |
 |---|---|---|
-| A | Bổ sung USER/PASS, directory command, PORT/PASV, RETR/STOR và reply | TCP command matrix được mở rộng |
-| B | Bổ sung retransmission, duplicate và checksum handling | RDT có stop-and-wait cơ bản |
-| C | Bổ sung root confinement, atomic upload và metadata | Filesystem không ghi trực tiếp ngoài FTP root |
+| A | Added login, directory commands, PORT/PASV, RETR/STOR, and replies | Expanded TCP command matrix |
+| B | Added retransmission, duplicate handling, and checksums | Basic Stop-and-Wait RDT |
+| C | Added root confinement, atomic upload, and metadata | Filesystem cannot write outside the FTP root |
 
-## Tuần 2.5 — Audit và sửa lỗi tích hợp
+## Week 2.5 and final week — Integration and verification
 
-| Role | Vấn đề phát hiện | Thay đổi đã thực hiện | Bằng chứng |
-|---|---|---|---|
-| A | Transfer chồng nhau ghi đè session state | Thêm guard trả `450 Transfer already in progress` | Test Role A pass |
-| A/B | `TransferManager` truyền Event nhưng adapter cần context | Thêm `common/rdt_context.py` và truyền `TransferContext` | Adapter clean transfer pass |
-| B | Server còn dùng adapter RDT cũ | `server/rdt_adapter.py` chuyển thành compatibility export | Import dùng cùng implementation |
-| B | Header/ACK chưa kiểm tra chặt | Validate flags, length, checksum, peer, transfer ID và ACK sequence | Header/protocol 21/21 pass |
-| B | Out-of-order test làm crash do log Unicode | Đổi log runtime sang ASCII | Protocol test pass |
-| B | Receiver chờ vô hạn khi sender mất | Giới hạn receiver timeout mặc định | Max-retry test pass |
-| C | Filesystem lifecycle cần giữ nguyên khi RDT fail/cancel | Giữ `FilesystemService` làm nơi commit và cleanup | Transfer manager tests |
-| C | Cần evidence demo thật cho tích hợp | Chạy Active upload + download bằng `client.demo_transfer` | Client nhận 220 và `Success: ACTIVE upload + download` |
-| C | Cần xác nhận hai data modes | Chạy PASV demo thủ công sau Active | Người chạy demo xác nhận PASV pass; giữ hash/video để nộp |
-| C | Cần evidence integrity cho hai mode | Lưu SHA-256 source/server/download cho Active và PASV | Hai file trong `docs/evidence/` có ba hash trùng khớp mỗi mode |
-| A/C | Full suite WSL2 có 3 test fail | Sửa TCP/IP address fallback và thay test debug ECHO bằng FTP `NOOP` | `python3 -m pytest -q`: 186 passed in 104.09s; log lưu trong `docs/evidence/` |
-| C | Chưa có bằng chứng transfer đa client | Thêm test 3 client PASV đồng thời, download directory riêng cho mỗi client và kiểm tra hash source/server/client | Test riêng: 1 passed in 5.34s; toàn bộ E2E: 3 passed in 15.47s; logs `docs/evidence/week-2.5-three-client.log`, `week-2.5-e2e-transfer.log` |
-| C | ABOR/disconnect chưa được chứng minh giữa transfer | Map `RuntimeError` từ RDT sang `TransferResult(426)`; thêm PASV upload chờ UDP rồi ABOR/disconnect, kiểm tra `.part`, file cũ và session registry | E2E: 5 passed in 18.03s; full WSL2: 189 passed in 113.94s; `docs/evidence/week-2.5-*.log` |
-| C | Server chỉ có entry point localhost, PASV LAN có thể quảng bá sai IP | Thêm `--host`, `--port`, `--ftp-root`, `--advertise-host`; session ưu tiên địa chỉ quảng bá cấu hình | `python3 -m server.threaded_server --help`; threaded + E2E: 10 passed in 21.56s |
-| C | `tuan-2.5-fix.md` trộn audit cũ với trạng thái mới, tạo checklist mâu thuẫn | Viết lại thành checklist hiện tại theo Role A/B/C, dependency, DoD và evidence links | Review đối chiếu full pytest 189 passed, E2E 5 passed và các evidence đã lưu |
-| A/B/C | LIST/NLST bị để thành dependency dù đề chỉ yêu cầu command/reply TCP | Đối chiếu đề §1.1–1.2, §2.2–2.3 và chốt listing là TCP textual result; UDP chỉ mang file payload | `docs/api-contract.md` §6.1; command tests và full pytest 189 passed |
-| C | CLI progress chỉ là UI helper; server chưa có lifecycle log đủ để demo | Nối RDT progress vào `FTPClient`/demo; log IP, command redact, reply, session/transfer, table, mode/bytes/result | 62 focused tests passed in 22.16s; full pytest 189 passed in 102.50s |
-| C | Download progress coi mỗi chunk là 100% vì RETR sender không biết tổng file size | Thêm `TransferContext.total_bytes`; TransferManager lấy size đã validate và sender đưa vào RDT START | E2E 5 passed in 17.61s; full pytest 189 passed in 106.91s |
-| C | Cần evidence trực quan cho progress/server observability | Người chạy demo PASV lưu screenshot server log, progress 0→100% và success dưới `docs/evidence/screenshots/` | User confirmation 08/08/2026; text logs/hash đã lưu trong `docs/evidence/` |
+The team added transfer guards, a shared `TransferContext`, strict RDT
+flag/length/checksum/peer/transfer-ID validation, bounded receiver timeouts,
+atomic failure/cancellation cleanup, Active/PASV end-to-end tests, concurrent
+PASV-client coverage, ABOR/disconnect cleanup, LAN endpoint configuration, CLI
+progress, server log redaction, total-size progress reporting, and Go-Back-N
+window four with START ACK/retry.
 
-## Trạng thái kiểm chứng hiện tại — 08/08/2026
-
-- Role A regression: **52 tests pass**.
-- RDT header/protocol logic: **21 tests pass**.
-- RDT fault injection + adapter fault injection: **14 tests pass**.
-- Localhost TCP + UDP/RDT integration: **2 tests pass** (Active/PASV upload,
-  download, and SHA-256 comparison).
-- Tổng các nhóm đã chạy: **87 test pass**; một số test có cảnh báo resource
-  từ test cũ nhưng không fail.
-- Full pytest trên WSL2/Linux: **189 passed in 113.94s**; log đã lưu trong
-  `docs/evidence/week-2.5-pytest.log`.
-- Active/PASV localhost đã có test và demo; 3 client PASV đồng thời,
-  ABOR/disconnect đang chờ UDP đã có evidence end-to-end. Demo khác máy vẫn
-  chưa có bằng chứng.
-
-## Cách dùng làm minh chứng
-
-Khi nộp báo cáo, đính kèm:
-
-1. File này để chứng minh lịch sử thay đổi.
-2. `docs/project-status.md` để chứng minh trạng thái hiện tại.
-3. `docs/api-contract.md` để chứng minh contract A–B–C.
-4. Output các lệnh test ở phần hướng dẫn chạy trong câu trả lời bàn giao.
-
-Không ghi “hoàn thành toàn bộ” cho Active/PASV hoặc FTP end-to-end nếu chưa có
-log client/server và hash nguồn/đích.
-
-## 09/08/2026 — Final-week documentation source-of-truth consolidation
-
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| C (documentation integration) | Nhiều file trạng thái/report cũ mâu thuẫn với full regression và FTP E2E đã có | `README.md`, `docs/project-status.md`, `docs/requirement-checklist.md`, `planning/`, `docs/report-parts/`, tài liệu tuần và final-week plan | Chỉ định một status hiện hành và một checklist acceptance; tổ chức planning thành requirement/ownership, status navigation và weekly plans; tổ chức report drafts thành technical/submission; cập nhật README theo commands và tài liệu hiện tại. `docs/report.md` được để nguyên cho Role B hoàn thiện. | Đối chiếu `189 passed in 106.91s`, FTP E2E `5 passed in 18.03s`, hash Active/PASV; kiểm tra Git và tìm stale claims trong tài liệu hiện hành |
-
-## 09/08/2026 — Role C Go-Back-N Excellent RDT lifecycle
-
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| C, with B wire-contract review pending | Sender was Stop-and-Wait and START metadata had no ACK/retry | `common/rdt_context.py`, `common/rdt_sender.py`, `common/rdt_receiver.py`, `tests/test_rdt.py`, Role C/status/contract docs | Implement bounded, streaming-safe Go-Back-N window 4, cumulative ACK, finite START retry and maintain atomic cleanup without changing header or TCP command interfaces | WSL2: final focused 50 passed in 85.01s; full suite 192 passed in 93.06s; `docs/evidence/final-week-rdt-gbn-verification.md` |
-| C | Windows CP1252 output crashed during ACTIVE progress; server-initiated ACTIVE RETR UDP traffic could be blocked until the client created state | `client/demo_transfer.py`, `client/ftp_client.py`, `tests/test_cli_display.py`, evidence/status docs | Make progress output encoding-safe and send zero-payload START probes before `RETR` and after `150`, without changing TCP or RDT header contracts | WSL2 full regression: 199 passed in 96.72s; physical LAN PASV and ACTIVE upload/download both succeeded with matching source/server/client SHA-256 |
-
-## 09/08/2026 — Role C report-component migration
-
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| C | Week 2 Role C document duplicated integration/evidence material needed by report components | `docs/report-parts/technical/01,03,06,08,09`, `docs/report-parts/submission/10–13`, checklist/status/contract docs; removed `docs/role-c-week-2.md` | Move ownership-scoped technical narrative and final evidence into the report workspace; preserve one evidence-backed source per report component | Cross-check against final verification: 199 full tests, 6 expanded E2E, LAN PASV/ACTIVE SHA-256 artifacts; link and diff audit pending handoff |
-
-## 09/08/2026 — Remove role-week-2 sources and repair report references
-
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| A/B/C documentation | Role A/B/C Week 2 documents were intentionally removed, leaving report-part source links broken; contribution matrix also duplicated merge content | Report parts 02, 04, 05, 07, 11 and 14 | Use surviving requirement, API contract and evidence files as canonical sources; make LIST/NLST documentation match the TCP-only contract; consolidate contribution ownership | Reference search and `git diff --check` run after the edit |
-
-## 09/08/2026 — Final-week plan aligned to the report workspace
-
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| C (documentation integration) | Final-week actions still named deleted Role Week 2 files and did not distinguish the requirement-mapping draft from the current project status | `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md` | Point B/C work to the report-parts workspace; define `submission/14` as mapping/reference only, with final claims sourced from project status and the acceptance checklist | Manual path/reference review; `git diff --check` passed |
-
-## 09/08/2026 — Role B release-state reconciliation
-
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| B (documentation), C (documentation integration) | B-F01 technical evidence was complete, while report and plan claimed unrecorded sign-off/percentage decisions and used conflicting task states | Final-week plan, `docs/report.md`, requirement checklist, project status and contribution component | Mark B-F01 complete; keep B-F02/B-F03 release gates open until real team decisions and dry-run/Git evidence exist; add oral-question locators without creating a second plan | Static cross-check of B-F01 actions, `docs/evidence/final-week-rdt-gbn-verification.md` (45 RDT/fault tests; 199 full tests), and documentation consistency review |
-
-## 09/08/2026 — A/C technical audit and evidence-only release documentation
-
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| A/C technical audit; C documentation integration | Report and support documents left stale review claims, internal dry-run gates and screenshot expectations despite existing log/hash evidence | Report, report-parts technical/submission components, API contract, GenAI logs, project status, acceptance checklist and final-week plan | Record a documentation technical audit rather than impersonated member signatures; use existing LAN server/client logs and SHA-256 artifacts; keep contribution and clean Git release as the only remaining release gates | `final-lan-server.log` contains client IP, commands, active-session snapshots, replies and transfer outcomes; LAN client logs/hash; RDT/fault 45 pass and full regression 199 pass evidence |
-
-## 09/08/2026 — Remove screenshot artifacts from submission evidence
-
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| C (documentation/evidence) | Screenshot artifacts were no longer wanted for submission and active documents still linked to them | Removed eight files under `docs/evidence/screenshots/`; updated current README, plan, report, checklist and evidence references | Keep a log/hash-only evidence pack while preserving the required IP, command, active-session, transfer-result and integrity proof | `final-lan-server.log`, `final-lan-pasv.log`, `final-lan-active.log`, and `final-lan-*-sha256.txt` |
-
-## 09/08/2026 — Repair requirement-source and RDT-review references
-
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| C (documentation integration) | Active documentation referenced the pre-reorganisation requirement path; requirement matrix also said B-F01 was still pending | README, checklist, final-week plan, technical parts, API contract, GenAI log and submission/14 | Point all current references to `planning/reference/Project1_SocketProgramming_2026.md` and record completed B-F01 technical review accurately | Repository path search and final-week B-F01 completion record |
-
-## 09/08/2026 — Restore screenshot evidence
-
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| C (documentation/evidence) | Screenshot removal was reversed by user request | Restored eight files under `docs/evidence/screenshots/` from Git | Preserve the screenshot bundle alongside the curated logs and SHA-256 evidence | Directory contains all eight restored PNG files; logs/hash remain canonical technical evidence |
-
-## 09/08/2026 — Add full TCP/UDP sequence diagram
-
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| A/B/C documentation integration | Report §2.4.1 described the architecture but had no full TCP+UDP sequence diagram | `docs/report.md` | Add the required lifecycle from TCP authentication and Active/PASV negotiation through RDT START/ACK, Go-Back-N DATA/ACK, FIN/ACK, ABORT and FTP completion reply | Diagram labels match `docs/api-contract.md`, RDT evidence and final transfer lifecycle |
-
-## 09/08/2026 — Screenshot capture guide
-
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| C (documentation/evidence) | Existing screenshots included a stale 186-test result and one server image with an earlier startup error; final report needed a repeatable capture plan | `docs/evidence/screenshot-capture-guide.md` | Identify usable evidence and specify four clean, named screenshots for current regression, server lifecycle, dual-mode SHA-256 and concurrent clients | Visual review of current PNGs; final logs/hash and test names referenced in the guide |
+Final evidence includes `python3 -m pytest -q` — **199 passed in 96.72s**,
+protocol/fault/E2E evidence, and two-machine LAN source/server/client SHA-256
+artifacts. See `docs/evidence/final-week-rdt-gbn-verification.md` and the
+curated files under `docs/evidence/`.
