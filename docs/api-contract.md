@@ -187,8 +187,10 @@ commit finish.
   does not alter the FTP lifecycle.
 - `FTPServer.advertised_host` overrides the bound address when a LAN server uses
   `--host 0.0.0.0`; old UDP sockets are closed before replacement.
-- Status: localhost Active/PASV is verified. Two-machine LAN evidence remains a
-  manual final-week task and must not be claimed until its artifacts are saved.
+- Status: localhost and two-machine LAN Active/PASV are verified. Saved PASV
+  and ACTIVE client/server output plus source/server/client SHA-256 are under
+  `docs/evidence/final-lan-*`; B review/sign-off remains required before final
+  report submission.
 
 ## 6.1 LIST/NLST transport decision
 
