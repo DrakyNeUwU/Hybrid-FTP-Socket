@@ -31,5 +31,5 @@ client giống nhau (`b57b64b...ebb90934`).
 ## Evidence selection
 
 Report cuối nên dùng full-regression log, một LAN hash table mỗi mode, một
-server lifecycle excerpt đã redact và screenshot PASV progress. ACTIVE server
-screenshot là artifact trình bày tùy chọn, không phải điều kiện functional pass.
+server lifecycle excerpt đã redact và LAN client/server logs. Không cần screenshot
+cho functional pass khi log/hash đã chứng minh transfer và session lifecycle.

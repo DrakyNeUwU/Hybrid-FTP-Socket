@@ -5,7 +5,7 @@ DEFAULT_CHUNK_SIZE = 1024
 
 def read_file_chunks(path: str, chunk_size: int = DEFAULT_CHUNK_SIZE):
     if not os.path.exists(path):
-        raise FileNotFoundError(f"File không tồn tại: {path}")
+        raise FileNotFoundError(f"File not found: {path}")
     with open(path, "rb") as f:
         while True:
             chunk = f.read(chunk_size)
@@ -15,7 +15,7 @@ def read_file_chunks(path: str, chunk_size: int = DEFAULT_CHUNK_SIZE):
 
 def read_file_bytes(path: str) -> bytes:
     if not os.path.exists(path):
-        raise FileNotFoundError(f"File không tồn tại: {path}")
+        raise FileNotFoundError(f"File not found: {path}")
     with open(path, "rb") as f:
         return f.read()
 
@@ -72,5 +72,5 @@ def delete_file(path: str) -> bool:
 
 def list_directory(path: str = ".") -> list[str]:
     if not os.path.exists(path):
-        raise FileNotFoundError(f"Thư mục không tồn tại: {path}")
+        raise FileNotFoundError(f"Directory not found: {path}")
     return os.listdir(path)

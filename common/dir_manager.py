@@ -1,25 +1,8 @@
-"""
-dir_manager.py — Quản lý filesystem phía server, chặn path traversal
+"""Server-side filesystem operations with path-traversal protection.
 
-=== FILE NÀY GIẢI QUYẾT GÌ? ===
-Cung cấp tất cả thao tác thư mục/file metadata cho FTP server:
-  - Validate path: đảm bảo client không thoát khỏi thư mục gốc FTP
-  - Resolve path: chuyển đường dẫn relative → absolute an toàn
-  - List directory: trả danh sách file/thư mục với metadata
-  - Tạo/xoá thư mục
-
-Mọi thao tác filesystem trong server PHẢI đi qua module này.
-Không bao giờ gọi os.listdir(), os.chdir(), os.makedirs()... trực tiếp từ handler.
-
-=== KẾT NỐI VỚI FILE NÀO? ===
-  - server/threaded_server.py  → handler gọi khi xử lý CWD, LIST, MKD, RMD...
-  - Role A's session            → session lưu working directory, dir_manager resolve path dựa trên đó
-  - common/file_handler.py      → dir_manager validate path trước, rồi file_handler đọc/ghi file
-
-=== XOÁ FILE NÀY THÌ GÌ HỎNG? ===
-  - Tất cả lệnh PWD, CWD, CDUP, MKD, RMD, LIST, NLST, STAT, MDTM đều chết
-  - Nghiêm trọng hơn: nếu không validate, client có thể đọc/ghi BẤT KỲ file nào trên server
-    (path traversal attack — lỗ hổng bảo mật cổ điển)
+All filesystem operations in FTP handlers must use this module. It validates
+paths against the FTP root and provides path resolution, listings, directory
+management, metadata, deletion, and renaming helpers.
 """
 
 import os
@@ -28,122 +11,81 @@ import time
 
 
 # ============================================================
-# VALIDATE PATH — Chặn path traversal
+# VALIDATE PATH — prevent path traversal
 # ============================================================
 
 def validate_path(base_dir: str, target_path: str) -> bool:
     """
-    Kiểm tra target_path có nằm trong base_dir (sandbox FTP) hay không.
+    Return whether ``target_path`` is inside the FTP-root ``base_dir``.
 
-    Cách hoạt động:
-      1. os.path.realpath(base_dir): resolve symlink + normalize base
-         Ví dụ: /srv/ftp → /srv/ftp (hoặc /mnt/data/ftp nếu là symlink)
-
-      2. os.path.realpath(target_path): resolve symlink + "../" trong target
-         Ví dụ: /srv/ftp/docs/../../etc → /etc
-
-      3. So sánh: real_target bắt đầu bằng real_base?
-         /etc.startswith(/srv/ftp) → False → ❌ BLOCKED
-         /srv/ftp/docs.startswith(/srv/ftp) → True → ✅ OK
-
-    Tại sao dùng realpath() thay vì abspath()?
-      - abspath() chỉ xử lý ".." bằng cách nối chuỗi, KHÔNG resolve symlink
-      - Ví dụ: nếu /srv/ftp/link → /etc (symlink), thì:
-        - abspath("/srv/ftp/link") = "/srv/ftp/link" → tưởng an toàn (SAI!)
-        - realpath("/srv/ftp/link") = "/etc" → phát hiện thoát sandbox (ĐÚNG!)
-
-    Tại sao thêm os.sep vào cuối real_base?
-      - Tránh false positive: base = "/srv/ftp", target = "/srv/ftp_backup"
-        - "/srv/ftp_backup".startswith("/srv/ftp") → True → SAI! (không phải thư mục con)
-        - "/srv/ftp_backup".startswith("/srv/ftp/") → False → ĐÚNG
-      - Ngoại trừ khi target == base (client ở đúng root) → cho phép
+    Both paths are resolved with ``realpath`` so symlink escapes and ``..``
+    traversal are detected. Appending ``os.sep`` to the root prevents a path
+    such as ``/srv/ftp_backup`` from being mistaken for a child of ``/srv/ftp``.
 
     Args:
-        base_dir: Thư mục gốc FTP (sandbox boundary)
-        target_path: Đường dẫn cần kiểm tra
+        base_dir: FTP root directory (sandbox boundary).
+        target_path: Path to validate.
 
     Returns:
-        bool: True nếu target nằm trong hoặc bằng base_dir
+        True when the target is inside or equal to ``base_dir``.
     """
-    # Resolve tất cả symlink và ".." để lấy đường dẫn thật
+    # Resolve symlinks and ``..`` components.
     real_base = os.path.realpath(base_dir)
     real_target = os.path.realpath(target_path)
 
-    # Trường hợp target = chính base dir (client ở root FTP)
+    # Allow the FTP root itself.
     if real_target == real_base:
         return True
 
-    # Kiểm tra target là con của base (thêm sep để tránh /ftp vs /ftp_backup)
+    # Require a child path; the separator avoids /ftp versus /ftp_backup.
     return real_target.startswith(real_base + os.sep)
 
 
 # ============================================================
-# RESOLVE PATH — Chuyển relative → absolute an toàn
+# RESOLVE PATH — safely convert relative paths to absolute paths
 # ============================================================
 
 def resolve_path(base_dir: str, cwd: str, relative_path: str) -> str:
     """
-    Chuyển đường dẫn relative từ client thành absolute path an toàn.
+    Resolve a client path safely to an absolute path within the FTP root.
 
-    Cách hoạt động:
-      1. Nếu relative_path là absolute (bắt đầu bằng /) → join với base_dir
-         Ví dụ: base="/srv/ftp", relative="/docs" → "/srv/ftp/docs"
-
-      2. Nếu relative_path là relative → join với cwd
-         Ví dụ: cwd="/srv/ftp/docs", relative="reports" → "/srv/ftp/docs/reports"
-
-      3. Validate kết quả → nếu thoát sandbox thì raise PermissionError
-
-    Tại sao return path đã resolve thay vì chỉ validate?
-      - Caller không cần tự join path (dễ sai)
-      - Đảm bảo path luôn đã qua validate
-      - Single point of truth: mọi path đều đi qua hàm này
-
-    Ví dụ sử dụng (trong command handler):
-      # Client gửi: CWD reports
-      new_cwd = resolve_path(FTP_ROOT, session.cwd, "reports")
-      # → "/srv/ftp/docs/reports" (nếu hợp lệ)
-      # → PermissionError (nếu thoát sandbox)
+    FTP-style absolute paths are relative to ``base_dir``; relative paths are
+    resolved from ``cwd``. The result is normalized and validated before use.
 
     Args:
-        base_dir: Thư mục gốc FTP
-        cwd: Thư mục hiện tại của session (absolute path)
-        relative_path: Đường dẫn client gửi lên (có thể relative hoặc absolute)
+        base_dir: FTP root directory.
+        cwd: Current session directory (absolute path).
+        relative_path: Client path, relative or FTP-style absolute.
 
     Returns:
-        str: Absolute path đã validate, an toàn
+        Validated absolute path.
 
     Raises:
-        PermissionError: Nếu path cố thoát khỏi sandbox
+        PermissionError: If the path escapes the sandbox.
     """
     if not relative_path:
-        # Client gửi lệnh không có argument (ví dụ: LIST không có path)
-        # → trả về cwd hiện tại
+        # Commands without a path (for example LIST) use the current directory.
         resolved_cwd = os.path.realpath(cwd)
         if not validate_path(base_dir, resolved_cwd):
             raise PermissionError("Current directory is outside the FTP root.")
         return resolved_cwd
 
-    # Kiểm tra path có phải "absolute" theo góc nhìn FTP không.
-    # FTP client luôn gửi đường dẫn kiểu Unix: "/docs", "/images/photo.jpg"
-    # Trên Windows, os.path.isabs("/docs") = False (cần drive letter C:\)
-    # → phải kiểm tra thêm: bắt đầu bằng "/" cũng coi là absolute trong FTP
+    # FTP clients use Unix-style paths even on Windows, where ``/docs`` is not
+    # considered absolute by os.path.isabs().
     is_absolute = os.path.isabs(relative_path) or relative_path.startswith("/")
 
     if is_absolute:
-        # Path absolute: client gửi "/docs" → hiểu là "<base>/docs"
-        # Bỏ "/" và "\" đầu tiên rồi join với base_dir
-        # Nếu không bỏ, os.path.join(base, "/docs") = "/docs" (Python bỏ base!)
+        # An FTP absolute path is rooted at ``base_dir``.
         stripped = relative_path.lstrip("/\\")
         resolved = os.path.join(base_dir, stripped)
     else:
-        # Path relative: client gửi "reports" → join với cwd
+        # A relative path is rooted at ``cwd``.
         resolved = os.path.join(cwd, relative_path)
 
     # Resolve symlink + normalize
     resolved = os.path.realpath(resolved)
 
-    # Validate: phải nằm trong sandbox
+    # The final path must remain inside the sandbox.
     if not validate_path(base_dir, resolved):
         raise PermissionError(
             f"Access denied: path '{relative_path}' is outside the FTP root directory."
@@ -153,45 +95,26 @@ def resolve_path(base_dir: str, cwd: str, relative_path: str) -> str:
 
 
 # ============================================================
-# LIST DIRECTORY — Danh sách file/thư mục
+# LIST DIRECTORY
 # ============================================================
 
 def list_directory(path: str, base_dir: str | None = None) -> list:
     """
-    Trả về danh sách chi tiết file/thư mục trong path.
+    Return detailed metadata for files and directories in ``path``.
 
-    Cách hoạt động:
-      1. Dùng os.scandir(path) thay vì os.listdir(path)
-         - scandir trả về DirEntry objects — đã có metadata sẵn (type, stat)
-         - listdir chỉ trả tên → phải gọi os.stat() cho từng file → chậm gấp đôi
-         - Với thư mục 1000 files: scandir ≈ 1 syscall, listdir+stat ≈ 2001 syscalls
-
-      2. Với mỗi entry, thu thập:
-         - name: tên file/thư mục
-         - size: kích thước (bytes), 0 nếu là thư mục
-         - type: "file" hoặc "dir"
-         - permissions: chuỗi rwx (ví dụ: "rwxr-xr-x")
-         - modified: thời gian sửa cuối (YYYYMMDDhhmmss — format FTP chuẩn cho MDTM)
-
-      3. Sắp xếp: thư mục trước, file sau. Trong mỗi nhóm sắp xếp theo tên.
-
-    Dùng cho lệnh FTP LIST:
-      Client gửi: LIST
-      Server trả: 150 Opening data connection
-                  drwxr-xr-x    4096  20260724103000  documents
-                  -rw-r--r--   15360  20260723090000  report.pdf
-                  226 Transfer complete
+    ``os.scandir`` provides entry metadata efficiently. Directories sort before
+    files, and each group is sorted case-insensitively by name. This supports
+    the FTP LIST command.
 
     Args:
-        path: Đường dẫn thư mục cần liệt kê (đã validate)
+        path: Validated directory path to list.
 
     Returns:
-        list[dict]: Danh sách dict, mỗi dict chứa thông tin 1 entry
-                    Keys: name, size, type, permissions, modified
+        Dictionaries with name, size, type, permissions, and modified fields.
 
     Raises:
-        NotADirectoryError: Nếu path không phải thư mục
-        FileNotFoundError: Nếu path không tồn tại
+        NotADirectoryError: If path is not a directory.
+        FileNotFoundError: If path does not exist.
     """
     if not os.path.isdir(path):
         if os.path.exists(path):
@@ -200,12 +123,12 @@ def list_directory(path: str, base_dir: str | None = None) -> list:
 
     entries = []
 
-    # os.scandir() trả về iterator of DirEntry — hiệu quả hơn listdir()
+    # scandir returns metadata-bearing DirEntry values efficiently.
     with os.scandir(path) as scanner:
         for entry in scanner:
             try:
                 if base_dir is not None and not validate_path(base_dir, entry.path):
-                    # Không để symlink trong FTP root làm lộ metadata bên ngoài root.
+                    # Do not expose metadata outside the root through a symlink.
                     continue
                 entry_stat = entry.stat()
 
@@ -217,10 +140,10 @@ def list_directory(path: str, base_dir: str | None = None) -> list:
                     "modified": _format_mtime(entry_stat.st_mtime),
                 })
             except (PermissionError, OSError):
-                # Bỏ qua file không có quyền đọc — vẫn list được phần còn lại
+                # Skip unreadable entries while listing the remaining entries.
                 continue
 
-    # Sắp xếp: thư mục trước, sau đó theo tên (case-insensitive)
+    # Directories first, then names case-insensitively.
     entries.sort(key=lambda e: (e["type"] != "dir", e["name"].lower()))
 
     return entries
@@ -228,22 +151,13 @@ def list_directory(path: str, base_dir: str | None = None) -> list:
 
 def list_names(path: str, base_dir: str | None = None) -> list:
     """
-    Trả về danh sách TÊN file/thư mục (chỉ tên, không metadata).
-
-    Dùng cho lệnh FTP NLST (Name List):
-      Client gửi: NLST
-      Server trả: documents
-                  report.pdf
-                  notes.txt
-
-    Khác LIST ở chỗ: không có size, permissions, modified — chỉ tên.
-    NLST thường dùng cho scripts/automation (dễ parse hơn LIST).
+    Return names only, without metadata, for the FTP NLST command.
 
     Args:
-        path: Đường dẫn thư mục (đã validate)
+        path: Validated directory path.
 
     Returns:
-        list[str]: Danh sách tên, sắp xếp theo alphabet
+        Alphabetically sorted entry names.
     """
     if not os.path.isdir(path):
         if os.path.exists(path):
@@ -261,32 +175,23 @@ def list_names(path: str, base_dir: str | None = None) -> list:
 
 
 # ============================================================
-# TẠO / XOÁ THƯ MỤC
+# CREATE / REMOVE DIRECTORIES
 # ============================================================
 
 def make_directory(base_dir: str, path: str) -> str:
     """
-    Tạo thư mục mới, validate trước để đảm bảo trong sandbox.
-
-    Cách hoạt động:
-      1. Validate path → chặn nếu cố tạo thư mục ngoài FTP root
-      2. Kiểm tra đã tồn tại chưa → nếu có thì báo lỗi (FTP không tự overwrite)
-      3. os.makedirs(path) — tạo thư mục (kể cả cha nếu cần)
-
-    Dùng cho lệnh MKD:
-      Client: MKD reports
-      Server: 257 "/documents/reports" created
+    Create a directory after validating that it is inside the FTP sandbox.
 
     Args:
-        base_dir: Thư mục gốc FTP (sandbox)
-        path: Đường dẫn thư mục cần tạo (đã resolve bằng resolve_path)
+        base_dir: FTP root directory.
+        path: Directory path resolved by resolve_path.
 
     Returns:
-        str: Đường dẫn tuyệt đối thư mục đã tạo
+        Absolute path of the created directory.
 
     Raises:
-        PermissionError: Path ngoài sandbox
-        FileExistsError: Thư mục đã tồn tại
+        PermissionError: If the path is outside the sandbox.
+        FileExistsError: If the directory already exists.
     """
     if not validate_path(base_dir, os.path.dirname(path)):
         raise PermissionError(
@@ -302,39 +207,26 @@ def make_directory(base_dir: str, path: str) -> str:
 
 def remove_directory(base_dir: str, path: str) -> None:
     """
-    Xoá thư mục RỖNG, validate trước.
+    Remove an empty directory after validating it is inside the FTP sandbox.
 
-    Cách hoạt động:
-      1. Validate path → chặn xoá ngoài sandbox
-      2. Kiểm tra tồn tại + là thư mục
-      3. os.rmdir(path) — CHỈ xoá nếu rỗng
-
-    Tại sao chỉ xoá rỗng?
-      - Đúng spec FTP (RFC 959): RMD chỉ xoá thư mục rỗng
-      - An toàn: tránh xoá nhầm cả cây thư mục lớn
-      - Nếu client muốn xoá thư mục có file → phải DELE từng file trước
-
-    Dùng cho lệnh RMD:
-      Client: RMD old_reports
-      Server: 250 Directory removed (nếu rỗng)
-      Server: 550 Directory not empty (nếu còn file)
+    This intentionally follows RFC 959: RMD removes empty directories only.
 
     Args:
-        base_dir: Thư mục gốc FTP
-        path: Đường dẫn thư mục cần xoá (đã resolve)
+        base_dir: FTP root directory.
+        path: Resolved directory path to remove.
 
     Raises:
-        PermissionError: Path ngoài sandbox hoặc cố xoá FTP root
-        FileNotFoundError: Thư mục không tồn tại
-        NotADirectoryError: Path là file, không phải thư mục
-        OSError: Thư mục không rỗng
+        PermissionError: If outside the sandbox or equal to the FTP root.
+        FileNotFoundError: If the directory does not exist.
+        NotADirectoryError: If path is a file.
+        OSError: If the directory is not empty.
     """
     if not validate_path(base_dir, path):
         raise PermissionError(
             f"Access denied: cannot remove directory outside FTP root."
         )
 
-    # Không cho xoá chính FTP root
+    # Never remove the FTP root itself.
     if os.path.realpath(path) == os.path.realpath(base_dir):
         raise PermissionError("Cannot remove the FTP root directory.")
 
@@ -344,24 +236,20 @@ def remove_directory(base_dir: str, path: str) -> None:
     if not os.path.isdir(path):
         raise NotADirectoryError(f"Not a directory: '{path}'")
 
-    # os.rmdir() chỉ xoá thư mục rỗng — raise OSError nếu còn file
+    # os.rmdir() raises OSError when the directory is not empty.
     os.rmdir(path)
 
 
 # ============================================================
-# THÔNG TIN FILE — Cho lệnh STAT, MDTM, SIZE, DELE, RNFR/RNTO
+# FILE INFORMATION — used by STAT, MDTM, SIZE, DELE, RNFR/RNTO
 # ============================================================
 
 def get_entry_info(path: str, base_dir: str | None = None) -> dict:
     """
-    Trả về metadata của 1 file hoặc thư mục.
-
-    Dùng cho:
-      - STAT <path>: trả thông tin chi tiết
-      - MDTM <file>: trả thời gian sửa cuối
+    Return metadata for one file or directory.
 
     Args:
-        path: Đường dẫn (đã validate)
+        path: Validated path.
 
     Returns:
         dict: {name, size, type, permissions, modified}
@@ -384,20 +272,16 @@ def get_entry_info(path: str, base_dir: str | None = None) -> dict:
 
 def delete_file(base_dir: str, path: str) -> None:
     """
-    Xoá 1 file, validate trước.
-
-    Dùng cho lệnh DELE:
-      Client: DELE old_report.pdf
-      Server: 250 File deleted
+    Delete one file after validating it is inside the FTP sandbox.
 
     Args:
-        base_dir: Thư mục gốc FTP
-        path: Đường dẫn file cần xoá (đã resolve)
+        base_dir: FTP root directory.
+        path: Resolved file path to delete.
 
     Raises:
-        PermissionError: Path ngoài sandbox
-        FileNotFoundError: File không tồn tại
-        IsADirectoryError: Path là thư mục (dùng RMD thay vì DELE)
+        PermissionError: If the path is outside the sandbox.
+        FileNotFoundError: If the file does not exist.
+        IsADirectoryError: If path is a directory; use RMD instead.
     """
     if not validate_path(base_dir, path):
         raise PermissionError("Access denied: path outside FTP root.")
@@ -415,27 +299,20 @@ def delete_file(base_dir: str, path: str) -> None:
 
 def rename_entry(base_dir: str, old_path: str, new_path: str) -> None:
     """
-    Đổi tên file hoặc thư mục (RNFR + RNTO).
+    Rename a file or directory for the RNFR/RNTO command pair.
 
-    Cách hoạt động:
-      1. Validate CẢ HAI path (cũ và mới) đều trong sandbox
-      2. Kiểm tra old_path tồn tại
-      3. Kiểm tra new_path chưa tồn tại (tránh ghi đè nhầm)
-      4. os.rename(old, new)
-
-    Dùng cho lệnh RNFR/RNTO:
-      Client: RNFR old_name.txt   → Server: 350 Ready for RNTO
-      Client: RNTO new_name.txt   → Server: 250 Rename successful
+    Both paths must remain in the sandbox, the source must exist, and the
+    destination must not exist to prevent accidental replacement.
 
     Args:
-        base_dir: Thư mục gốc FTP
-        old_path: Đường dẫn cũ (đã resolve)
-        new_path: Đường dẫn mới (đã resolve)
+        base_dir: FTP root directory.
+        old_path: Resolved source path.
+        new_path: Resolved destination path.
 
     Raises:
-        PermissionError: Path ngoài sandbox
-        FileNotFoundError: old_path không tồn tại
-        FileExistsError: new_path đã tồn tại
+        PermissionError: If either path is outside the sandbox.
+        FileNotFoundError: If old_path does not exist.
+        FileExistsError: If new_path already exists.
     """
     if not validate_path(base_dir, old_path):
         raise PermissionError("Access denied: source path outside FTP root.")
@@ -451,22 +328,12 @@ def rename_entry(base_dir: str, old_path: str, new_path: str) -> None:
 
 
 # ============================================================
-# HELPER FUNCTIONS — Hàm nội bộ (tiền tố _ = không dùng bên ngoài)
+# HELPER FUNCTIONS — private functions (the _ prefix means internal use)
 # ============================================================
 
 def _format_permissions(mode: int) -> str:
     """
-    Chuyển số mode (ví dụ: 0o755) thành chuỗi rwx (ví dụ: "rwxr-xr-x").
-
-    Cách hoạt động:
-      - mode là bitmask: mỗi bit đại diện 1 quyền
-      - stat.S_IRUSR = bit read cho owner, stat.S_IWUSR = write, stat.S_IXUSR = execute
-      - Tương tự cho group (GRP) và others (OTH)
-      - Kiểm tra từng bit: nếu bật → ký tự tương ứng, nếu tắt → "-"
-
-    Ví dụ:
-      0o755 → rwxr-xr-x (owner: full, group: read+exec, others: read+exec)
-      0o644 → rw-r--r-- (owner: read+write, others: read only)
+    Convert a mode such as ``0o755`` to an rwx string such as ``rwxr-xr-x``.
     """
     perms = ""
     perms += "r" if mode & stat.S_IRUSR else "-"
@@ -483,19 +350,12 @@ def _format_permissions(mode: int) -> str:
 
 def _format_mtime(timestamp: float) -> str:
     """
-    Chuyển Unix timestamp thành chuỗi FTP chuẩn: YYYYMMDDhhmmss.
-
-    Đây là format bắt buộc cho lệnh MDTM (RFC 3659):
-      Client: MDTM report.pdf
-      Server: 213 20260724103000
-
-    Ví dụ:
-      1753346400.0 → "20260724103000" (24/07/2026 10:30:00)
+    Convert a Unix timestamp to the FTP MDTM format, YYYYMMDDhhmmss.
 
     Args:
-        timestamp: Unix timestamp (float, từ os.stat().st_mtime)
+        timestamp: Unix timestamp from os.stat().st_mtime.
 
     Returns:
-        str: Chuỗi 14 ký tự YYYYMMDDhhmmss
+        A 14-character YYYYMMDDhhmmss string.
     """
     return time.strftime("%Y%m%d%H%M%S", time.localtime(timestamp))

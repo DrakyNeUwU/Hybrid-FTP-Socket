@@ -89,7 +89,7 @@ class TestRDTHeader(unittest.TestCase):
         self.assertNotEqual(
             hdr0.compute_checksum(payload),
             hdr1.compute_checksum(payload),
-            "Checksum phải cover seq_num trong header"
+            "Checksum must cover seq_num in the header"
         )
     def test_is_valid_flags_accepts_known_combinations(self):
         self.assertTrue(RDTHeader.is_valid_flags(RDTHeader.FLAG_DATA))
@@ -113,7 +113,7 @@ class TestRDTHeader(unittest.TestCase):
     def test_validate_length_overflow(self):
         hdr = RDTHeader(transfer_id=1, seq_num=0, ack_num=0,
                         flags=RDTHeader.FLAG_DATA, length=100)
-        packet = hdr.serialize() + b"short"  # length=100 nhưng chỉ 5 bytes payload
+        packet = hdr.serialize() + b"short"  # length=100 but only 5 payload bytes
         self.assertFalse(hdr.validate_length(packet))
 
     def test_validate_length_zero(self):
@@ -340,7 +340,7 @@ class TestRDTProtocolLogic(unittest.TestCase):
         t.join(timeout=3)
         pair.close()
 
-        self.assertEqual(received, [b"X"], f"Phải yield đúng 1 lần, thực tế: {received}")
+        self.assertEqual(received, [b"X"], f"Must yield exactly once; got: {received}")
 
     def test_out_of_order_dropped_then_recovered(self):
         from common.rdt_receiver import receive_chunks_rdt

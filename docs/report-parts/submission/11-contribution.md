@@ -44,3 +44,12 @@
 Role B completes `docs/report.md` and the team completes the oral dry run.
 Record each member's sign-off with the final report/release checklist. Do not
 infer percentages from file count or self-assessment alone.
+
+| Final decision | Required record | Current state |
+|---|---|---|
+| Contribution percentage | A/B/C percentage, total exactly 100%, and decision date | Pending group decision |
+| Technical sign-off | A review for control/command; C review for filesystem/concurrency/evidence | Pending release-checklist record |
+| Submission sign-off | All members confirm report claims, oral dry run and clean Git release | Pending after the two rows above |
+
+The authoritative gate is `docs/requirement-checklist.md`; this component only
+records the final decision after that checklist has supporting evidence.

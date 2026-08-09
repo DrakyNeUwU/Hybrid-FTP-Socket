@@ -13,8 +13,8 @@
 | Filesystem sandbox, atomic upload, cleanup, concurrency | Done | C | FTP E2E gồm 3 PASV clients, ABOR và disconnect |
 | Active/PASV localhost | Done | C | `5 passed in 18.03s`; `docs/evidence/week-2.5-e2e-transfer.log` |
 | Active/PASV hai máy LAN | Done | C | PASV/ACTIVE two-machine upload/download and source/server/client SHA-256 match |
-| Report nộp cuối và acceptance checklist | In progress | B | A/C phải sign-off phần kỹ thuật của mình |
-| Oral/dry run và Git release check | In progress | B | Chưa có evidence dry run/release check |
+| Report nộp cuối, peer evaluation và acceptance checklist | In progress | B | Technical audit passed; chờ contribution percentage và Git release check |
+| Oral preparation và Git release check | In progress | B | Oral pack/locator ready; Git status sạch còn chờ |
 | C-F01 Go-Back-N flow/congestion control (Excellent) | Done | C/B | Window 4, cumulative ACK, bounded retry; 199 full tests in 96.72s |
 
 ## Sự thật đã xác minh
@@ -26,7 +26,8 @@
 - SHA-256 source/server/client khớp cho Active và PASV: `docs/evidence/week-2.5-active-sha256.txt`, `docs/evidence/week-2.5-pasv-sha256.txt`.
 - PASV hai máy LAN: source/server/download SHA-256 khớp; `docs/evidence/final-lan-pasv-sha256.txt`.
 - ACTIVE hai máy LAN: source/server/download SHA-256 khớp; `docs/evidence/final-lan-active-sha256.txt`.
-- Progress, safe server logging và PASV screenshots: `docs/evidence/week-2.5-cli-logging.log`, `docs/evidence/screenshots/`.
+- Progress và safe server logging: `docs/evidence/week-2.5-cli-logging.log`;
+  LAN server/client logs và SHA-256 nằm tại `docs/evidence/final-lan-*`.
 
 ## Quy ước cập nhật mỗi tối
 

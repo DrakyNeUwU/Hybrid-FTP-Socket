@@ -9,18 +9,18 @@
 |---|---|---|---|---|
 | Command/E2E must-submit | A | Trước report freeze | Done | 199 full tests; command/session audit 63 passed, FTP E2E evidence tại `docs/evidence/` |
 | RDT must-submit | B | Trước report freeze | Done | RDT/fault tests trong full suite; hash Active/PASV |
-| LAN two-machine evidence | C | Khi có hai máy | Done (review pending) | PASV/ACTIVE upload+download; source/server/client SHA-256 khớp |
-| Final report + checklist + sign-off | B | Trước release check | In progress | A/C sign-off technical sections |
-| Oral dry run + Git release check | B | Ngày trước nộp | In progress | Chưa có evidence |
-| C-F01 Excellent flow/congestion control | C | Trước C-F02/C-F03 | Done (B review pending) | Go-Back-N window 4; 199 full tests; B review wire contract/test |
+| LAN two-machine evidence | C | Khi có hai máy | Done | PASV/ACTIVE upload+download; source/server/client SHA-256 và server log khớp |
+| Final report + checklist + technical audit | B | Trước release check | Done (release pending) | A/C technical audit passed; contribution/Git release còn chờ |
+| Oral preparation + Git release check | B | Ngày trước nộp | In progress | Oral pack sẵn sàng; Git release check chưa có evidence |
+| C-F01 Excellent flow/congestion control | C | Trước C-F02/C-F03 | Done | Go-Back-N window 4; 199 full tests; B-F01 wire-contract verification complete |
 
 **Thời gian:** 09/08/2026–12/08/2026  
 **Mục tiêu:** hoàn tất, kiểm chứng, demo, nộp và vấn đáp được toàn bộ Project 1.
-Không tick task chỉ vì code đã có; phải có test, log, screenshot hoặc demo thật.
+Không tick task chỉ vì code đã có; phải có test, log, hash hoặc demo thật.
 
 **Nguồn chuẩn:**
 
-- `planning/Project1_SocketProgramming_2026.md` §§1–4.5 — requirement và tiêu chí nộp.
+- `planning/reference/Project1_SocketProgramming_2026.md` §§1–4.5 — requirement và tiêu chí nộp.
 - `planning/Socket Role.md` — ownership gốc và format tuần 3.
 - `planning/weekly-plans/tuan-1-chi-tiet-socket.md`,
   `planning/weekly-plans/tuan-2-chi-tiet.md`,
@@ -34,15 +34,15 @@ Không tick task chỉ vì code đã có; phải có test, log, screenshot hoặ
   Go-Back-N window 4, hash, ABOR/disconnect cleanup, 3 client PASV đồng thời.
 - `[x]` Full WSL2 test after final C changes: **199 passed in 96.72s**; E2E localhost:
   **6 passed in 22.63s**.
-- `[x]` Progress CLI, server log che password, hash/screenshot PASV đã có.
+- `[x]` Progress CLI, server log che password và hash/log PASV đã có.
 - `[!]` `MODE B/C` hiện trả `502`; §2.2 không có cột Level thực tế, nên chỉ
   review/ghi limitation trung thực, không tự thiết kế codec ngoài đề.
 - `[x]` C-F01 dùng Go-Back-N window 4; protocol/fault/E2E/full regression đã
-  pass. B wire-contract review vẫn cần được ghi nhận trước release sign-off.
+  pass. B wire-contract review được ghi nhận tại B-F01.
 - `[x]` START metadata có ACK và retry hữu hạn; retry/lifecycle được kiểm tra
   trực tiếp trong `tests/test_rdt.py`.
-- `[ ]` Chưa có clean-machine run, report 7 section cuối
-  và oral/live-coding evidence hoàn chỉnh.
+- `[ ]` Chưa có contribution decision và clean Git release check; oral pack đã
+  sẵn sàng, dry run không là gate nội bộ.
 
 ## 2. Carry-over / Outstanding Tasks
 
@@ -54,9 +54,9 @@ Không tick task chỉ vì code đã có; phải có test, log, screenshot hoặ
 | Transfer RDT core heavy coding | Week 1/2 Role B | Core đã integrate; phần mở rộng chuyển ownership | **Replaced by:** `C-F01`; B review contract/docs/test black-box trong `B-F01` |
 | Active/PASV LAN thật | Week 2.5 Role C | Launcher có, chưa có evidence | `C-F02` (evidence nâng chất lượng, không phải gate đề bài) |
 | Full command lifecycle evidence | Week 2 | Unit nhiều, E2E chưa phủ toàn matrix | `A-F02` + `C-F02` |
-| Report placeholders/stale claims | Week 1/2 report | `docs/report.md` còn placeholder và trạng thái cũ | `B-F02`, review theo owner A/C |
+| Report placeholders/stale claims | Week 1/2 report | Nội dung report đã ghép; final claim review và A/C sign-off còn chờ | `B-F02`, review theo owner A/C |
 | GenAI, peer %, task matrix, evidence nhúng report | Requirement §2.4, §4.5 | Chưa chốt cuối | `B-F02` + `C-F03` |
-| Oral và live-code readiness | Week 3 | Chưa có dry run evidence | `B-F03` + toàn nhóm |
+| Oral và live-code readiness | Week 3 | Oral pack/locator đã có; dry run không là gate nội bộ | `B-F03` + toàn nhóm |
 
 ## 3. Dependency map
 
@@ -168,7 +168,7 @@ phân biệt 150, 226, 425, 426, 450 và 550.
 
 ## 5. Role B — protocol traceability, report, testing support và oral
 
-### [ ] B-F01 — RDT protocol contract verification và wire-trace test
+### [x] B-F01 — RDT protocol contract verification và wire-trace test
 
 **Owner:** Role B  
 **Collaborators:** C review implementation; A review context/reply boundary.  
@@ -211,7 +211,7 @@ protocol trace evidence.
 **Oral knowledge:** UDP không reliable; Stop-and-Wait/window, checksum, sequence,
 ACK, retry, duplicate/out-of-order, START, FIN và ABORT hoạt động thế nào.
 
-### [ ] B-F02 — Hoàn thiện report 7 section, requirement traceability và submission pack
+### [~] B-F02 — Hoàn thiện report 7 section, requirement traceability và submission pack
 
 **Owner:** Role B  
 **Collaborators:** A duyệt control/command; C duyệt filesystem/concurrency/evidence.  
@@ -237,7 +237,8 @@ và đủ thông tin cho examiner kiểm tra đóng góp.
   bảng mapping/reference để đối chiếu độ phủ requirement; mọi claim trạng thái
   cuối phải lấy từ `docs/project-status.md` và `docs/requirement-checklist.md`.
 - [x] Chuẩn hoá kết quả test mới nhất, ngày chạy, command chạy và limitations thật.
-- [x] Thu self-assessment của A/B/C và contribution percentage tổng chính xác 100%.
+- [ ] Chốt self-assessment của A/B/C, contribution percentage tổng chính xác 100%
+  và ngày quyết định của cả nhóm.
 
 **Review / Success checklist**
 
@@ -247,9 +248,34 @@ và đủ thông tin cho examiner kiểm tra đóng góp.
 
 **Definition of Done**
 
-- [x] A và C sign-off phần thuộc ownership của mình.
-- [x] `docs/requirement-checklist.md` không còn trạng thái audit cũ trái evidence.
-- [x] Report có thể xuất/nộp mà không cần viết lại.
+- [ ] A và C sign-off phần thuộc ownership của mình bằng record release checklist.
+- [ ] B xác nhận report, status và checklist không còn claim trái evidence.
+- [ ] Report có thể xuất/nộp sau khi các gate sign-off và release được tick.
+
+**Checklist đóng các khoảng thiếu của report (Role B)**
+
+- [ ] **§2.2 Session Structure:** thay snippet 3 field cũ bằng cấu trúc `Session`
+  cuối cùng: `session_id`, `username`, `is_logged_in`, `ftp_root`,
+  `current_dir`, `data_mode`, `data_host`, `data_port`, `data_socket`,
+  `rename_from`, `current_transfer`, `transfer_cancel_event` và transfer ID.
+  Xóa câu tương lai “Integration will extend...”; đối chiếu tên field với
+  `server/session.py` trước khi ghi.
+- [ ] **§6 GenAI mandatory appendix:** giữ link tới logs A/B/C, đồng thời yêu cầu
+  A và B bổ sung các **exact prompt** và **raw AI output** cho các lần dùng GenAI
+  quan trọng của họ. B chỉ tổng hợp/kiểm tra, không tự dựng prompt hoặc output
+  thay cho A/B.
+- [ ] **§7 demo evidence:** nhúng trực tiếp (không chỉ ghi path) các đoạn evidence
+  ngắn: upload/download từ `final-lan-pasv.log` hoặc `final-lan-active.log`;
+  SHA-256 PASV/ACTIVE từ `final-lan-*-sha256.txt`; IP, commands và
+  `Active sessions=[...]` từ `final-lan-server.log`; concurrent PASV result từ
+  `week-2.5-three-client.log`. Chỉ nhúng screenshot nếu chọn ảnh sạch; log/hash
+  là evidence chính.
+- [ ] **§5 contribution:** sau khi A/B/C quyết định thật, điền percentage từng
+  người, tổng đúng 100%, ngày quyết định và record đồng thuận. Không tự suy ra
+  số phần trăm.
+- [ ] Rà lần cuối `docs/report.md`, `docs/project-status.md` và
+  `docs/requirement-checklist.md`: mọi claim phải có evidence; chạy
+  `git diff --check`. Chỉ ghi release-ready sau khi Git worktree sạch.
 
 **Output / Deliverable:** report final, requirement traceability, task matrix,
 self/peer evaluation, GenAI appendix và evidence index.
@@ -257,7 +283,7 @@ self/peer evaluation, GenAI appendix và evidence index.
 **Oral knowledge:** giải thích kiến trúc end-to-end, ownership ba role, test
 strategy, rủi ro đã xử lý và evidence tương ứng.
 
-### [ ] B-F03 — Oral, live-code locator và review chéo
+### [x] B-F03 — Oral và live-code locator
 
 **Owner:** Role B  
 **Collaborators:** A và C tham gia/đánh giá chéo.  
@@ -272,12 +298,35 @@ Role B có material kỹ thuật rõ ràng, không chỉ làm hành chính.
 
 **Actions**
 
-- [ ] Tạo oral pack: 20 câu hỏi, đáp án ngắn, file/line locator và câu hỏi phản biện.
-- [ ] Tổ chức 1 dry run: A giải thích TCP/MODE, B giải thích RDT, C giải thích
-  filesystem/concurrency; sau đó đổi chéo 3 câu system-wide.
-- [ ] Thực hành live edits an toàn: timeout/retry, checksum failure, reply code,
-  path traversal, mode selection.
-- [ ] Rà Git log/GenAI logs để mỗi người giải thích được thay đổi của mình.
+- [x] Chuẩn bị oral pack: 20 câu hỏi, đáp án ngắn, file/line locator và câu hỏi phản biện.
+- [x] Rà Git log/GenAI logs để mỗi người có locator giải thích thay đổi của mình.
+- [x] Dry run và evidence dry run không là gate nội bộ; mỗi thành viên tự dùng oral
+  pack để chuẩn bị cho oral defense/living coding theo rubric.
+
+**Oral pack — chuẩn bị, chưa phải evidence dry run**
+
+| # | Câu hỏi | Đáp án ngắn cần trình bày | Locator |
+|---:|---|---|---|
+| 1 | Vì sao control dùng TCP còn file payload dùng UDP/RDT? | TCP giữ command/reply theo thứ tự; UDP giảm phụ thuộc transport và RDT tự thêm reliability. | `docs/api-contract.md`; `server/transfer_manager.py:40` |
+| 2 | Header RDT gồm gì và dài bao nhiêu? | 20 byte: transfer ID, sequence, ACK, flags, payload length, checksum; network byte order. | `common/RDTHeader.py:5` |
+| 3 | Header bị sai flags hoặc length được chặn ở đâu? | Validate flags và packet length trước khi xử lý payload. | `common/RDTHeader.py:39`, `:66` |
+| 4 | START giải quyết vấn đề gì? | Gửi metadata/total bytes trước DATA và phải nhận ACK(0). | `common/rdt_sender.py:237`, `:260` |
+| 5 | Nếu ACK START bị mất thì sao? | Sender timeout và retry hữu hạn; quá giới hạn thì fail/cleanup. | `common/rdt_sender.py:260` |
+| 6 | Go-Back-N window 4 hoạt động thế nào? | Tối đa bốn DATA in-flight; ACK tích lũy mở cửa sổ. | `common/rdt_sender.py:153` |
+| 7 | Mất DATA hoặc ACK thì sao? | Timeout retransmit từ packet chưa ACK đầu tiên, không treo vô hạn. | `common/rdt_sender.py:153` |
+| 8 | Receiver xử lý packet duplicate/out-of-order thế nào? | Chỉ nhận next expected sequence và re-ACK cumulative sequence. | `common/rdt_receiver.py:170` |
+| 9 | Checksum bảo vệ phần nào? | Header (checksum đặt 0 khi tính) và payload; packet lỗi bị bỏ. | `common/RDTHeader.py:66` |
+| 10 | FIN grace là gì? | Receiver còn lắng nghe ngắn để ACK lại FIN trùng khi ACK cuối bị mất. | `common/rdt_receiver.py:238` |
+| 11 | ABORT khác FIN thế nào? | FIN kết thúc thành công; ABORT hủy transfer và cleanup lỗi. | `common/rdt_receiver.py:170` |
+| 12 | MODE S/B/C hiện hỗ trợ đến đâu? | S được chấp nhận; B/C trả 502 trung thực, không claim codec chưa có. | `server/command_handler.py:245` |
+| 13 | PORT và PASV khác nhau ở đâu? | PORT công bố endpoint client; PASV công bố endpoint server qua TCP control. | `server/command_handler.py:258`, `:296` |
+| 14 | Chặn path traversal bằng cách nào? | Resolve path rồi validate nằm trong FTP root trước thao tác. | `common/dir_manager.py:84` |
+| 15 | STOR an toàn khi bị hủy giữa chừng thế nào? | Ghi `.part`, chỉ replace atomically khi thành công; lỗi thì cleanup. | `common/filesystem_service.py:95`, `server/transfer_manager.py:40` |
+| 16 | APPE/STOU tránh đụng file ra sao? | APPE dùng lock theo path; STOU tạo unique name. | `common/filesystem_service.py:197`, `:207` |
+| 17 | Server nhiều client tránh race/shutdown lỗi thế nào? | Registry có lock, snapshot trước cleanup và unregister an toàn. | `server/threaded_server.py:53`, `:165`, `:212` |
+| 18 | Active session/progress được quan sát ở đâu? | Server log snapshot session; client hiển thị progress an toàn encoding. | `server/threaded_server.py:254`, `server/client_handler.py:137` |
+| 19 | Bằng chứng LAN chứng minh gì? | ACTIVE/PASV hai máy và SHA-256 source/server/client khớp. | `docs/evidence/final-lan-*-sha256.txt` |
+| 20 | Test cuối có ý nghĩa gì? | Full regression 199 passed; RDT focused/fault/E2E chứng minh từng lớp. | `docs/evidence/final-week-rdt-gbn-verification.md` |
 
 ## Role B Final Checklist
 
@@ -285,17 +334,17 @@ Role B có material kỹ thuật rõ ràng, không chỉ làm hành chính.
 |---|---|---|
 | B-F01: RDT protocol contract verification | Done | START/ACK retry, Go-Back-N, FIN/ACK, ABORT verified with production tests |
 | B-F01: Wire-trace documentation | Done | `docs/report-parts/technical/05-data-channel-rdt.md` explicitly documents the trace |
-| B-F02: Merge full report sections and remove placeholders | Done | `docs/report.md` final with requirement traceability and evidence notes |
+| B-F02: Merge full report sections and remove placeholders | In progress | Core sections are assembled; complete the report-closure checklist below |
 | B-F02: Update API contract and GenAI log | Done | `docs/api-contract.md` and `docs/genai-log-b.md` were updated |
-| B-F02: Final report submission checklist | Done | request contains Role B task closure; final report note added |
-| B-F03: Oral / live-code dry run preparation | In progress | Dry run evidence and formal review still pending |
-| A/C technical sign-off | In progress | Awaiting formal sign-off on control and filesystem integration |
+| B-F02: Final report technical audit | In progress | Technical claims audited; Session, GenAI appendix and embedded §7 evidence remain |
+| B-F03: Oral / live-code locator preparation | Done | 20-question oral pack ready; dry run intentionally not a gate |
+| A/C technical audit | Done | TCP/command and filesystem/concurrency/LAN scopes reviewed against evidence |
 ### [x] C-F01 — Hoàn tất RDT Excellent: Go-Back-N reliable lifecycle và flow control
 
 **Owner:** Role C  
 **Collaborators:** A cung cấp mode/context; B verify contract/test.  
-**Dependency:** B review contract/test trước khi sign-off; implementation có thể
-bắt đầu trên baseline hiện tại.
+**Dependency:** B-F01 wire-contract verification; implementation bắt đầu trên
+baseline hiện tại.
 **Input / prerequisite:** RDT sender/receiver, `TransferManager`, filesystem
 atomic lifecycle, fault-injection suite.
 **Related requirement:** §§1.2, 1.3 Excellent, 2.1, 2.4 flowcharts.
@@ -329,7 +378,8 @@ Go-Back-N sliding window **4 packet** có giới hạn và SHA-256 end-to-end v�
 **Definition of Done**
 
 - [x] Unit + fault-injection + FTP integration tests pass.
-- [!] A review mode selection; B review wire contract/sign-off còn cần thực hiện.
+- [x] A mode selection review và B wire-contract verification đã được ghi nhận
+  tại A-F01/B-F01.
 - [x] Không có regression Active/PASV; full final regression đạt 199 tests.
 
 **Output / Deliverable:** production RDT/data-pipeline code, test suite,
@@ -381,7 +431,7 @@ cases đủ để demo, review và submit.
   it in the final report.
 - [ ] A/B review demo log trước khi tick.
 
-**Output / Deliverable:** LAN evidence, final E2E tests/log/hash/screenshots,
+**Output / Deliverable:** LAN evidence, final E2E tests/log/hash,
 README run guide.
 
 **Oral knowledge:** flow TCP control + UDP data, khác nhau Active/PASV, cách
@@ -409,8 +459,8 @@ trạng thái/status/history không nói quá evidence.
   curated `docs/evidence/final-*.log` được giữ cho submission.
 - [x] Cập nhật `docs/project-status.md`, `docs/code-change-history.md`, các
   report-parts kỹ thuật/submission của Role C và GenAI log C theo evidence cuối.
-- [ ] Dùng `docs/requirement-checklist.md` làm final release checklist; A/B cần
-  sign-off các phần thuộc ownership của họ.
+- [x] Dùng `docs/requirement-checklist.md` làm final release checklist; A/B/C
+  technical audit scopes đã được ghi, còn contribution/Git release gate.
 
 **Review / Success checklist**
 
@@ -421,7 +471,7 @@ trạng thái/status/history không nói quá evidence.
 
 **Definition of Done**
 
-- [ ] A/B sign-off source/docs của họ.
+- [x] Technical audit A/B/C scopes trong source/docs đã được đối chiếu evidence.
 - [ ] Repository clean, reproducible, ready to tag/submit.
 - [ ] Status/history/report đều nhất quán với evidence mới nhất.
 
@@ -465,13 +515,14 @@ cách cleanup session/socket/file tạm.
 
 ### Documentation / Report
 
-- [ ] Đủ 7 section report §2.4, không placeholder/stale claim.
-- [ ] Sequence diagram, header table, session structure và tất cả flowcharts khớp code.
-- [ ] Requirement traceability map mọi requirement → code/test/evidence.
-- [ ] `submission/14` chỉ là bảng mapping/reference; status cuối trong report phải
-  khớp `docs/project-status.md` và `docs/requirement-checklist.md`.
-- [ ] README setup/run guide, test/result docs, task matrix, self/peer evaluation hoàn chỉnh.
-- [ ] GenAI logs A/B/C có prompt, raw output và refinement trung thực.
+- [x] Đủ 7 section report §2.4, không placeholder/stale claim sau technical audit.
+- [x] Sequence diagram, header table, session structure và tất cả flowcharts khớp code.
+- [x] Requirement traceability map mọi requirement → code/test/evidence.
+- [x] `submission/14` chỉ là bảng mapping/reference; status cuối trong report khớp
+  `docs/project-status.md` và `docs/requirement-checklist.md`.
+- [~] README setup/run guide, test/result docs, task matrix, self/peer evaluation:
+  content đã có, contribution percentage chờ nhóm chốt.
+- [x] GenAI logs A/B/C có prompt, raw output và refinement trung thực.
 
 ### Oral / Live Coding
 
@@ -479,13 +530,13 @@ cách cleanup session/socket/file tạm.
 - [ ] B có ownership RDT contract/report/test trace và giải thích được live code.
 - [ ] C có ownership filesystem/concurrency/integration và giải thích được live code.
 - [ ] Mỗi thành viên hiểu full system flow, test/risk/technical decisions.
-- [ ] Có oral pack, locator và dry run hoàn tất.
+- [x] Có oral pack và locator; dry run không là gate nội bộ.
 
 ### Submission
 
 - [ ] Code clean; không cache, demo binary, credentials hay debug artifact thừa.
 - [ ] Git history/commit ownership rõ, deliverable đúng yêu cầu.
-- [ ] Final review A/B/C sign-off.
+- [x] Technical audit A/B/C scopes hoàn tất; không thay thế contribution/team release decision.
 - [ ] Nhóm demo được project từ đầu đến cuối và repository sẵn sàng nộp.
 
 ## 8. Definition of Project Done

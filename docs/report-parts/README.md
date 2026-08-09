@@ -45,7 +45,7 @@ draft này; owner chỉ cung cấp phần kỹ thuật đã review cùng evidenc
 
 ## Quy tắc dùng draft
 
-- Chỉ đưa claim vào `docs/report.md` khi có evidence trong checklist/log/hash/screenshot.
+- Chỉ đưa claim vào `docs/report.md` khi có evidence trong checklist/log/hash.
 - Giữ `TODO` và trạng thái lịch sử trong draft cho đến khi owner cập nhật; không
   dùng chúng để kết luận tiến độ dự án.
 - Dẫn test bằng lệnh, ngày chạy và artifact lưu được. Không dùng mock, sleep hay

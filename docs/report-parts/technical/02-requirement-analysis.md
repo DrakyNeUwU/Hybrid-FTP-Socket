@@ -4,7 +4,7 @@
 **Mục tiêu:** Trình bày checklist chính thức và mapping owner.  
 **Requirement:** toàn bộ yêu cầu đề §1–§4.5. **Owner:** A. **Reviewer:** B/C.  
 **Source:** [`../../requirement-checklist.md`](../../requirement-checklist.md),
-`../../../planning/Project1_SocketProgramming_2026.md` §2.1–§2.4, and
+`../../../planning/reference/Project1_SocketProgramming_2026.md` §2.1–§2.4, and
 `../../evidence/final-week-rdt-gbn-verification.md`.
 **Code:** toàn repo theo matrix.
 
@@ -30,6 +30,6 @@
 - Trạng thái hiện tại duy nhất: [`../../project-status.md`](../../project-status.md); acceptance trước nộp: [`../../requirement-checklist.md`](../../requirement-checklist.md).
 - Role A hoàn thành **A-F01** (MODE compliance) và **A-F02** (28-command matrix) trong tuần cuối; mọi claim có evidence tại `docs/evidence/final-week-rdt-gbn-verification.md`.
 - `MODE B/C` được báo cáo trung thực là limitation (`502`) vì bảng §2.2 không yêu cầu codec block/compressed ở data path — không claim success giả.
-- `Verified` chỉ gán cho hàng có artifact thật (log/hash/screenshot). Các hàng report/oral còn "In progress" thuộc B-F02/B-F03, không phải defect kỹ thuật.
+- `Verified` chỉ gán cho hàng có artifact thật (log/hash/test output). Các hàng report/oral còn "In progress" thuộc B-F02/B-F03, không phải defect kỹ thuật.
 
 **DoD:** Mọi requirement có ID (§ đề), owner, section report, code/test/evidence hoặc TODO rõ ràng.

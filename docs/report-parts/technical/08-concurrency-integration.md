@@ -1,6 +1,7 @@
 # 8. Concurrency and Integration
 
-**Trạng thái:** Hoàn thành phần Role C; A/B evidence review completed.
+**Trạng thái:** Hoàn thành phần Role C; technical audit evidence passed, final
+team release decision pending.
 **Owner:** C. **Reviewer:** A/B.
 **Nguồn:** `../../api-contract.md`, `../../project-status.md`, `tests/test_e2e_transfer.py`.
 
@@ -28,4 +29,5 @@ không bị ghi hai lần. Không global/session lock nào bị giữ khi chờ 
 | LAN PASV/ACTIVE | Hai máy upload/download; hash source/server/client khớp | `../../evidence/final-lan-*-sha256.txt` |
 
 **Evidence final:** focused RDT/fault/transfer/E2E `50 passed in 85.01s`; full
-regression `199 passed in 96.72s`. Cần A/B review artifact trước release sign-off.
+regression `199 passed in 96.72s`. Technical audit đã đối chiếu artifact; final
+team release decision vẫn chờ Git release check và contribution decision.

@@ -12,8 +12,8 @@
 - **Scope:** triển khai reliable transport trên UDP gồm header, checksum, ACK, retransmission, FIN/ABORT và recovery khi có packet loss/corruption.
 - **Module chính:** `common/RDTHeader.py`, `common/rdt_sender.py`, `common/rdt_receiver.py`.
 - **Evidence:** chạy `python3 -m pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q` với kết quả `45 passed in 67.09s`.
-- **Reference evidence:** RDT unit/fault evidence is linked below; B still reviews
-  the wire contract in B-F01.
+- **Reference evidence:** RDT unit/fault evidence is linked below; B-F01
+  technical wire-contract review is complete.
 
 | Requirement của đề | Mức độ | Role | Report section | Code liên quan | Test/evidence | Reference coverage |
 |---|---|---|---|---|---|---|
@@ -34,7 +34,7 @@
 | Diagrams/structures 7 sections (§2.4) | Report | all | 03–08 | docs/report-parts | đủ section; diagram khớp code | Final assembly tracked in B-F02 |
 | Task matrix, self/peer evaluation | Report | all | 11 | Git/docs | matrix có; percentage chờ sign-off | Final sign-off tracked in checklist |
 | GenAI prompt/raw/refinement (§4.3) | Report | all | 13 | `docs/genai-log-*.md` | A/B/C logs đầy đủ | Source logs mapped |
-| Demo screenshots/logs/hash/client table (§4.5) | Submission | C | 10 | runtime artifacts | `docs/evidence/` gồm `final-lan-*` | Evidence mapped |
+| Demo logs/hash/client table (§4.5) | Submission | C | 10 | runtime artifacts | `docs/evidence/` gồm `final-lan-*` | Evidence mapped |
 
 Các ô coverage chỉ nói rằng requirement đã có code hoặc artifact để tham chiếu.
 Chúng không thay thế trạng thái cuối, sign-off, hay acceptance decision trong

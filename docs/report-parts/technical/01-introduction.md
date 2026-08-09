@@ -2,7 +2,7 @@
 
 **Trạng thái:** Hoàn thành phần Role C; chờ A review và B tổng hợp report.
 **Owner:** C. **Reviewer:** A.
-**Nguồn:** `../../../planning/Project1_SocketProgramming_2026.md`, `../../requirement-checklist.md`.
+**Nguồn:** `../../../planning/reference/Project1_SocketProgramming_2026.md`, `../../requirement-checklist.md`.
 
 Hybrid FTP tách hai trách nhiệm mạng: TCP mang command, FTP reply và session;
 UDP mang payload file qua Reliable Data Transfer (RDT) tự cài đặt. Thiết kế này
@@ -27,4 +27,5 @@ khớp. Xem `../../evidence/final-week-rdt-gbn-verification.md`,
 `../../evidence/final-lan-active-sha256.txt`.
 
 **Limitation còn lại:** `MODE B/C` vẫn trả `502` vì chưa có data path được
-requirement/team chốt; B cần review wire contract trước release sign-off.
+requirement/team chốt. B-F01 đã hoàn tất technical wire-contract review; chỉ
+final team release decision còn pending.

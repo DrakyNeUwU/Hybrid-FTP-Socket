@@ -478,7 +478,7 @@ aligned with the requirement and does not need an RDT transfer.
 
 **Evidence:**
 
-- `planning/Project1_SocketProgramming_2026.md` §1.1–1.2 and §2.2–2.3
+- `planning/reference/Project1_SocketProgramming_2026.md` §1.1–1.2 and §2.2–2.3
 - Full WSL2 pytest: 189 passed in 113.94s
 
 ## August 8, 2026 — Real CLI Progress and Server Lifecycle Logging
@@ -827,3 +827,125 @@ documentation cleanup.
 `docs/code-change-history.md`, and this log.
 
 **Verification:** Manual path/reference review and `git diff --check` passed.
+
+## August 9, 2026 — Role B Release-State Reconciliation
+
+**Exact prompt:**
+> "PLEASE IMPLEMENT THIS PLAN: Đồng bộ và đóng các việc còn lại của Role B"
+
+**Manual refinement:**
+
+- Kept the evidence-backed RDT completion claim, but changed unrecorded A/C
+  sign-off and contribution-percentage claims to pending release gates.
+- Added a 20-question oral pack with real code/evidence locators directly to
+  B-F03; the actual dry-run record must still be created only after the session.
+- Made the project status and acceptance checklist the only locations that can
+  close report, peer-evaluation, oral and Git release work.
+
+**Affected files:** final-week plan, `docs/report.md`, requirement checklist,
+project status, submission contribution component, code-change history and this log.
+
+**Verification:** Static review against `docs/evidence/final-week-rdt-gbn-verification.md`;
+`git diff --check` run after all documentation edits.
+
+## August 9, 2026 — A/C Technical Audit and Evidence-Only Release Review
+
+**Exact prompt:**
+> "Review/sign-off chính thức phần TCP/command trong report ... C review/sign-off filesystem, concurrency, LAN/evidence trong report và các lỗi tài liệu"
+
+**Manual refinement:**
+
+- Recorded “technical audit passed” for A TCP/command and C
+  filesystem/concurrency/LAN scopes, explicitly distinguishing it from personal
+  signatures and the later team release decision.
+- Verified existing LAN logs provide client IP, commands, active-session
+  snapshots, transfer results and replies, so no new screenshot or dry-run
+  evidence is required.
+- Removed stale B wire-review/report-assembly claims, mapped Role B GenAI
+  provenance into submission component 13, and removed blank log templates.
+
+**Affected files:** report, report-parts, API contract, GenAI logs, status,
+checklist, final-week plan, code-change history and this log.
+
+**Verification:** `docs/evidence/final-lan-server.log`, final LAN client/hash
+artifacts and `docs/evidence/final-week-rdt-gbn-verification.md` (45 RDT/fault
+tests; 199 full tests); documentation consistency and `git diff --check` follow.
+
+## August 9, 2026 — Screenshot Evidence Removal
+
+**Exact prompt:**
+> "tôi không cần screenshot nữa nên xoá file đó nha"
+
+**Manual refinement:**
+
+- Removed the eight screenshot files under `docs/evidence/screenshots/` after
+  confirming their exact paths.
+- Replaced active submission references with curated LAN server/client logs and
+  SHA-256 files; historical notes now state that screenshots were removed from
+  the submission evidence pack.
+
+**Verification:** `final-lan-server.log` includes client IP, commands,
+active-session snapshots, replies and transfer outcomes; PASV/ACTIVE client logs
+and SHA-256 files remain available.
+
+## August 9, 2026 — Requirement Reference Repair
+
+**Exact prompt:**
+> "bạn sửa cái lỗi tài liệu cho tôi nhé"
+
+**Manual refinement:**
+
+- Repaired active documentation links after the planning folder moved the
+  immutable requirement into `planning/reference/`.
+- Corrected submission component 14 to state that B-F01 wire-contract review
+  is complete, rather than leaving a stale pending-review claim.
+
+**Verification:** Repository-wide reference search resolves the current
+requirement path; final-week plan records B-F01 as complete.
+
+## August 9, 2026 — Screenshot Evidence Restore
+
+**Exact prompt:**
+> "ê chết, bạn revert các screenshot lại giùm tôi"
+
+**Manual refinement:**
+
+- Restored all eight tracked screenshot files from the current Git revision.
+- Retained the documentation policy that logs and hashes are sufficient
+  technical evidence; screenshots are now available again as supplementary
+  presentation evidence.
+
+**Verification:** `docs/evidence/screenshots/` contains the eight restored PNG
+files.
+
+## August 9, 2026 — Full TCP/UDP Sequence Diagram
+
+**Exact prompt:**
+> "bạn thêm cho tôi nhé"
+
+**Manual refinement:**
+
+- Added a Mermaid sequence diagram to report §2.4.1 with TCP authentication,
+  PASV/PORT alternatives, `150 → 226/426`, RDT START/ACK, four-packet
+  Go-Back-N DATA/ACK, FIN/ACK and ABORT/error flow.
+- Kept filesystem writes and downloads distinct so the diagram shows ownership
+  across A/B/C without claiming a separate TCP data connection.
+
+**Verification:** Static review against `docs/api-contract.md` and
+`docs/evidence/final-week-rdt-gbn-verification.md`.
+
+## August 9, 2026 — Screenshot Capture Guide
+
+**Exact prompt:**
+> "bạn tạo 1 file md cho tôi, HD chạy và đặt tên ảnh ntn nhé và bổ sung mấy cái còn thiếu"
+
+**Manual refinement:**
+
+- Audited the restored PNG files against §2.4.7/§4.5 and visual content.
+- Kept the usable PASV client and ACTIVE hash images; marked the old 186-test
+  image and server image containing a startup error as unsuitable for final
+  embedding.
+- Added exact commands and filenames for four clean final screenshots.
+
+**Verification:** Guide references real README commands, E2E test locator,
+existing LAN logs and SHA-256 artifacts.

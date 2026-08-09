@@ -4,7 +4,7 @@
 **Trạng thái:** contract được chốt ở mức tài liệu; phần ghi `Proposed` hoặc
 `Needs change` chưa được xem là đã triển khai.  
 **Nguồn requirement:** `docs/requirement-checklist.md` và
-`planning/Project1_SocketProgramming_2026.md`.
+`planning/reference/Project1_SocketProgramming_2026.md`.
 
 ## 1. Ownership và nguyên tắc
 
@@ -189,8 +189,8 @@ commit finish.
   `--host 0.0.0.0`; old UDP sockets are closed before replacement.
 - Status: localhost and two-machine LAN Active/PASV are verified. Saved PASV
   and ACTIVE client/server output plus source/server/client SHA-256 are under
-  `docs/evidence/final-lan-*`; B review/sign-off remains required before final
-  report submission.
+  `docs/evidence/final-lan-*`; B-F01 technical wire-contract review is complete.
+  Final team release approval remains pending the release checklist.
 
 ## 6.1 LIST/NLST transport decision
 
@@ -208,7 +208,7 @@ file payload.
 - Owner: A handles command/reply; C supplies the validated filesystem listing.
 
 **Status:** Existing and aligned with
-`planning/Project1_SocketProgramming_2026.md` §2.2–2.3.
+`planning/reference/Project1_SocketProgramming_2026.md` §2.2–2.3.
 
 ## 7. RDT packet contract
 
@@ -286,7 +286,7 @@ client thread except `cancel_event`, which is the explicitly synchronized A/B/C
 handoff. Server logging now records connected client IP, redacted command,
 reply, session ID, transfer ID, active-session snapshot, transfer mode, byte
 count and result. The demo client renders real upload/download progress.
-**Status:** Existing; screenshots remain manual evidence.
+**Status:** Existing; curated server/client logs and SHA-256 files are submission evidence.
 
 ## 11. Contract change procedure
 

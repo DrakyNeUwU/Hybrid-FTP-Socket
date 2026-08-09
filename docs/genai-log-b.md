@@ -1,13 +1,5 @@
 # GenAI Usage Log — Role B
 
-Format mỗi lần dùng AI:
-
-**Prompt:** [mô tả yêu cầu]  
-**Raw output:** [tóm tắt output thô]  
-**Refinement:** (mình đã sửa/hiểu gì, lỗi/hạn chế phát hiện được)
-
----
-
 ## 2026-08-07 — Bug Audit và Fix (Phiên 1)
 
 **Prompt:**

@@ -17,10 +17,66 @@ client may issue control commands. The server parses each request, validates the
 session state, performs the operation, and returns the corresponding FTP reply.
 `QUIT` ends the session and closes the control connection safely.
 
-The complete TCP-plus-UDP sequence diagram will be finalized during integration.
-Role A owns the TCP lifecycle, Role B adds UDP DATA/ACK/retransmission behavior,
-and Role C verifies threading, filesystem operations, and cleanup against the
-integrated implementation.
+The TCP-plus-UDP sequence diagram in this report describes the integrated
+implementation. Role A owns the TCP lifecycle, Role B owns UDP
+DATA/ACK/retransmission behavior, and Role C verifies threading, filesystem
+operations, and cleanup.
+
+```mermaid
+sequenceDiagram
+    participant Client as FTP Client
+    participant Control as FTP Server (TCP control)
+    participant Sender as UDP/RDT Sender
+    participant Receiver as UDP/RDT Receiver
+    participant FS as Filesystem Service
+
+    Client->>Control: TCP connect
+    Control-->>Client: 220 Service ready
+    Client->>Control: USER / PASS
+    Control-->>Client: 331 / 230
+
+    alt Passive mode
+        Client->>Control: PASV
+        Control-->>Client: 227 server UDP endpoint
+    else Active mode
+        Client->>Control: PORT client UDP endpoint
+        Control-->>Client: 200 endpoint accepted
+    end
+
+    Client->>Control: STOR or RETR filename
+    Control-->>Client: 150 Opening data connection; transfer_id
+
+    alt STOR upload
+        Client->>Sender: Read local file chunks
+        Sender->>Receiver: UDP START(metadata, total bytes)
+        Receiver-->>Sender: ACK(0)
+        loop Go-Back-N window, maximum 4 packets
+            Sender->>Receiver: DATA(sequence, payload, checksum)
+            Receiver-->>Sender: Cumulative ACK
+        end
+        Sender->>Receiver: FIN
+        Receiver-->>Sender: ACK(FIN)
+        Receiver->>FS: Validate path, write .part, atomic replace
+    else RETR download
+        Sender->>FS: Read validated file chunks
+        Sender->>Receiver: UDP START(metadata, total bytes)
+        Receiver-->>Sender: ACK(0)
+        loop Go-Back-N window, maximum 4 packets
+            Sender->>Receiver: DATA(sequence, payload, checksum)
+            Receiver-->>Sender: Cumulative ACK
+        end
+        Sender->>Receiver: FIN
+        Receiver-->>Sender: ACK(FIN)
+        Receiver->>Client: Write downloaded file
+    end
+
+    alt Transfer succeeds
+        Control-->>Client: 226 Transfer complete
+    else Timeout, ABOR, or RDT failure
+        Sender->>Receiver: ABORT / bounded retry exhausted
+        Control-->>Client: 426 Transfer failed or aborted
+    end
+```
 
 ## 2. Project-Wide Data Structures
 
@@ -343,7 +399,9 @@ The integrated project now includes the verified TCP control and UDP RDT flow. E
 
 ### 5.4 Peer Evaluation
 
-The contribution percentages are tracked in the submission documents and were finalized through review of implementation scope, test evidence, and role ownership rather than by guesswork.
+Contribution percentages must be agreed by A, B, and C, total exactly 100%, and
+be recorded with the final release sign-off. They are not inferred from file
+count or self-assessment; see `docs/report-parts/submission/11-contribution.md`.
 
 ## 6. GenAI Usage & Code Refinement Log
 
@@ -370,13 +428,15 @@ The TCP control test uses the project client or Netcat (`nc`) to:
 4. Send `NOOP` and other implemented control commands.
 5. Send `QUIT`, receive `221`, and confirm safe session cleanup.
 
-Role A's report must include actual terminal output or screenshots before final
-submission. The server should return the expected FTP replies without crashing
-on invalid authentication input.
+The existing server logs provide the required demonstration record instead of
+screenshots: `docs/evidence/final-lan-server.log` records client IPs, executed
+commands, password redaction, active-session snapshots, transfer outcomes and
+FTP replies. The server returns the expected replies without crashing on invalid
+authentication input.
 
 ### 7.2 Filesystem and Concurrency Evidence (Role C)
 
-The final regression suite verified the integrated server behavior under filesystem and concurrency scenarios. The completed test evidence includes the RDT and transfer suites plus the end-to-end transfer cases for concurrent upload/download, ABOR handling, and disconnect cleanup.
+The final regression suite verified the integrated server behavior under filesystem and concurrency scenarios. The completed test evidence includes the RDT and transfer suites plus the end-to-end transfer cases for concurrent upload/download, ABOR handling, and disconnect cleanup. The LAN server log additionally records IP, command, active-session and transfer-result evidence without requiring a new screenshot.
 
 ### 7.3 UDP Transfer and End-to-End Evidence
 
@@ -449,7 +509,12 @@ tests/test_rdt_fault_injection.py::TestRDTAdapterFaultInjection::test_adapter_pa
 
 ## 8. Requirement Traceability & Final Evidence
 
-This report is aligned with the final acceptance checklist and the final regression evidence. All claims in this document are supported by code, tests, or artifacts in the repository; no `TODO`, `pending`, `unverified`, or stale claim remains in the submitted report.
+The technical claims below are aligned with the final regression evidence. This
+report is ready for final team review, but submission remains pending the release
+checklist: report-claim review, contribution percentage/sign-off, and clean Git
+release verification. Oral preparation uses the locator pack; no dry-run record
+is required. The current acceptance decision is recorded
+only in `docs/project-status.md` and `docs/requirement-checklist.md`.
 
 | Requirement area | Final status | Evidence |
 |---|---|---|
@@ -461,19 +526,31 @@ This report is aligned with the final acceptance checklist and the final regress
 | Active/PASV upload/download and LAN SHA-256 integrity | Verified | `docs/evidence/final-lan-active-sha256.txt`, `docs/evidence/final-lan-pasv-sha256.txt` |
 | Final regression suite | Verified | `python3 -m pytest -q` — 199 passed in 96.72s; `docs/evidence/final-week-rdt-gbn-verification.md` |
 
-### Final completion note
+### Final release note
 
-- `docs/report.md` is the final submission-ready report.
+- `docs/report.md` is the release-candidate report; it becomes submission-ready
+  only after the final checklist is completed.
 - `docs/report-parts/technical/05-data-channel-rdt.md` documents the implemented RDT contract and evidence trace.
 - `docs/api-contract.md` records the final contract review status.
 - `docs/genai-log-b.md` captures the final Role B verification summary.
 - `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md` includes the Role B final checklist and task status.
 - **Duplicate & Out-of-Order Handling**: Verified by the protocol logic tests that confirm duplicate packets are re-ACKed and out-of-order packets are handled without corrupting the stream.
 
-## 9. Final Review and Sign-off
+## 9. Technical Audit Review and Release Sign-off
 
-- Role A reviewed and signed off the TCP control channel, command parser, session isolation, and `MODE`/`PORT`/`PASV` negotiation sections.
-- Role C reviewed and signed off the filesystem security, concurrency, Active/PASV integration, and end-to-end transfer evidence.
-- Role B compiled and verified the RDT wire protocol documentation, START/ACK retry behavior, Go-Back-N evidence, and final requirement traceability.
+- **Role A technical audit: passed.** Reviewed TCP control, command parser,
+  session isolation and `MODE`/`PORT`/`PASV` behavior against the 28-command
+  matrix, the Role A audit (**63 passed in 5.71s**) and final regression
+  (**199 passed in 96.72s**).
+- **Role C technical audit: passed.** Reviewed FTP-root/atomic lifecycle,
+  concurrency/cleanup, Active/PASV and LAN evidence against the focused audit
+  (**135 passed in 86.22s**), final regression, LAN SHA-256 logs and
+  `docs/evidence/final-lan-server.log`.
+- **Role B technical verification: passed.** The 20-byte RDT contract,
+  START/ACK retry, Go-Back-N, FIN/ABORT and fault handling are supported by
+  RDT/fault tests (**45 passed in 67.09s**) and final regression evidence.
 
-These reviews confirm that the submitted report and documentation are aligned with the implemented code and final test evidence.
+These are documentation technical-audit results, not personal A/B/C signatures.
+Final team release approval remains pending contribution percentages and a clean
+Git release check; the current acceptance decision is in the status and
+requirement-checklist documents.
