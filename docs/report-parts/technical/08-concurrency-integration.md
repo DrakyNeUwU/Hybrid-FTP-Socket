@@ -3,7 +3,7 @@
 **Trạng thái:** Hoàn thành một phần
 **Mục tiêu:** Thread-per-client, locks, A+B+C handoff and cleanup.  
 **Requirement:** RQ-07, RQ-09, RQ-10. **Owner:** C. **Reviewer:** A/B.  
-**Source:** `role-c-week-2.md`, `api-contract.md`.  
+**Source:** `../../role-c-week-2.md`, `../../api-contract.md`.  
 **Code:** `server/threaded_server.py`, `client_handler.py`, `transfer_manager.py`.
 
 **Diagram/table:** thread dispatch and transfer lifecycle.  

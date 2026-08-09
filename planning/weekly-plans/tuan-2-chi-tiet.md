@@ -1,5 +1,8 @@
 # TUẦN 2 — CÔNG VIỆC THEO VAI TRÒ (2/8/2026 → 8/8/2026)
 
+> **Snapshot lịch sử, không phải trạng thái hiện tại.** Xem
+> `docs/project-status.md` và `docs/requirement-checklist.md`.
+
 **Mục tiêu tuần:** Hoàn thiện các chức năng Advanced gồm truyền file binary, quản lý cây thư mục, Active/PASV và nhiều client đồng thời; hoàn thiện lớp truyền file UDP tin cậy; tích hợp ba module thành hệ thống chạy end-to-end.
 
 > Theo `Project1_SocketProgramming_2026.md`, RDT có ACK, sequence number, timeout/retransmit và HASH thuộc tiêu chí Excellent. Tuy nhiên, đề cũng bắt buộc kênh UDP phải xử lý mất, lỗi, trùng và sai thứ tự, nên Stop-and-Wait vẫn là công việc cốt lõi cần hoàn thành trước khi tích hợp.

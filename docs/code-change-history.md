@@ -69,3 +69,9 @@ Khi nộp báo cáo, đính kèm:
 
 Không ghi “hoàn thành toàn bộ” cho Active/PASV hoặc FTP end-to-end nếu chưa có
 log client/server và hash nguồn/đích.
+
+## 09/08/2026 — Final-week documentation source-of-truth consolidation
+
+| Role owner | Problem | Files changed | Reason | Verification evidence |
+|---|---|---|---|---|
+| C (documentation integration) | Nhiều file trạng thái/report cũ mâu thuẫn với full regression và FTP E2E đã có | `README.md`, `docs/project-status.md`, `docs/requirement-checklist.md`, `planning/`, `docs/report-parts/`, tài liệu tuần và final-week plan | Chỉ định một status hiện hành và một checklist acceptance; tổ chức planning thành requirement/ownership, status navigation và weekly plans; tổ chức report drafts thành technical/submission; cập nhật README theo commands và tài liệu hiện tại. `docs/report.md` được để nguyên cho Role B hoàn thiện. | Đối chiếu `189 passed in 106.91s`, FTP E2E `5 passed in 18.03s`, hash Active/PASV; kiểm tra Git và tìm stale claims trong tài liệu hiện hành |

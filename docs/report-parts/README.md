@@ -1,42 +1,54 @@
-# Report Components
+# Report Parts — Draft Workspace
 
-## Mục đích
+> **Không phải trạng thái hiện tại hoặc bản nộp.** `docs/report.md` là report
+> nộp cuối đang do Role B hoàn thiện. Xem `docs/project-status.md` cho trạng
+> thái vận hành và `docs/requirement-checklist.md` cho acceptance trước nộp.
 
-Thư mục này chứa các section độc lập để ghép thành `docs/report.md`; không ghi
-đè report hiện tại. Requirement chuẩn là [`../requirement-checklist.md`](../requirement-checklist.md),
-API chuẩn là [`../api-contract.md`](../api-contract.md).
+## Cấu trúc
 
-## Thứ tự merge, owner và reviewer
+```text
+docs/report-parts/
+├── README.md
+├── technical/       # Nội dung kỹ thuật theo luồng kiến trúc và triển khai
+│   ├── 01-introduction.md
+│   ├── 02-requirement-analysis.md
+│   ├── 03-system-architecture.md
+│   ├── 04-control-channel.md
+│   ├── 05-data-channel-rdt.md
+│   ├── 06-filesystem-security.md
+│   ├── 07-active-pasv.md
+│   ├── 08-concurrency-integration.md
+│   └── 09-client-cli-logging.md
+└── submission/      # Evidence, contribution và kiểm tra trước nộp
+    ├── 10-testing-results.md
+    ├── 11-contribution.md
+    ├── 12-limitations-future-work.md
+    ├── 13-genai-usage.md
+    └── 14-requirement-compliance.md
+```
 
-| Thứ tự | File | Owner | Reviewer | Dependency |
-|---:|---|---|---|---|
-| 1 | 01-introduction | C | A | requirement |
-| 2 | 02-requirement-analysis | A | B/C | checklist |
-| 3 | 03-system-architecture | C | A/B | 01–02, API |
-| 4 | 04-control-channel | A | C | API, architecture |
-| 5 | 05-data-channel-rdt | B | A/C | API, architecture |
-| 6 | 06-filesystem-security | C | A | API |
-| 7 | 07-active-pasv | A/B | C | 04–05 |
-| 8 | 08-concurrency-integration | C | A/B | 04–07 |
-| 9 | 09-client-cli-logging | C | A | 08 |
-| 10 | 10-testing-results | C | A/B | actual tests/evidence |
-| 11 | 11-contribution | A/C | all | Git/peer agreement |
-| 12 | 12-limitations-future-work | all | all | audit |
-| 13 | 13-genai-usage | all | all | GenAI logs |
-| 14 | 14-requirement-compliance | A | all | all sections |
+## Ownership và thứ tự hoàn thiện
 
-Merge theo số thứ tự; mỗi owner sửa section của mình, editor cuối cùng là người
-được nhóm chỉ định và phải ghi tên trong commit. Không chỉnh đồng thời cùng một
-section; dùng một commit cho một component.
+| Nhóm | Parts | Owner chính | Review |
+|---|---|---|---|
+| Technical | 01, 03, 06, 08, 09 | C | A/B theo phần liên quan |
+| Technical | 02, 04 | A | B/C |
+| Technical | 05 | B | A/C |
+| Technical | 07 | A/B | C |
+| Submission | 10 | C | A/B |
+| Submission | 11 | A/C | Cả nhóm |
+| Submission | 12–13 | Cả nhóm | Cả nhóm |
+| Submission | 14 | A | B/C |
 
-## Quy tắc bằng chứng và định dạng
+Role B là editor của `docs/report.md`. Không sửa trực tiếp report của B từ các
+draft này; owner chỉ cung cấp phần kỹ thuật đã review cùng evidence.
 
-- Hình: `docs/evidence/fig-<section>-<n>.<ext>`; bảng: `Table <section>.<n>`.
-- Dẫn code bằng đường dẫn tương đối + symbol/function, không paste cả file.
-- Dẫn test bằng lệnh, test name, ngày chạy và output lưu được; mock/sleep/compileall
-  không phải evidence end-to-end.
-- Trạng thái component luôn `Chưa hoàn thành` cho tới khi owner cập nhật bằng chứng.
-- Không bịa test, benchmark, screenshot, diagram đã chạy, hash, Active/PASV hoặc
-  concurrency. Dữ liệu thiếu phải là TODO cụ thể.
-- Trước merge: link API/checklist đúng, requirement có owner, TODO có owner, diagram
-  khớp code, test/evidence tồn tại, không mâu thuẫn reply/header/cleanup.
+## Quy tắc dùng draft
+
+- Chỉ đưa claim vào `docs/report.md` khi có evidence trong checklist/log/hash/screenshot.
+- Giữ `TODO` và trạng thái lịch sử trong draft cho đến khi owner cập nhật; không
+  dùng chúng để kết luận tiến độ dự án.
+- Dẫn test bằng lệnh, ngày chạy và artifact lưu được. Không dùng mock, sleep hay
+  compile-only làm evidence end-to-end.
+- Mỗi phần merge theo ownership, có reviewer, và không được mâu thuẫn với
+  `docs/api-contract.md` về reply, RDT header hay cleanup.

@@ -1,5 +1,9 @@
 # Role C — Week 2 Integration Contract
 
+> **Snapshot lịch sử, không phải trạng thái hiện tại.** Xem
+> `docs/project-status.md` và `docs/requirement-checklist.md` để biết evidence
+> và tiến độ final.
+
 ## Filesystem API
 
 `common.filesystem_service.FilesystemService` is the only filesystem entry point

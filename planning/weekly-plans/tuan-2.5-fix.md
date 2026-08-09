@@ -1,5 +1,9 @@
 # TUẦN 2.5 — CHECKLIST TỔNG HỢP A / B / C
 
+> **Snapshot lịch sử, không phải trạng thái hiện tại.** Xem
+> `docs/project-status.md` cho tiến độ, `docs/requirement-checklist.md` cho
+> acceptance và `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md` cho final-week tasks.
+
 **Thời gian:** 02/08/2026–08/08/2026  
 **Mục tiêu:** chạy được Hybrid FTP thật: TCP control, UDP/RDT data và filesystem
 an toàn.

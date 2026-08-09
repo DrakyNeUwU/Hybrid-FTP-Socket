@@ -4,7 +4,7 @@
 **Trạng thái:** contract được chốt ở mức tài liệu; phần ghi `Proposed` hoặc
 `Needs change` chưa được xem là đã triển khai.  
 **Nguồn requirement:** `docs/requirement-checklist.md` và
-`filephanchiacv/Project1_SocketProgramming_2026.md`.
+`planning/Project1_SocketProgramming_2026.md`.
 
 ## 1. Ownership và nguyên tắc
 
@@ -198,7 +198,7 @@ file payload.
 - Owner: A handles command/reply; C supplies the validated filesystem listing.
 
 **Status:** Existing and aligned with
-`filephanchiacv/Project1_SocketProgramming_2026.md` §2.2–2.3.
+`planning/Project1_SocketProgramming_2026.md` §2.2–2.3.
 
 ## 7. RDT packet contract
 

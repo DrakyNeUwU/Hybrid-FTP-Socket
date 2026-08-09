@@ -3,7 +3,7 @@
 **Trạng thái:** Chưa hoàn thành  
 **Mục tiêu:** Satisfy mandatory provenance and show critical review.  
 **Requirement:** RQ-10, RQ-11. **Owner:** all. **Reviewer:** all.  
-**Source:** `docs/genai-log-a.md`, `genai-log-b.md`, `genai-log-c.md`, official spec.  
+**Source:** `../../genai-log-a.md`, `../../genai-log-b.md`, `../../genai-log-c.md`, official spec.  
 **Code:** AI-assisted symbols listed per log.
 
 **Diagram/table:** prompt/output/refinement table.  

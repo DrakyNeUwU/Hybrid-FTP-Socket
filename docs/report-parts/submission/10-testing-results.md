@@ -3,7 +3,7 @@
 **Trạng thái:** Hoàn thành một phần
 **Mục tiêu:** Separate unit, fault-injection, integration and demo evidence.  
 **Requirement:** RQ-09, RQ-10. **Owner:** C. **Reviewer:** A/B.  
-**Source:** `tests/`, `requirement-checklist.md`.  
+**Source:** `tests/`, `../../requirement-checklist.md`.  
 **Code:** all production modules.
 
 **Diagram/table:** test matrix by command, mode, data type and fault.  

@@ -3,7 +3,7 @@
 **Trạng thái:** Chưa hoàn thành  
 **Mục tiêu:** Root confinement, metadata, binary I/O, atomic upload and locks.  
 **Requirement:** RQ-06, RQ-10. **Owner:** C. **Reviewer:** A.  
-**Source:** `role-c-week-2.md`, `api-contract.md`.  
+**Source:** `../../role-c-week-2.md`, `../../api-contract.md`.  
 **Code:** `common/filesystem_service.py`, `dir_manager.py`, `file_handler.py`.
 
 **Diagram/table:** path resolution and `.part -> os.replace` flow.  
