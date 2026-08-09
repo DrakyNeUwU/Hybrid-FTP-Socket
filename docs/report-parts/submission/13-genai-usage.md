@@ -37,3 +37,23 @@ xử lý edge case và xác nhận bằng unit test trước khi đưa vào prod
 
 Final report chỉ được nói GenAI-assisted ở mức có thể giải thích và truy vết
 vào logs; không thay thế peer review, ownership hoặc verification độc lập.
+
+## Role B
+
+Role B dùng GenAI để hỗ trợ audit protocol, xác định lỗi implementation, xây dựng
+black-box test và kiểm tra phần RDT contract/docs với evidence thực tế. Mỗi lần
+GenAI đề xuất đều được đánh giá thủ công, sửa lỗi, và đối chiếu với kết quả test
+thực tế trước khi ghi vào report.
+
+| Hạng mục Role B | Manual refinement | Verification |
+|---|---|---|
+| Bug audit và fix protocol | AI phân tích `common/RDTHeader.py`, `common/rdt_sender.py`, `common/rdt_receiver.py`, `tests/test_rdt.py`, `tests/test_rdt_fault_injection.py`, `docs/api-contract.md`; phát hiện các vấn đề về checksum, START packet, dynamic port, cờ, retry và wire-header contract | Bản thân team chạy test và chỉnh sửa code để đảm bảo tính đúng đắn |
+| Thiết kế black-box test | AI đề xuất kịch bản kiểm thử RDT thực tế như kiểm tra `transfer_id`, ABORT, duplicate FIN, invalid length và START retry | Các test được thêm vào `tests/test_rdt.py` và xác nhận bằng `pytest` |
+| RDT START/ACK retry verification | AI hướng dẫn kiểm tra thiết kế retry hữu hạn trên START và giới hạn lỗi | Trong code có cơ chế timeout/retry và docs đã ghi rõ; evidence `tests/test_rdt.py` |
+| Report/doc update | AI đề xuất bổ sung `docs/api-contract.md`, `docs/report-parts/technical/05-data-channel-rdt.md` và `docs/genai-log-b.md` | Report final đã cập nhật, claim không còn placeholder/pending |
+| Final verification evidence | AI gợi ý tổng hợp evidence Role B và kiểm tra lại toàn bộ | `python3 -m pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q` → 45 passed in 67.09s; full regression `199 passed in 96.72s` |
+
+**Refinement:**
+- AI không thay thế review manual; mọi sửa đổi code và test đều được team kiểm định lại.
+- Các đề xuất về START packet, dynamic port và protocol contract được dùng để định hướng, nhưng cần quyết định nội dung cuối cùng bởi team.
+- GenAI được sử dụng ở mức hỗ trợ phân tích và chuẩn bị draft, không được dùng để tạo evidence hoặc quyết định ownership.
