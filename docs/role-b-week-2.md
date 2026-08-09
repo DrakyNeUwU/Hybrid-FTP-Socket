@@ -1,6 +1,10 @@
 
 # Role B — Week 2 Documentation
 
+> **Snapshot lịch sử, không phải trạng thái hiện tại.** Xem
+> `docs/project-status.md` và `docs/requirement-checklist.md`; các câu về test
+> chưa chạy trong tài liệu này phản ánh thời điểm Week 2.
+
 > **Shared API:** [`api-contract.md`](api-contract.md)  
 > **Requirement checklist:** [`requirement-checklist.md`](requirement-checklist.md)  
 > **Trạng thái tài liệu:** `Đã cập nhật — 2026-08-07`

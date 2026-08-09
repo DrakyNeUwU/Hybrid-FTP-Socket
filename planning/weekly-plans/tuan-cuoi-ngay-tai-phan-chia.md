@@ -1,5 +1,19 @@
 # FINAL WEEK — HOÀN TẤT PROJECT 1: HYBRID FTP
 
+> **Bảng điều hành final week.** Trạng thái dự án duy nhất nằm tại
+> `docs/project-status.md`; checklist trước nộp ở `docs/requirement-checklist.md`.
+
+## Dashboard họp mỗi tối
+
+| Task | DRI cuối | Deadline | Trạng thái | Blocker / evidence |
+|---|---|---|---|---|
+| Command/E2E must-submit | A | Trước report freeze | Done | 189 full tests; 5 FTP E2E tại `docs/evidence/` |
+| RDT must-submit | B | Trước report freeze | Done | RDT/fault tests trong full suite; hash Active/PASV |
+| LAN two-machine evidence | C | Khi có hai máy | In progress | Phụ thuộc LAN/firewall; localhost không bị block |
+| Final report + checklist + sign-off | B | Trước release check | In progress | A/C sign-off technical sections |
+| Oral dry run + Git release check | B | Ngày trước nộp | In progress | Chưa có evidence |
+| C-F01 Excellent flow/congestion control | C | Sau must-submit gates | Deferred | Không được đẩy report/E2E xuống ưu tiên thấp hơn |
+
 **Thời gian:** 09/08/2026–12/08/2026  
 **Mục tiêu:** hoàn tất, kiểm chứng, demo, nộp và vấn đáp được toàn bộ Project 1.
 Không tick task chỉ vì code đã có; phải có test, log, screenshot hoặc demo thật.

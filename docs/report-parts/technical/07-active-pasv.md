@@ -3,7 +3,7 @@
 **Trạng thái:** Chưa hoàn thành  
 **Mục tiêu:** Chốt UDP endpoint negotiation and lifecycle.  
 **Requirement:** RQ-02, RQ-05, RQ-10. **Owner:** A/B. **Reviewer:** C.  
-**Source:** `api-contract.md`, `tuan-2-chi-tiet.md`.  
+**Source:** `../../api-contract.md`, `../../../planning/weekly-plans/tuan-2-chi-tiet.md`.  
 **Code:** `server/command_handler.py`, `common/rdt_utils.py`.
 
 **Diagram/table:** PORT/PASV sequence and endpoint ownership table.  

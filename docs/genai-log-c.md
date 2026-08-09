@@ -221,7 +221,7 @@ be recorded as an integration issue rather than claimed as complete.
 
 - `docs/project-status.md`
 - `docs/code-change-history.md`
-- `filephanchiacv/tuan-2.5-fix.md`
+- `planning/weekly-plans/tuan-2.5-fix.md`
 - Existing Role C implementation and tests in `common/`, `server/`, and `tests/`
 
 ## August 8, 2026 — Manual Active Transfer Demo Evidence
@@ -329,7 +329,7 @@ a separate temporary directory.
 - `tests/test_e2e_transfer.py`
 - `docs/evidence/week-2.5-three-client.log`
 - `docs/role-c-week-2.md`, `docs/project-status.md`,
-  `docs/code-change-history.md`, `filephanchiacv/tuan-2.5-fix.md`
+  `docs/code-change-history.md`, `planning/weekly-plans/tuan-2.5-fix.md`
 
 **Verification:**
 
@@ -376,7 +376,7 @@ exception fallback.
 - `server/transfer_manager.py`
 - `tests/test_e2e_transfer.py`
 - `docs/api-contract.md`, `docs/role-c-week-2.md`, `docs/project-status.md`,
-  `docs/code-change-history.md`, `filephanchiacv/tuan-2.5-fix.md`
+  `docs/code-change-history.md`, `planning/weekly-plans/tuan-2.5-fix.md`
 
 **Verification:**
 
@@ -418,7 +418,7 @@ remote client may receive an unusable endpoint.
 - `server/client_handler.py`
 - `README.md`
 - `docs/api-contract.md`, `docs/project-status.md`,
-  `docs/code-change-history.md`, `filephanchiacv/tuan-2.5-fix.md`
+  `docs/code-change-history.md`, `planning/weekly-plans/tuan-2.5-fix.md`
 
 **Verification:**
 
@@ -453,7 +453,7 @@ dependencies, and Definition of Done.
 
 **Affected files:**
 
-- `filephanchiacv/tuan-2.5-fix.md`
+- `planning/weekly-plans/tuan-2.5-fix.md`
 - `docs/code-change-history.md`
 - `docs/genai-log-c.md`
 
@@ -478,7 +478,7 @@ aligned with the requirement and does not need an RDT transfer.
 
 **Evidence:**
 
-- `filephanchiacv/Project1_SocketProgramming_2026.md` §1.1–1.2 and §2.2–2.3
+- `planning/Project1_SocketProgramming_2026.md` §1.1–1.2 and §2.2–2.3
 - Full WSL2 pytest: 189 passed in 113.94s
 
 ## August 8, 2026 — Real CLI Progress and Server Lifecycle Logging
@@ -559,3 +559,80 @@ The user confirmed that the corrected PASV server-log, progress, and success
 screenshots were saved under `docs/evidence/screenshots/`. This closes the
 localhost visual-evidence item. LAN remains pending because it requires a
 second machine/network path.
+
+## August 9, 2026 — Final-Week Source-of-Truth Consolidation
+
+**Exact prompt:**
+> "Nhìn theo góc Product Manager... từ cái này, bạn lên plan sửa cho tôi nhé"
+> followed by "Implement the plan."
+
+**Raw GenAI output summary:**
+
+The review found that the repository had accurate evidence but conflicting
+current-status language: the report and report parts still contained
+placeholders, the Role B Week 2 snapshot said pytest had not run, and the
+requirement checklist had been deleted. It proposed one operational status,
+one acceptance checklist, a short final-week dashboard, and a final report
+that makes only evidence-backed claims.
+
+**Manual refinement:**
+
+- Recreated `docs/requirement-checklist.md` as the pre-submission acceptance
+  gate and made `docs/project-status.md` the only current-status source.
+- Kept `docs/report.md` unchanged because Role B owns its final-week completion;
+  the checklist/status make that ownership and its A/C technical sign-off gate
+  explicit.
+- Added a compact dashboard to the final-week plan and historical banners to
+  week reports and `docs/report-parts/`, preventing stale snapshots from being
+  presented as the current project state.
+
+**Affected files:**
+
+- `docs/project-status.md`, `docs/requirement-checklist.md`
+- `docs/report-parts/README.md`, `docs/report-parts/submission/14-requirement-compliance.md`
+- `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md` and historical week documents
+- `docs/code-change-history.md`
+
+**Verification:**
+
+- Existing evidence referenced without changing its claims: WSL2 full pytest
+  **189 passed in 106.91s** and FTP E2E **5 passed in 18.03s**.
+- Repository search and Git status are run after the document change to verify
+  current documents do not retain stale completion claims and the recreated
+  checklist is tracked as an intentional change.
+
+## August 9, 2026 — Planning and Report-Part Folder Structure
+
+**Exact prompt:**
+> "bạn format lại cái filephanchia cv theo format Đổi filephanchiacv/ thành cấu trúc dễ hiểu: planning/ ├── status/ ├── weekly-plans/ đi"
+> followed by "tượng tự với reportpart, bạn format lại cho đẹp nhé"
+
+**Raw GenAI output summary:**
+
+The restructuring separated immutable requirements and ownership from weekly
+planning, kept one status source instead of copying status files, and grouped
+report drafts by technical content versus submission material.
+
+**Manual refinement:**
+
+- Renamed `filephanchiacv/` to `planning/`; requirement and role ownership are
+  at its root, week documents are in `planning/weekly-plans/`, and
+  `planning/status/README.md` routes users to `docs/project-status.md`.
+- Grouped report drafts under `docs/report-parts/technical/` (01–09) and
+  `docs/report-parts/submission/` (10–14), with a root README for structure,
+  ownership and merge rules.
+- Updated internal references without changing `docs/report.md`, which remains
+  Role B's final-week responsibility.
+
+**Affected files:**
+
+- `planning/`, `docs/report-parts/`, and their internal references
+- `docs/api-contract.md`, `docs/project-status.md`,
+  `docs/requirement-checklist.md`, `docs/report_role_a_week2.md`, `.gitignore`,
+  `README.md`
+
+**Verification:**
+
+- Repository search confirms no operational `filephanchiacv/` reference remains;
+  the exact user prompt above intentionally retains the historical folder name.
+- `git diff --check` is run after the moves and link updates.

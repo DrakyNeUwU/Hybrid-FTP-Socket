@@ -1,7 +1,12 @@
-# 14. Requirement Compliance Matrix
+# 14. Requirement Compliance Matrix (Historical Draft)
 
-**Trạng thái:** Chưa hoàn thành  
-**Owner:** A. **Reviewer:** B/C. **Source:** `requirement-checklist.md`, official spec, `api-contract.md`.
+> **Snapshot lịch sử, không phải trạng thái hiện tại.** Xem
+> [`../../project-status.md`](../../project-status.md) cho tiến độ,
+> [`../../requirement-checklist.md`](../../requirement-checklist.md) cho acceptance,
+> và [`../../report.md`](../../report.md) cho bản nộp cuối.
+
+**Trạng thái snapshot:** Chưa hoàn thành tại thời điểm soạn nháp; đã lỗi thời.
+**Owner:** A. **Reviewer:** B/C. **Source:** `../../requirement-checklist.md`, official spec, `../../api-contract.md`.
 
 | Requirement của đề | Mức độ | Role phụ trách | Report section | Code liên quan | Test/evidence | Trạng thái |
 |---|---|---|---|---|---|---|

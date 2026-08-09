@@ -3,7 +3,7 @@
 **Trạng thái:** Chưa hoàn thành  
 **Mục tiêu:** Giới thiệu Hybrid FTP và phạm vi report.  
 **Requirement:** RQ-01, RQ-12. **Owner:** C. **Reviewer:** A.  
-**Source:** `Project1_SocketProgramming_2026.md`, `requirement-checklist.md`.  
+**Source:** `../../../planning/Project1_SocketProgramming_2026.md`, `../../requirement-checklist.md`.  
 **Code:** `client/`, `server/`, `common/`.
 
 Phải mô tả TCP control, UDP/RDT data, mục tiêu Basic/Advanced/Excellent và giới

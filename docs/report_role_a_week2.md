@@ -1,5 +1,8 @@
 # Technical Report — Hybrid FTP — Role A
 
+> **Snapshot lịch sử, không phải report nộp cuối.** Xem `docs/report.md` cho
+> bản nộp và `docs/project-status.md` cho tiến độ hiện tại.
+
 > This document follows the seven mandatory sections in Section 2.4 of the
 > project specification. Each member completes the sections related to their
 > implementation.
@@ -749,7 +752,7 @@ Lập command-spec table áp dụng chung cho dispatcher:
 | `docs/genai-log-a.md` | Bổ sung toàn bộ prompt/raw output/refinement/evidence cho các thay đổi tuần 2.5 |
 | `docs/report.md` | Cập nhật phần TCP control: phản ánh đúng trạng thái thật của transfer command (không ghi "hoàn thành" cho skeleton) |
 | `docs/report_role_a_week2.md` | Bổ sung mục 8 này (chi tiết tuần 2.5) |
-| `filephanchiacv/tuan-2.5-fix.md` | Đánh `[x]` các mục Role A đã hoàn thành; ghi chú lý do chưa tick startup/stop trên Linux/WSL2 |
+| `planning/weekly-plans/tuan-2.5-fix.md` | Đánh `[x]` các mục Role A đã hoàn thành; ghi chú lý do chưa tick startup/stop trên Linux/WSL2 |
 
 ---
 

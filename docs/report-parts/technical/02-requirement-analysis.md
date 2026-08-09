@@ -3,7 +3,7 @@
 **Trạng thái:** Chưa hoàn thành  
 **Mục tiêu:** Trình bày checklist chính thức và mapping owner.  
 **Requirement:** toàn bộ RQ-01–RQ-12. **Owner:** A. **Reviewer:** B/C.  
-**Source:** [`../requirement-checklist.md`](../requirement-checklist.md), đề gốc.  
+**Source:** [`../../requirement-checklist.md`](../../requirement-checklist.md), đề gốc.  
 **Code:** toàn repo theo matrix.
 
 Phải giải thích command, RDT, security, concurrency, report, GenAI và tier; không
