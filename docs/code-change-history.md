@@ -82,3 +82,9 @@ log client/server và hash nguồn/đích.
 |---|---|---|---|---|
 | C, with B wire-contract review pending | Sender was Stop-and-Wait and START metadata had no ACK/retry | `common/rdt_context.py`, `common/rdt_sender.py`, `common/rdt_receiver.py`, `tests/test_rdt.py`, Role C/status/contract docs | Implement bounded, streaming-safe Go-Back-N window 4, cumulative ACK, finite START retry and maintain atomic cleanup without changing header or TCP command interfaces | WSL2: final focused 50 passed in 85.01s; full suite 192 passed in 93.06s; `docs/evidence/final-week-rdt-gbn-verification.md` |
 | C | Windows CP1252 output crashed during ACTIVE progress; server-initiated ACTIVE RETR UDP traffic could be blocked until the client created state | `client/demo_transfer.py`, `client/ftp_client.py`, `tests/test_cli_display.py`, evidence/status docs | Make progress output encoding-safe and send zero-payload START probes before `RETR` and after `150`, without changing TCP or RDT header contracts | WSL2 full regression: 199 passed in 96.72s; physical LAN PASV and ACTIVE upload/download both succeeded with matching source/server/client SHA-256 |
+
+## 09/08/2026 — Role C report-component migration
+
+| Role owner | Problem | Files changed | Reason | Verification evidence |
+|---|---|---|---|---|
+| C | Week 2 Role C document duplicated integration/evidence material needed by report components | `docs/report-parts/technical/01,03,06,08,09`, `docs/report-parts/submission/10–13`, checklist/status/contract docs; removed `docs/role-c-week-2.md` | Move ownership-scoped technical narrative and final evidence into the report workspace; preserve one evidence-backed source per report component | Cross-check against final verification: 199 full tests, 6 expanded E2E, LAN PASV/ACTIVE SHA-256 artifacts; link and diff audit pending handoff |

@@ -1,24 +1,31 @@
 # 8. Concurrency and Integration
 
-**Trạng thái:** Hoàn thành một phần
-**Mục tiêu:** Thread-per-client, locks, A+B+C handoff and cleanup.  
-**Requirement:** RQ-07, RQ-09, RQ-10. **Owner:** C. **Reviewer:** A/B.  
-**Source:** `../../role-c-week-2.md`, `../../api-contract.md`.  
-**Code:** `server/threaded_server.py`, `client_handler.py`, `transfer_manager.py`.
+**Trạng thái:** Hoàn thành phần Role C; A/B review evidence còn pending.
+**Owner:** C. **Reviewer:** A/B.
+**Nguồn:** `../../api-contract.md`, `../../project-status.md`, `tests/test_e2e_transfer.py`.
 
-**Diagram/table:** thread dispatch and transfer lifecycle.  
-**Test/evidence:** Ba client PASV upload + download song song đã pass, mỗi
-client có session, remote filename và download directory riêng. Test kiểm tra
-SHA-256 source/server/client: `docs/evidence/week-2.5-three-client.log`
-(`1 passed in 5.34s`).
+Server dùng thread-per-client. Mỗi `ClientHandler` sở hữu socket, session và
+transfer lifecycle riêng; registry active clients chỉ phục vụ quản lý/quan sát.
+Lock của registry được nhả trước cleanup/join. Filesystem dùng per-path lock nên
+file khác nhau vẫn transfer song song, còn cùng target không bị interleave.
 
-**Test/evidence bổ sung:** ABOR và TCP disconnect trong khi PASV worker chờ UDP
-đều xóa `.part`, giữ file cũ và đưa active-session registry về đúng số client.
-Toàn bộ nhóm E2E: `5 passed in 18.03s` trong
-`docs/evidence/week-2.5-e2e-transfer.log`.
+Role C kiểm chứng ba PASV clients đồng thời: mỗi client có TCP session, remote
+filename và download directory riêng; SHA-256 source/server/client khớp. ABOR
+hoặc TCP disconnect khi worker đang chờ UDP đều hủy bounded, xóa `.part`, giữ
+file cũ và đưa registry về đúng số active clients.
 
-**TODO(C):** Thực hiện demo khác máy nếu yêu cầu nộp có mạng LAN.
+Trong final week, sender được nâng lên Go-Back-N window 4. Sender chỉ giữ tối đa
+bốn packets in-flight, nhận ACK tích lũy và retransmit toàn bộ unacknowledged
+window từ packet đầu tiên khi timeout. Receiver chỉ commit expected sequence,
+re-ACK last contiguous sequence khi nhận duplicate/future packet, nên payload
+không bị ghi hai lần. Không global/session lock nào bị giữ khi chờ ACK.
 
-**DoD:** Session/data/file isolation đã được kiểm chứng cho ba PASV client;
-bounded cleanup khi ABOR/disconnect đã được kiểm chứng; cross-machine còn
-pending.
+| Scenario | Kết quả | Evidence |
+|---|---|---|
+| 3 PASV clients | Isolated session/file/download và hash khớp | `../../evidence/week-2.5-three-client.log` |
+| ABOR/disconnect | `.part` removed, old target preserved | `../../evidence/week-2.5-e2e-transfer.log` |
+| Fault/window | loss, corruption, reorder, exhaustion có retry bounded | `../../evidence/final-week-rdt-gbn-verification.md` |
+| LAN PASV/ACTIVE | Hai máy upload/download; hash source/server/client khớp | `../../evidence/final-lan-*-sha256.txt` |
+
+**Evidence final:** focused RDT/fault/transfer/E2E `50 passed in 85.01s`; full
+regression `199 passed in 96.72s`. Cần A/B review artifact trước release sign-off.
