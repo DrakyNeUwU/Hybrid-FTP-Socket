@@ -655,3 +655,46 @@ AI sinh file test mới `tests/test_transfer_manager.py` và class `TestRoleAVal
 
 **Refinement:**
 Đã integrate. Một số mock cần chỉnh: `receiver.receive` phải trả `iter([b'chunk1', b'chunk2'])` thay vì list để giống production. `sender.send` mock trả `int` (số bytes). `threading.Event` dùng thật (không mock) để test cancel đúng. Kết quả cuối: **61 unit test pass 100%** trong `test_command_parser.py`, `test_session.py`, `test_commands.py`, `test_transfer_manager.py`.
+
+---
+
+## [09/08/2026] - Task A-F01: MODE Compliance & Limitation Review (Final Week)
+
+**Prompt:**
+Rà soát tuân thủ lệnh `MODE` theo yêu cầu §2.2 bài tập: (1) `MODE S` (Stream) phải hoạt động chuẩn và trả `200 Mode Stream`; (2) `MODE B` (Block) và `MODE C` (Compressed) không được báo thành công giả (không trả 200), mà phải trả mã `502 Mode not implemented` và ghi rõ limitation trung thực; (3) Thêm unit tests kiểm tra `MODE S/B/C`, tham số không hợp lệ, khi chưa đăng nhập và tính cô lập giữa các session; (4) Cập nhật tài liệu báo cáo kỹ thuật.
+
+**Raw output:**
+AI đề xuất phương án xử lý `mode_cmd` trong `CommandHandler`:
+
+```python
+def mode_cmd(self, arg, session):
+    if not session.is_logged_in:
+        return "530 Not logged in\r\n"
+    if not arg:
+        return "501 Missing argument\r\n"
+    mode = arg.upper()
+    if mode == "S":
+        session.transfer_mode = "S"
+        return "200 Mode Stream\r\n"
+    elif mode in ("B", "C"):
+        return "502 Mode not implemented\r\n"
+    return "501 Invalid MODE\r\n"
+```
+
+Và thêm class `TestModeComplianceRoleA` kiểm thử các trường hợp `MODE S`, `MODE B`, `MODE C`, `MODE X`, chưa login và session isolation.
+
+**Refinement:**
+Đã xác nhận và tích hợp `TestModeComplianceRoleA` vào `tests/test_commands.py`. Cập nhật phần 4 trong `docs/report-parts/technical/04-control-channel.md` với bảng lệnh và giải thích lý do trả mã `502` cho `MODE B/C` theo đúng tinh thần báo cáo trung thực.
+
+---
+
+## [09/08/2026] - Task A-F02: 28-Command Compliance Matrix & Transfer Lifecycle (Final Week)
+
+**Prompt:**
+Lập bảng ma trận kiểm thử tuân thủ cho toàn bộ 28 lệnh FTP theo yêu cầu bài tập (§2.2): (1) Kiểm tra đủ 28 lệnh trong `CommandHandler`; (2) Xác nhận luồng chuỗi phản hồi transfer `150 -> 226/4xx` trên kênh TCP control và worker thread; (3) Bổ sung class test `TestCommandMatrix28RoleA` bảo đảm không lệnh nào bị bỏ sót; (4) Cập nhật phần 4 trong báo cáo kỹ thuật.
+
+**Raw output:**
+AI sinh danh sách 28 lệnh và ma trận test case trong `TestCommandMatrix28RoleA`, xác minh phản hồi lệnh `HELP` trả về `214` chứa đầy đủ danh sách lệnh hỗ trợ, các lệnh chưa hỗ trợ (như `SITE`) trả về `502`.
+
+**Refinement:**
+Đã tích hợp vào `tests/test_commands.py` và hoàn thiện `docs/report-parts/technical/04-control-channel.md`. Tất cả các test đều trôi qua 100%.

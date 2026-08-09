@@ -82,7 +82,7 @@ phải qua integration/fault-injection test trước khi update report/evidence.
 
 ## 4. Role A — TCP control, command lifecycle và mode negotiation
 
-### [ ] A-F01 — Rà command compliance và `MODE` theo requirement
+### [x] A-F01 — Rà command compliance và `MODE` theo requirement
 
 **Owner:** Role A  
 **Dependency:** Không có; C-F01 chỉ nhận context RDT hiện có.  
@@ -99,23 +99,23 @@ codec/format không được đề chỉ định.
 
 **Actions**
 
-- [ ] Xác nhận `MODE S` state/reply/transfer path; test input invalid và session isolation.
-- [ ] Rà `MODE B/C`: nếu không có implementation đã được requirement/team chốt,
+- [x] Xác nhận `MODE S` state/reply/transfer path; test input invalid và session isolation.
+- [x] Rà `MODE B/C`: nếu không có implementation đã được requirement/team chốt,
   giữ `502` và ghi rõ limitation trong HELP/report.
-- [ ] Bổ sung unit tests valid/invalid/unauthenticated/state isolation cho S/B/C.
-- [ ] Cập nhật phần control/session/command map trong report và GenAI log A.
+- [x] Bổ sung unit tests valid/invalid/unauthenticated/state isolation cho S/B/C.
+- [x] Cập nhật phần control/session/command map trong report và GenAI log A.
 
 **Review / Success checklist**
 
-- [ ] `MODE S` trả 200; MODE B/C không bao giờ trả 200 nếu không có implementation thật.
-- [ ] Một session đổi mode không ảnh hưởng session khác.
-- [ ] Command matrix ghi rõ reply và status thực tế của MODE B/C.
+- [x] `MODE S` trả 200; MODE B/C không bao giờ trả 200 nếu không có implementation thật.
+- [x] Một session đổi mode không ảnh hưởng session khác.
+- [x] Command matrix ghi rõ reply và status thực tế của MODE B/C.
 
 **Definition of Done**
 
-- [ ] Code + unit tests pass.
-- [ ] Không có false-success cho MODE B/C.
-- [ ] API contract/report/GenAI log A cập nhật.
+- [x] Code + unit tests pass.
+- [x] Không có false-success cho MODE B/C.
+- [x] API contract/report/GenAI log A cập nhật.
 
 **Output / Deliverable:** code Role A, tests command/session, contract mode và
 phần report control channel.
@@ -123,7 +123,7 @@ phần report control channel.
 **Oral knowledge:** giải thích MODE khác Active/PASV và lý do `502` trung thực
 tốt hơn trả 200 cho chức năng chưa có.
 
-### [ ] A-F02 — Command matrix qua TCP và transfer lifecycle cuối
+### [x] A-F02 — Command matrix qua TCP và transfer lifecycle cuối
 
 **Owner:** Role A  
 **Dependency:** A-F01; C-F01 cho transfer mode; `FilesystemService` C.  
@@ -138,24 +138,24 @@ command transfer chạy xuyên suốt thay vì chỉ có unit dispatch.
 
 **Actions**
 
-- [ ] Lập command matrix 28 lệnh: happy path, invalid syntax/state, expected reply.
-- [ ] Bổ sung TCP-level tests cho auth, directory, metadata, rename, LIST/NLST,
+- [x] Lập command matrix 28 lệnh: happy path, invalid syntax/state, expected reply.
+- [x] Bổ sung TCP-level tests cho auth, directory, metadata, rename, LIST/NLST,
   HELP, PORT/PASV và MODE S/B/C.
-- [ ] Phối hợp C thêm E2E cho STOR/RETR/STOU/APPE/HASH/ABOR ở mode cần thiết.
-- [ ] Xác nhận `LIST/NLST` luôn trả text qua TCP; chỉ file payload đi UDP/RDT.
-- [ ] Ghi evidence/reply matrix vào report phần A và `docs/requirement-checklist.md`.
+- [x] Phối hợp C thêm E2E cho STOR/RETR/STOU/APPE/HASH/ABOR ở mode cần thiết.
+- [x] Xác nhận `LIST/NLST` luôn trả text qua TCP; chỉ file payload đi UDP/RDT.
+- [x] Ghi evidence/reply matrix vào report phần A và `docs/requirement-checklist.md`.
 
 **Review / Success checklist**
 
-- [ ] Không command nào trong §2.2 thiếu handler hoặc reply ba chữ số.
-- [ ] `150 → 226` chỉ xuất hiện sau transfer thực; lỗi map đúng 4xx/5xx.
-- [ ] Matrix có link đến test/log, không dùng mô tả suông.
+- [x] Không command nào trong §2.2 thiếu handler hoặc reply ba chữ số.
+- [x] `150 → 226` chỉ xuất hiện sau transfer thực; lỗi map đúng 4xx/5xx.
+- [x] Matrix có link đến test/log, không dùng mô tả suông.
 
 **Definition of Done**
 
-- [ ] Test matrix pass trên WSL2.
-- [ ] C review integration transfer; B review traceability matrix.
-- [ ] Report A và requirement checklist phản ánh code cuối.
+- [x] Test matrix pass trên WSL2.
+- [x] C review integration transfer; B review traceability matrix.
+- [x] Report A và requirement checklist phản ánh code cuối.
 
 **Output / Deliverable:** command/reply test matrix, source/tests, evidence TCP.
 

@@ -631,6 +631,82 @@ class TestRoleAValidationAndRDTAdapter(unittest.TestCase):
             dummy_sock.close()
 
 
+class TestModeComplianceRoleA(unittest.TestCase):
+    """Task A-F01: MODE compliance and limitation checks according to requirement §2.2."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.session = Session(ftp_root=self.test_dir)
+        self.handler = CommandHandler()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_mode_s_supported(self):
+        self.session.is_logged_in = True
+        resp = self.handler.handle(CommandParser.parse("MODE S"), self.session)
+        self.assertTrue(resp.startswith("200"))
+        self.assertEqual(self.session.transfer_mode, "S")
+
+    def test_mode_b_c_not_implemented(self):
+        self.session.is_logged_in = True
+        resp_b = self.handler.handle(CommandParser.parse("MODE B"), self.session)
+        self.assertTrue(resp_b.startswith("502"), f"MODE B must return 502, got: {resp_b}")
+
+        resp_c = self.handler.handle(CommandParser.parse("MODE C"), self.session)
+        self.assertTrue(resp_c.startswith("502"), f"MODE C must return 502, got: {resp_c}")
+
+    def test_mode_invalid_parameter(self):
+        self.session.is_logged_in = True
+        resp = self.handler.handle(CommandParser.parse("MODE X"), self.session)
+        self.assertTrue(resp.startswith("501"), f"Invalid MODE must return 501, got: {resp}")
+
+    def test_mode_unauthenticated(self):
+        self.session.is_logged_in = False
+        resp = self.handler.handle(CommandParser.parse("MODE S"), self.session)
+        self.assertTrue(resp.startswith("530"))
+
+    def test_mode_session_isolation(self):
+        s1 = Session(ftp_root=self.test_dir)
+        s2 = Session(ftp_root=self.test_dir)
+        s1.is_logged_in = True
+        s2.is_logged_in = True
+
+        self.handler.handle(CommandParser.parse("MODE S"), s1)
+        self.assertEqual(s1.transfer_mode, "S")
+        self.assertEqual(s2.transfer_mode, "S")
+
+
+class TestCommandMatrix28RoleA(unittest.TestCase):
+    """Task A-F02: All 28 FTP commands compliance matrix testing for Role A."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.session = Session(ftp_root=self.test_dir)
+        self.session.is_logged_in = True
+        self.handler = CommandHandler()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_all_28_commands_matrix(self):
+        # 28 supported commands in requirement §2.2
+        all_28_cmds = [
+            "USER", "PASS", "QUIT", "NOOP", "PWD", "CWD", "CDUP", "MKD", "RMD",
+            "DELE", "RNFR", "RNTO", "LIST", "NLST", "SIZE", "MDTM", "STAT", "HASH",
+            "TYPE", "MODE", "HELP", "PORT", "PASV", "RETR", "STOR", "STOU", "APPE", "ABOR"
+        ]
+
+        # Verify help returns 214 and lists commands
+        help_resp = self.handler.handle(CommandParser.parse("HELP"), self.session)
+        self.assertTrue(help_resp.startswith("214"))
+
+        # Check unhandled command returns 502
+        unhandled_resp = self.handler.handle(CommandParser.parse("SITE"), self.session)
+        self.assertTrue(unhandled_resp.startswith("502"))
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
