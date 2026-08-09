@@ -125,7 +125,9 @@ def receive_chunks_rdt(
                         print(f"[RDT][Start] File size: {total_bytes} bytes")
                 except Exception:
                     pass
-            continue  
+            # START is idempotent.  ACK it every time so sender retries are safe.
+            _send_ack(udp_socket, peer_addr, transfer_id, 0)
+            continue
 
         if not header.validate_length(data):
             print(f"[RDT][Length] Invalid payload length seq={header.seq_num}")
@@ -157,10 +159,13 @@ def receive_chunks_rdt(
 
         elif header.seq_num < expected_seq:
             print(f"[RDT][Dup] Duplicate seq={header.seq_num}, re-ACK")
-            _send_ack(udp_socket, peer_addr, transfer_id, header.seq_num)
+            _send_ack(udp_socket, peer_addr, transfer_id, expected_seq - 1)
 
         else:
             print(f"[RDT][OOO] Got seq={header.seq_num}, expected={expected_seq}")
+            # Go-Back-N uses a cumulative ACK for the last contiguous packet.
+            if expected_seq > 0:
+                _send_ack(udp_socket, peer_addr, transfer_id, expected_seq - 1)
 
 def receive_file_rdt(
     udp_socket: socket.socket,

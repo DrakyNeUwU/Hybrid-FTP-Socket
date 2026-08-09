@@ -75,3 +75,9 @@ log client/server và hash nguồn/đích.
 | Role owner | Problem | Files changed | Reason | Verification evidence |
 |---|---|---|---|---|
 | C (documentation integration) | Nhiều file trạng thái/report cũ mâu thuẫn với full regression và FTP E2E đã có | `README.md`, `docs/project-status.md`, `docs/requirement-checklist.md`, `planning/`, `docs/report-parts/`, tài liệu tuần và final-week plan | Chỉ định một status hiện hành và một checklist acceptance; tổ chức planning thành requirement/ownership, status navigation và weekly plans; tổ chức report drafts thành technical/submission; cập nhật README theo commands và tài liệu hiện tại. `docs/report.md` được để nguyên cho Role B hoàn thiện. | Đối chiếu `189 passed in 106.91s`, FTP E2E `5 passed in 18.03s`, hash Active/PASV; kiểm tra Git và tìm stale claims trong tài liệu hiện hành |
+
+## 09/08/2026 — Role C Go-Back-N Excellent RDT lifecycle
+
+| Role owner | Problem | Files changed | Reason | Verification evidence |
+|---|---|---|---|---|
+| C, with B wire-contract review pending | Sender was Stop-and-Wait and START metadata had no ACK/retry | `common/rdt_context.py`, `common/rdt_sender.py`, `common/rdt_receiver.py`, `tests/test_rdt.py`, Role C/status/contract docs | Implement bounded, streaming-safe Go-Back-N window 4, cumulative ACK, finite START retry and maintain atomic cleanup without changing header or TCP command interfaces | WSL2: final focused 50 passed in 85.01s; full suite 192 passed in 93.06s; `docs/evidence/final-week-rdt-gbn-verification.md` |

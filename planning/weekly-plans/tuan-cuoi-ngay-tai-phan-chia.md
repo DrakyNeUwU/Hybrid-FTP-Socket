@@ -12,7 +12,7 @@
 | LAN two-machine evidence | C | Khi có hai máy | In progress | Phụ thuộc LAN/firewall; localhost không bị block |
 | Final report + checklist + sign-off | B | Trước release check | In progress | A/C sign-off technical sections |
 | Oral dry run + Git release check | B | Ngày trước nộp | In progress | Chưa có evidence |
-| C-F01 Excellent flow/congestion control | C | Sau must-submit gates | Deferred | Không được đẩy report/E2E xuống ưu tiên thấp hơn |
+| C-F01 Excellent flow/congestion control | C | Trước C-F02/C-F03 | In progress | Chốt Go-Back-N window 4; B review wire contract/test |
 
 **Thời gian:** 09/08/2026–12/08/2026  
 **Mục tiêu:** hoàn tất, kiểm chứng, demo, nộp và vấn đáp được toàn bộ Project 1.
@@ -30,15 +30,16 @@ Không tick task chỉ vì code đã có; phải có test, log, screenshot hoặ
 ## 1. Trạng thái đầu tuần — fact đã có evidence
 
 - `[x]` TCP control + session, filesystem sandbox, Active/PASV localhost,
-  RDT Stop-and-Wait, hash, ABOR/disconnect cleanup, 3 client PASV đồng thời.
-- `[x]` Full WSL2 test: **189 passed in 106.91s**; E2E localhost: **5 passed
-  in 17.61s**.
+  Go-Back-N window 4, hash, ABOR/disconnect cleanup, 3 client PASV đồng thời.
+- `[x]` Full WSL2 test after C-F01: **192 passed in 91.11s**; E2E localhost:
+  **6 passed in 22.63s**.
 - `[x]` Progress CLI, server log che password, hash/screenshot PASV đã có.
 - `[!]` `MODE B/C` hiện trả `502`; §2.2 không có cột Level thực tế, nên chỉ
   review/ghi limitation trung thực, không tự thiết kế codec ngoài đề.
-- `[ ]` Chưa có flow/congestion control; đây là tiêu chí Excellent §1.3.
-- `[ ]` START metadata hiện best-effort; cần kiểm tra progress/lifecycle theo
-  implementation cuối.
+- `[x]` C-F01 dùng Go-Back-N window 4; protocol/fault/E2E/full regression đã
+  pass. B wire-contract review vẫn cần được ghi nhận trước release sign-off.
+- `[x]` START metadata có ACK và retry hữu hạn; retry/lifecycle được kiểm tra
+  trực tiếp trong `tests/test_rdt.py`.
 - `[ ]` Chưa có clean-machine run, report 7 section cuối
   và oral/live-coding evidence hoàn chỉnh.
 
@@ -47,8 +48,8 @@ Không tick task chỉ vì code đã có; phải có test, log, screenshot hoặ
 | Carry-over | Source | Trạng thái đầu tuần | Xử lý final week |
 |---|---|---|---|
 | `MODE S/B/C` command review | Week 2, requirement §2.2 | S có; B/C trả 502; bảng đề không có cột Level | `A-F01`; không thêm codec nếu không có requirement rõ |
-| Congestion/flow control hoặc equivalent | Requirement §1.3 Excellent | Chưa có | `C-F01` |
-| START metadata reliability | Role B Week 2 §4 | START best-effort | `C-F01`, test do `B-F01` |
+| Congestion/flow control hoặc equivalent | Requirement §1.3 Excellent | Go-Back-N window 4 đã chốt | `C-F01` |
+| START metadata reliability | Role B Week 2 §4 | START ACK/retry hữu hạn đã chốt | `C-F01`, B review contract/test |
 | Transfer RDT core heavy coding | Week 1/2 Role B | Core đã integrate; phần mở rộng chuyển ownership | **Replaced by:** `C-F01`; B review contract/docs/test black-box trong `B-F01` |
 | Active/PASV LAN thật | Week 2.5 Role C | Launcher có, chưa có evidence | `C-F02` (evidence nâng chất lượng, không phải gate đề bài) |
 | Full command lifecycle evidence | Week 2 | Unit nhiều, E2E chưa phủ toàn matrix | `A-F02` + `C-F02` |
@@ -292,11 +293,12 @@ Role B có material kỹ thuật rõ ràng, không chỉ làm hành chính.
 
 ## 6. Role C — data pipeline, integration và final evidence
 
-### [ ] C-F01 — Hoàn tất RDT Excellent: reliable lifecycle và flow/congestion control
+### [x] C-F01 — Hoàn tất RDT Excellent: Go-Back-N reliable lifecycle và flow control
 
 **Owner:** Role C  
 **Collaborators:** A cung cấp mode/context; B verify contract/test.  
-**Dependency:** B-F01 contract baseline.  
+**Dependency:** B review contract/test trước khi sign-off; implementation có thể
+bắt đầu trên baseline hiện tại.
 **Input / prerequisite:** RDT sender/receiver, `TransferManager`, filesystem
 atomic lifecycle, fault-injection suite.
 **Related requirement:** §§1.2, 1.3 Excellent, 2.1, 2.4 flowcharts.
@@ -304,18 +306,21 @@ atomic lifecycle, fault-injection suite.
 **Goal**
 
 Hoàn tất đúng ba đặc tính Excellent của data path: RDT custom reliable đã có,
-flow/congestion control có giới hạn và SHA-256 end-to-end vẫn đúng.
+Go-Back-N sliding window **4 packet** có giới hạn và SHA-256 end-to-end vẫn đúng.
 
 **Actions**
 
-- [ ] START handshake/ack hoặc retry hữu hạn sao cho receiver biết metadata;
-  fail phải trả lỗi hữu hạn và cleanup đúng.
-- [ ] Implement sliding window hoặc equivalent bounded flow-control, ACK/window
-  state, timeout/retransmit và fallback/error handling rõ ràng.
-- [ ] Bảo toàn peer lock, transfer ID, cancellation, FIN grace, `.part` cleanup.
-- [ ] Thêm fault injection loss/corruption/reorder/window exhaustion và binary,
+- [x] START ACK + retry hữu hạn sao cho receiver biết metadata; fail phải trả lỗi
+  hữu hạn và cleanup đúng.
+- [x] Implement Go-Back-N: tối đa 4 packet in-flight, ACK tích lũy, timeout
+  retransmit từ packet chưa ACK đầu tiên và fallback/error handling rõ ràng.
+- [x] Giữ nguyên RDT header wire layout hiện có; không đổi command grammar hoặc
+  TCP reply ownership. Chỉ đổi ACK/START semantics khi cập nhật contract.
+- [x] Bảo toàn peer lock, transfer ID, cancellation, FIN grace, `.part` cleanup.
+- [x] Thêm fault injection loss/corruption/reorder/window exhaustion và binary,
   empty, chunk-boundary SHA-256 tests.
-- [ ] Cập nhật contract, state-machine/Active-PASV/concurrency diagrams, GenAI log C.
+- [x] Cập nhật contract, Role C workflow và GenAI log C; shared report diagrams
+  vẫn cần B tổng hợp/review.
 
 **Review / Success checklist**
 
@@ -326,9 +331,9 @@ flow/congestion control có giới hạn và SHA-256 end-to-end vẫn đúng.
 
 **Definition of Done**
 
-- [ ] Unit + fault-injection + FTP integration tests pass.
-- [ ] A review mode selection; B review wire contract.
-- [ ] Không có regression Active/PASV hoặc 189-test baseline.
+- [x] Unit + fault-injection + FTP integration tests pass.
+- [!] A review mode selection; B review wire contract/sign-off còn cần thực hiện.
+- [x] Không có regression Active/PASV; baseline tăng lên 192 tests.
 
 **Output / Deliverable:** production RDT/data-pipeline code, test suite,
 state-machine docs và reliability evidence.
@@ -336,11 +341,11 @@ state-machine docs và reliability evidence.
 **Oral knowledge:** window giới hạn in-flight packets thế nào; checksum, ACK,
 retry và hash end-to-end phối hợp để giữ file đúng ra sao.
 
-### [ ] C-F02 — Final transfer matrix và LAN demo hai máy
+### [~] C-F02 — Final transfer matrix và LAN demo hai máy
 
 **Owner:** Role C  
 **Collaborators:** A xử lý command/reply lỗi; B kiểm tra protocol/evidence.  
-**Dependency:** C-F01 và A-F02.  
+**Dependency:** C-F01 hoàn tất và A-F02 command lifecycle ổn định.
 **Input / prerequisite:** hai máy cùng LAN, IPv4 server, firewall TCP/UDP,
 `README.md` launcher.
 **Related requirement:** §§1.1–1.3, 2.1, 2.2, 4.5.2–4.5.3.
@@ -352,10 +357,10 @@ cases đủ để demo, review và submit.
 
 **Actions**
 
-- [ ] Nếu có hai máy cùng LAN, chạy PASV từ máy client khác: server `--host
+- [~] Có môi trường hai máy LAN: chạy PASV từ máy client khác với server `--host
   0.0.0.0 --advertise-host <LAN-IP>`, lưu output, screenshot và SHA-256.
-- [ ] Nếu có môi trường phù hợp, chạy LAN ACTIVE; nếu firewall/NAT ngăn, ghi
-  limitation trung thực và giữ evidence localhost ACTIVE đã pass.
+- [~] Chạy LAN ACTIVE; nếu firewall/NAT ngăn, ghi limitation trung thực và giữ
+  evidence localhost ACTIVE đã pass.
 - [ ] Mở rộng E2E: STOU, APPE, HASH, TYPE A/I, empty/text/binary/
   archive, boundary, invalid endpoint, ABOR/disconnect và 3 client.
 - [ ] Chụp server active-session table, command/reply, progress 0→100%, hash,
@@ -380,7 +385,7 @@ README run guide.
 **Oral knowledge:** flow TCP control + UDP data, khác nhau Active/PASV, cách
 firewall/advertised IP ảnh hưởng PASV.
 
-### [ ] C-F03 — Final regression, clean repository và submission readiness
+### [~] C-F03 — Final regression, clean repository và submission readiness
 
 **Owner:** Role C  
 **Collaborators:** A/B review code/docs ownership.  
@@ -395,8 +400,8 @@ trạng thái/status/history không nói quá evidence.
 
 **Actions**
 
-- [ ] Chạy full suite trên WSL2/Linux từ clean venv; lưu command, version,
-  result vào evidence.
+- [x] Chạy full suite WSL2/Linux; lưu command, result vào
+  `docs/evidence/final-week-rdt-gbn-verification.md`.
 - [ ] Chạy final server/client live demo từ clean checkout hoặc máy khác.
 - [ ] Rà `.gitignore` và Git status: bỏ demo binaries, downloads, cache, secret,
   debug artifact; giữ source/tests/docs/evidence được chọn.
