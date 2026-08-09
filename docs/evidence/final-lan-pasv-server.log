@@ -1,0 +1,24 @@
+[2026-08-09 15:44:34] FTP Server listen 172.18.0.48:2121
+[2026-08-09 15:49:33] Client connected session=S000002 ip=172.18.0.49:57718 active=1
+[2026-08-09 15:49:33] Reply session=S000002 ip=172.18.0.49 transfer_id=- code=220
+[2026-08-09 15:49:33] Command session=S000002 ip=172.18.0.49 transfer_id=- command=USER admin
+[2026-08-09 15:49:33] Reply session=S000002 ip=172.18.0.49 transfer_id=- code=331
+[2026-08-09 15:49:33] Command session=S000002 ip=172.18.0.49 transfer_id=- command=PASS ******
+[2026-08-09 15:49:33] Reply session=S000002 ip=172.18.0.49 transfer_id=- code=230
+[2026-08-09 15:49:33] Command session=S000002 ip=172.18.0.49 transfer_id=- command=PASV
+[2026-08-09 15:49:33] Reply session=S000002 ip=172.18.0.49 transfer_id=- code=227
+[2026-08-09 15:49:34] Command session=S000002 ip=172.18.0.49 transfer_id=- command=STOR final-lan-pasv.bin
+[2026-08-09 15:49:34] Reply session=S000002 ip=172.18.0.49 transfer_id=T000001 code=150
+[RDT][Start] File size: 256000 bytes
+[2026-08-09 15:49:39] Transfer session=S000002 transfer_id=T000001 operation=STOR mode=PASSIVE result=success bytes=256000
+[2026-08-09 15:49:39] Reply session=S000002 ip=172.18.0.49 transfer_id=T000001 code=226
+[2026-08-09 15:49:39] Command session=S000002 ip=172.18.0.49 transfer_id=T000001 command=PASV
+[2026-08-09 15:49:39] Reply session=S000002 ip=172.18.0.49 transfer_id=T000001 code=227
+[2026-08-09 15:49:39] Command session=S000002 ip=172.18.0.49 transfer_id=T000001 command=RETR final-lan-pasv.bin
+[2026-08-09 15:49:39] Reply session=S000002 ip=172.18.0.49 transfer_id=T000002 code=150
+[RDT][Timeout] Go-Back-N retry (1/10)
+[2026-08-09 15:49:46] Transfer session=S000002 transfer_id=T000002 operation=RETR mode=PASSIVE result=success bytes=256000
+[2026-08-09 15:49:46] Reply session=S000002 ip=172.18.0.49 transfer_id=T000002 code=226
+[2026-08-09 15:49:49] Command session=S000002 ip=172.18.0.49 transfer_id=T000002 command=QUIT
+[2026-08-09 15:49:49] Reply session=S000002 ip=172.18.0.49 transfer_id=T000002 code=221
+[2026-08-09 15:49:49] Client disconnected session=S000002 ip=172.18.0.49 active=0

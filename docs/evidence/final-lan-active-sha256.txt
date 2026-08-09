@@ -1,0 +1,16 @@
+# Two-machine LAN ACTIVE SHA-256 — 09/08/2026
+
+Source (client):
+`b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  C:\Code\Code\socket\demo.bin`
+
+Downloaded file (client):
+`b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  C:\Code\Code\socket\client\downloads\final-lan-active.bin`
+
+Stored file (server):
+`b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  ./ftp_root/final-lan-active.bin`
+
+Client transfer evidence: `docs/evidence/final-lan-active.log` records download
+progress to 100% and `Success: ACTIVE upload + download for final-lan-active.bin`.
+
+Result: ACTIVE upload and download over two machines preserved byte-for-byte
+SHA-256 integrity.

@@ -181,6 +181,10 @@ commit finish.
 - Old endpoint/socket is closed before replacement; QUIT/disconnect/ABOR closes it.
 - B uses only the endpoint passed in `TransferContext`; B does not invent a second
   endpoint. C does not open a TCP data connection.
+- For an ACTIVE download, the client emits a zero-payload RDT `START` probe to
+  the negotiated server UDP endpoint after `150`. It creates the stateful
+  UDP/NAT path for the server's real `START`; it carries no file payload and
+  does not alter the FTP lifecycle.
 - `FTPServer.advertised_host` overrides the bound address when a LAN server uses
   `--host 0.0.0.0`; old UDP sockets are closed before replacement.
 - Status: localhost Active/PASV is verified. Two-machine LAN evidence remains a
