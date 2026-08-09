@@ -100,3 +100,45 @@ log client/server và hash nguồn/đích.
 | Role owner | Problem | Files changed | Reason | Verification evidence |
 |---|---|---|---|---|
 | C (documentation integration) | Final-week actions still named deleted Role Week 2 files and did not distinguish the requirement-mapping draft from the current project status | `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md` | Point B/C work to the report-parts workspace; define `submission/14` as mapping/reference only, with final claims sourced from project status and the acceptance checklist | Manual path/reference review; `git diff --check` passed |
+
+## 09/08/2026 — Role B release-state reconciliation
+
+| Role owner | Problem | Files changed | Reason | Verification evidence |
+|---|---|---|---|---|
+| B (documentation), C (documentation integration) | B-F01 technical evidence was complete, while report and plan claimed unrecorded sign-off/percentage decisions and used conflicting task states | Final-week plan, `docs/report.md`, requirement checklist, project status and contribution component | Mark B-F01 complete; keep B-F02/B-F03 release gates open until real team decisions and dry-run/Git evidence exist; add oral-question locators without creating a second plan | Static cross-check of B-F01 actions, `docs/evidence/final-week-rdt-gbn-verification.md` (45 RDT/fault tests; 199 full tests), and documentation consistency review |
+
+## 09/08/2026 — A/C technical audit and evidence-only release documentation
+
+| Role owner | Problem | Files changed | Reason | Verification evidence |
+|---|---|---|---|---|
+| A/C technical audit; C documentation integration | Report and support documents left stale review claims, internal dry-run gates and screenshot expectations despite existing log/hash evidence | Report, report-parts technical/submission components, API contract, GenAI logs, project status, acceptance checklist and final-week plan | Record a documentation technical audit rather than impersonated member signatures; use existing LAN server/client logs and SHA-256 artifacts; keep contribution and clean Git release as the only remaining release gates | `final-lan-server.log` contains client IP, commands, active-session snapshots, replies and transfer outcomes; LAN client logs/hash; RDT/fault 45 pass and full regression 199 pass evidence |
+
+## 09/08/2026 — Remove screenshot artifacts from submission evidence
+
+| Role owner | Problem | Files changed | Reason | Verification evidence |
+|---|---|---|---|---|
+| C (documentation/evidence) | Screenshot artifacts were no longer wanted for submission and active documents still linked to them | Removed eight files under `docs/evidence/screenshots/`; updated current README, plan, report, checklist and evidence references | Keep a log/hash-only evidence pack while preserving the required IP, command, active-session, transfer-result and integrity proof | `final-lan-server.log`, `final-lan-pasv.log`, `final-lan-active.log`, and `final-lan-*-sha256.txt` |
+
+## 09/08/2026 — Repair requirement-source and RDT-review references
+
+| Role owner | Problem | Files changed | Reason | Verification evidence |
+|---|---|---|---|---|
+| C (documentation integration) | Active documentation referenced the pre-reorganisation requirement path; requirement matrix also said B-F01 was still pending | README, checklist, final-week plan, technical parts, API contract, GenAI log and submission/14 | Point all current references to `planning/reference/Project1_SocketProgramming_2026.md` and record completed B-F01 technical review accurately | Repository path search and final-week B-F01 completion record |
+
+## 09/08/2026 — Restore screenshot evidence
+
+| Role owner | Problem | Files changed | Reason | Verification evidence |
+|---|---|---|---|---|
+| C (documentation/evidence) | Screenshot removal was reversed by user request | Restored eight files under `docs/evidence/screenshots/` from Git | Preserve the screenshot bundle alongside the curated logs and SHA-256 evidence | Directory contains all eight restored PNG files; logs/hash remain canonical technical evidence |
+
+## 09/08/2026 — Add full TCP/UDP sequence diagram
+
+| Role owner | Problem | Files changed | Reason | Verification evidence |
+|---|---|---|---|---|
+| A/B/C documentation integration | Report §2.4.1 described the architecture but had no full TCP+UDP sequence diagram | `docs/report.md` | Add the required lifecycle from TCP authentication and Active/PASV negotiation through RDT START/ACK, Go-Back-N DATA/ACK, FIN/ACK, ABORT and FTP completion reply | Diagram labels match `docs/api-contract.md`, RDT evidence and final transfer lifecycle |
+
+## 09/08/2026 — Screenshot capture guide
+
+| Role owner | Problem | Files changed | Reason | Verification evidence |
+|---|---|---|---|---|
+| C (documentation/evidence) | Existing screenshots included a stale 186-test result and one server image with an earlier startup error; final report needed a repeatable capture plan | `docs/evidence/screenshot-capture-guide.md` | Identify usable evidence and specify four clean, named screenshots for current regression, server lifecycle, dual-mode SHA-256 and concurrent clients | Visual review of current PNGs; final logs/hash and test names referenced in the guide |

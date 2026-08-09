@@ -21,5 +21,5 @@ upload and download between server `172.18.0.48` and client `172.18.0.49`.
 Source/server/client SHA-256 values match for both modes; see
 `final-lan-pasv-sha256.txt` and `final-lan-active-sha256.txt`. The PASV server
 lifecycle is retained in `final-lan-pasv-server.log`; the ACTIVE client log
-contains the final success. An ACTIVE server screenshot/log copy remains an
-optional presentation artifact, not a functional blocker.
+contains the final success. Curated server/client logs and SHA-256 files are the
+submission artifacts; screenshots are not required.

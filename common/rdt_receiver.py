@@ -265,7 +265,7 @@ def _fin_grace(
         except OSError:
             break  
 def _ctx_transfer_id(context: object) -> int | None:
-    """Lấy transfer_id số nguyên từ TransferContext (có thể là str UUID)."""
+    """Return an integer transfer ID from a TransferContext (possibly a UUID string)."""
     raw = getattr(context, "transfer_id", None)
     if raw is None:
         return None

@@ -57,7 +57,7 @@ class RDTHeader:
     @classmethod
     def deserialize(cls, data: bytes) -> "RDTHeader":
         if len(data) < cls.size:
-            raise ValueError(f"Dữ liệu quá ngắn: {len(data)} < {cls.size}")
+            raise ValueError(f"Data is too short: {len(data)} < {cls.size}")
         transfer_id, seq_num, ack_num, flags, checksum, length = struct.unpack(
             cls.format, data[: cls.size]
         )

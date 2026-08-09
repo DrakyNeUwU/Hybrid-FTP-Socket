@@ -1,18 +1,9 @@
 """
-cli_display.py — Module định dạng và hiển thị giao diện CLI cho FTP Client
+cli_display.py — CLI formatting and display module for the FTP client.
 
-=== FILE NÀY GIẢI QUYẾT GÌ? ===
-Cung cấp các hàm format giao diện trực quan trên Terminal cho Client:
-  - Format dung lượng file (Bytes -> KB, MB, GB).
-  - Khung thông tin kết nối Server (Header status).
-  - Thanh tiến trình tải/gửi file (Progress Bar).
-  - Format bảng danh sách thư mục (Directory listing table).
-
-=== KẾT NỐI VỚI FILE NÀO? ===
-  - client/client.py -> Gọi hiển thị khi người dùng tương tác CLI.
-
-=== XOÁ FILE NÀY THÌ GỊ HỎNG? ===
-  - Client không có giao diện hiển thị tiến trình transfer, không format được bảng thư mục.
+Provides terminal presentation helpers for file sizes, connection status,
+transfer progress, and directory listings. client/client.py calls these
+helpers while the user interacts with the CLI.
 """
 
 import sys
@@ -21,9 +12,9 @@ import math
 
 def format_size(bytes_count: int) -> str:
     """
-    Chuyển đổi số bytes thô thành dạng dung lượng đọc được (Human-readable format).
+    Convert a raw byte count into a human-readable size.
 
-    Ví dụ:
+    Examples:
       1024       -> "1.00 KB"
       1572864    -> "1.50 MB"
       1073741824 -> "1.00 GB"
@@ -44,7 +35,7 @@ def format_size(bytes_count: int) -> str:
 
 def render_header(server_ip: str, port: int, connected: bool, cwd: str = "/", user: str = None) -> str:
     """
-    Định dạng khung Header hiển thị trạng thái kết nối Server.
+    Format the connection-status header.
     """
     status_str = "● CONNECTED" if connected else "○ DISCONNECTED"
     user_str = user if user else "Anonymous / Not logged in"
@@ -63,9 +54,9 @@ def render_header(server_ip: str, port: int, connected: bool, cwd: str = "/", us
 
 def render_progress_bar(filename: str, transferred: int, total: int, speed_bytes_sec: float = 0.0, width: int = 30) -> str:
     """
-    Tạo chuỗi hiển thị thanh tiến trình truyền file (Progress Bar).
+    Create a file-transfer progress-bar string.
 
-    Ví dụ output:
+    Example output:
       Downloading: sample.zip
       [████████████████████████░░░░░░░░░░] 60.0% (6.00 MB / 10.00 MB) - 1.20 MB/s
     """
@@ -92,7 +83,7 @@ def render_progress_bar(filename: str, transferred: int, total: int, speed_bytes
 
 def render_directory_list(entries: list) -> str:
     """
-    Định dạng danh sách file/thư mục từ dir_manager.list_directory thành bảng hiển thị ngay ngắn.
+    Format entries from dir_manager.list_directory as a readable table.
 
     Input entry dict format:
       {"name": str, "size": int, "type": "file"/"dir", "permissions": str, "modified": str}
@@ -116,7 +107,7 @@ def render_directory_list(entries: list) -> str:
 
 
 if __name__ == "__main__":
-    # Test hiển thị trực quan thử nghiệm
+    # Quick visual-display test.
     print(render_header("127.0.0.1", 2121, True, "/docs/reports", "admin"))
     print()
     print(render_progress_bar("report_2026.pdf", 6291456, 10485760, 1258291.2))

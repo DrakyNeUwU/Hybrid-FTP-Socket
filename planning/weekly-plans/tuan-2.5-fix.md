@@ -61,10 +61,9 @@ pytest 189 passed.
 - [x] Chạy demo thật giữa hai máy LAN: PASV và ACTIVE upload/download thành
   công; SHA-256 source/server/client khớp. Xem `docs/evidence/final-lan-*.log`
   và `docs/evidence/final-lan-*-sha256.txt`.
-- [x] Thu screenshot PASV server log, download progress đúng 0→100% và success
-  sau fix `total_bytes`; lưu tại `docs/evidence/screenshots/` theo xác nhận
-  của người chạy demo. Screenshot full pytest/Active cũ tiếp tục là evidence
-  bổ sung khi chuẩn bị nộp.
+- [x] Log PASV/ACTIVE, progress, server lifecycle và SHA-256 được lưu dưới
+  `docs/evidence/`; screenshot demo đã được loại khỏi submission, nên log/hash
+  là evidence canonical khi chuẩn bị nộp.
 - [x] Client demo hiển thị progress upload/download thật; server log connect,
   command đã redact, reply, active-session table, mode/byte count/kết quả.
 
@@ -76,7 +75,7 @@ pytest 189 passed.
 | Việc | Owner chính | Phụ thuộc | Trạng thái |
 |---|---|---|---|
 | Demo hai máy LAN | C | Hai máy cùng mạng, IPv4 server, firewall mở TCP/UDP 2121 | `[x]` PASV/ACTIVE đã thành công, hash khớp |
-| Screenshot evidence | C | Terminal chạy demo/test | `[x]` PASV screenshot/server log đã lưu; ACTIVE server screenshot là artifact bổ sung |
+| Log/hash evidence | C | Terminal chạy demo/test | `[x]` LAN server/client logs, active-session output và SHA-256 đã lưu |
 
 ## Definition of Done — Tuần 2.5
 
@@ -91,9 +90,8 @@ pytest 189 passed.
 
 ### Chưa được phép gọi “hoàn thành toàn bộ”
 
-- [x] Có log/hash demo hai máy LAN cho PASV và ACTIVE; screenshot PASV đã lưu.
-- [x] Screenshot PASV progress/server/success đã lưu dưới
-  `docs/evidence/screenshots/`.
+- [x] Có log/hash demo hai máy LAN cho PASV và ACTIVE; server log có
+  active-session output, command/reply và transfer result.
 
 ## Review tổng
 
@@ -102,8 +100,8 @@ pytest 189 passed.
 Role C không còn lỗi cleanup/concurrency hoặc data-path đã biết trong các
 scenario đã chạy.
 
-**Còn lại:** A/B review evidence, report và release sign-off. ACTIVE server
-log/screenshot có thể thêm cho slide/demo nhưng không phải blocker kỹ thuật.
+**Còn lại:** Contribution decision và Git release check. Curated LAN server/client
+logs cùng SHA-256 là demo evidence; screenshot không phải blocker kỹ thuật.
 
 **Lịch sử thay đổi chi tiết:** `docs/code-change-history.md`
 **Contract đang dùng:** `docs/api-contract.md`

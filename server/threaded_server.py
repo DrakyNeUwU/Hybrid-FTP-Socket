@@ -19,11 +19,11 @@ class FTPServer:
     """
     TCP Control Server.
     
-    Nhiệm vụ:
-    - listen TCP
-    - accept client
-    - tạo ClientHandler thread
-    - quản lý session
+    Responsibilities:
+    - listen for TCP connections
+    - accept clients
+    - create ClientHandler threads
+    - manage sessions
     """
 
 
@@ -48,7 +48,7 @@ class FTPServer:
         self.is_running = False
 
 
-        # danh sách client đang kết nối
+        # Connected clients.
 
         self.active_clients = []
 
@@ -57,7 +57,7 @@ class FTPServer:
 
 
 
-        # tạo session id
+        # Generate session IDs.
 
         self._session_ids = itertools.count(1)
 

@@ -2,7 +2,8 @@ import socket
 
 def parse_pasv_response(response_str):
     """
-    Tách IP và Port từ chuỗi phản hồi PASV: '227 Entering Passive Mode (127,0,0,1,35,42)'
+    Parse an IP address and port from a PASV reply such as
+    '227 Entering Passive Mode (127,0,0,1,35,42)'.
     """
     start = response_str.find('(')
     end = response_str.find(')')
@@ -16,7 +17,7 @@ def parse_pasv_response(response_str):
 
 def format_port_command(ip, port):
     """
-    Tạo chuỗi tham số cho lệnh PORT từ IP và Port
+    Create the PORT-command argument from an IP address and port.
     """
     h_parts = ip.split('.')
     p1, p2 = port // 256, port % 256

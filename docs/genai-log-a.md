@@ -1,14 +1,5 @@
 # GenAI Usage Log — Role A
 
-Format mỗi lần dùng AI:
-
-## [Ngày] - [Tên chức năng]
-**Prompt:** ...
-**Raw output:** ...
-**Refinement:** (mình đã sửa/hiểu gì, lỗi/hạn chế phát hiện được)
-
-# GenAI Usage Log — Role A
-
 ## [05/08/2026] - Refactor TCP Command Handler
 **Prompt:**
 Thiết kế lại phần xử lý lệnh FTP theo hướng tách `ClientHandler`, `CommandHandler`, `CommandParser` và `Session`, đảm bảo mỗi client có session riêng và dễ mở rộng thêm command.

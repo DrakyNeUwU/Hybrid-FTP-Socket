@@ -1,6 +1,7 @@
 # 13. GenAI Usage and Refinement
 
-**Trạng thái:** Role A và Role C hoàn thành provenance; B cần xác nhận phần của mình.
+**Trạng thái:** Provenance A/B/C được map tới các GenAI logs; final release
+decision vẫn theo `docs/requirement-checklist.md`.
 **Owner:** all. **Reviewer:** all.
 
 Role A lưu exact prompt, raw-output summary, manual refinement, affected files
@@ -14,6 +15,20 @@ kiểm tra lại bằng code review và test thật.
 | Go-Back-N/START | Chọn window 4, ACK tích lũy, retry bounded; không đổi header/TCP contract | RDT 27 pass; final full suite 199 pass |
 | LAN ACTIVE | Chẩn đoán CP1252 và server-initiated UDP; thêm output-safe/probe behavior | CLI/E2E regression; ACTIVE LAN hash |
 | Documentation migration | Đồng bộ evidence vào report parts, status/checklist và changelog | Link/evidence audit |
+
+## Role B
+
+Role B lưu prompt, raw-output summary, manual refinement và verification tại
+`../../genai-log-b.md`. Log bao phủ audit/fix RDT, black-box protocol testing,
+START inspection và final RDT contract/report verification. Mọi đề xuất được
+đối chiếu lại với `RDTHeader`, sender/receiver, API contract và test thật.
+
+| Hạng mục Role B | Manual refinement | Verification |
+|---|---|---|
+| RDT bug audit | Validate flags/length/checksum ACK, dùng socket do `TransferManager` cấp và sửa FIN grace | RDT/fault tests |
+| Black-box protocol tests | Bổ sung transfer-ID và ABORT cases, không mock sai production behavior | `45 passed in 67.09s` |
+| START/Go-Back-N review | Đối chiếu START ACK/retry, cumulative ACK/window 4 và FIN/ABORT với contract | Protocol 27 pass; full suite 199 pass |
+| Final report support | Map RDT trace/evidence vào technical/05 và report tổng | `docs/evidence/final-week-rdt-gbn-verification.md` |
 
 ## Role A
 

@@ -249,22 +249,22 @@ class TestRDTFaultInjection(unittest.TestCase):
 
     def test_clean_transfer_sha256(self):
         send_ok, recv_ok = _run_transfer(self.test_src, self.test_dst)
-        self.assertTrue(send_ok, "Sender báo fail")
-        self.assertTrue(recv_ok, "Receiver báo fail")
+        self.assertTrue(send_ok, "Sender reported failure")
+        self.assertTrue(recv_ok, "Receiver reported failure")
         self.assertTrue(os.path.exists(self.test_dst))
         self.assertEqual(self.src_hash, compute_hash(self.test_dst),
-                         "SHA-256 không khớp sau transfer sạch")
+                         "SHA-256 does not match after a clean transfer")
 
     def test_packet_loss_recovery(self):
         send_ok, recv_ok = _run_transfer(self.test_src, self.test_dst, drop_rate=0.15)
-        self.assertTrue(send_ok, "Sender fail khi có drop 15%")
-        self.assertTrue(recv_ok, "Receiver fail khi có drop 15%")
+        self.assertTrue(send_ok, "Sender failed with 15% packet loss")
+        self.assertTrue(recv_ok, "Receiver failed with 15% packet loss")
         self.assertEqual(self.src_hash, compute_hash(self.test_dst))
 
     def test_corruption_recovery(self):
         send_ok, recv_ok = _run_transfer(self.test_src, self.test_dst, corrupt_rate=0.10)
-        self.assertTrue(send_ok, "Sender fail khi có corrupt 10%")
-        self.assertTrue(recv_ok, "Receiver fail khi có corrupt 10%")
+        self.assertTrue(send_ok, "Sender failed with 10% corruption")
+        self.assertTrue(recv_ok, "Receiver failed with 10% corruption")
         self.assertEqual(self.src_hash, compute_hash(self.test_dst))
 
     def test_loss_and_corruption_recovery(self):
@@ -322,8 +322,8 @@ class TestRDTFaultInjection(unittest.TestCase):
                 is_cancelled=lambda: True,
             )
             elapsed = time.time() - start
-            self.assertFalse(result, "Sender phải trả False khi bị cancel")
-            self.assertLess(elapsed, 3.0, "Cancel phải dừng nhanh, không timeout hết")
+            self.assertFalse(result, "Sender must return False when cancelled")
+            self.assertLess(elapsed, 3.0, "Cancellation must stop promptly, not exhaust the timeout")
         finally:
             rec_sock.close()
 
@@ -333,8 +333,8 @@ class TestRDTFaultInjection(unittest.TestCase):
             drop_ack_rate=0.20,
             retry_limit=20,
         )
-        self.assertTrue(send_ok, "Sender fail khi mất ACK 20%")
-        self.assertTrue(recv_ok, "Receiver fail khi mất ACK 20%")
+        self.assertTrue(send_ok, "Sender failed with 20% ACK loss")
+        self.assertTrue(recv_ok, "Receiver failed with 20% ACK loss")
         self.assertEqual(self.src_hash, compute_hash(self.test_dst))
 
     def test_max_retry_exhausted_is_finite(self):
@@ -346,8 +346,8 @@ class TestRDTFaultInjection(unittest.TestCase):
             timeout=10.0,
         )
         elapsed = time.time() - start
-        self.assertFalse(send_ok, "Sender phải fail khi drop 100%")
-        self.assertLess(elapsed, 8.0, "Phải kết thúc hữu hạn, không treo")
+        self.assertFalse(send_ok, "Sender must fail with 100% packet loss")
+        self.assertLess(elapsed, 8.0, "Must finish in finite time without hanging")
 
 class TestRDTAdapterFaultInjection(unittest.TestCase):
     TEST_DIR = os.path.dirname(__file__)
@@ -371,8 +371,8 @@ class TestRDTAdapterFaultInjection(unittest.TestCase):
 
     def test_adapter_clean_transfer_sha256(self):
         send_ok, recv_ok = _run_transfer_adapter(self.test_src, self.test_dst)
-        self.assertTrue(send_ok, "Adapter sender báo fail")
-        self.assertTrue(recv_ok, "Adapter receiver báo fail")
+        self.assertTrue(send_ok, "Adapter sender reported failure")
+        self.assertTrue(recv_ok, "Adapter receiver reported failure")
         self.assertEqual(self.src_hash, compute_hash(self.test_dst))
 
     def test_adapter_packet_loss_recovery(self):
@@ -421,7 +421,7 @@ class TestRDTAdapterFaultInjection(unittest.TestCase):
 
         endpoint = _SimpleEndpoint("127.0.0.1", dest_port)
         ctx = _SimpleContext(transfer_id, retry_limit=5)
-        ctx.cancel_event.set()  # cancel ngay từ đầu
+        ctx.cancel_event.set()  # cancel immediately
 
         try:
             start = time.time()
@@ -433,7 +433,7 @@ class TestRDTAdapterFaultInjection(unittest.TestCase):
                     ctx,
                 )
             elapsed = time.time() - start
-            self.assertLess(elapsed, 3.0, "Cancel phải dừng nhanh")
+            self.assertLess(elapsed, 3.0, "Cancellation must stop promptly")
         finally:
             rec_sock.close()
             send_sock.close()
