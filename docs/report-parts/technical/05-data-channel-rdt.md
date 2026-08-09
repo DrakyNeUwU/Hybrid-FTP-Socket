@@ -49,7 +49,7 @@ pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q
 
 Kết quả thực tế:
 
-- `45 passed in 61.13s`
+- `45 passed in 70.66s`
 
 Các trường hợp bao phủ gồm:
 - round-trip serialization/deserialization header,

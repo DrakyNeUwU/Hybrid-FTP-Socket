@@ -8,7 +8,11 @@
 **Trạng thái snapshot:** cập nhật theo code tuần cuối; Role A sign-off phần control/command.
 **Owner:** A. **Reviewer:** B/C. **Source:** `../../requirement-checklist.md`, đề gốc, `../../api-contract.md`, `../../report_role_a_week2.md`.
 
-> Bằng chứng mới cho Role B: chạy `pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q` cho kết quả `45 passed in 61.13s`.
+### Role B — UDP data channel / RDT
+- **Scope:** triển khai reliable transport trên UDP gồm header, checksum, ACK, retransmission, FIN/ABORT và recovery khi có packet loss/corruption.
+- **Module chính:** `common/RDTHeader.py`, `common/rdt_sender.py`, `common/rdt_receiver.py`.
+- **Evidence:** chạy `pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q` với kết quả `45 passed in 70.66s`.
+- **Status:** Verified.
 
 | Requirement của đề | Mức độ | Role | Report section | Code liên quan | Test/evidence | Trạng thái |
 |---|---|---|---|---|---|---|

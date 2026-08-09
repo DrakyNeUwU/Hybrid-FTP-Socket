@@ -8,7 +8,7 @@
 
 | Command | Result | Coverage |
 |---|---:|---|
-| `pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q` | **45 passed / 61.13s** | Header, checksum, duplicate/reorder, fault injection, ACK loss, cancel/abort, chunk-boundary transfer |
+| `pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q` | **45 passed / 70.66s** | Header, checksum, duplicate/reorder, fault injection, ACK loss, cancel/abort, chunk-boundary transfer |
 | `python3 -m pytest tests/test_e2e_transfer.py -q` | 6 passed / 22.63s | STOU, APPE, HASH, TYPE và transfer matrix |
 | Focused C audit | 135 passed / 86.22s | Filesystem, RDT, fault, transfer, E2E, CLI |
 | `python3 -m pytest -q` | **199 passed / 96.72s** | Final WSL2 full regression |
