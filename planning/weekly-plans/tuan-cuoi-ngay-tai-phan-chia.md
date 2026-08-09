@@ -12,7 +12,7 @@
 | LAN two-machine evidence | C | Khi có hai máy | In progress | Phụ thuộc LAN/firewall; localhost không bị block |
 | Final report + checklist + sign-off | B | Trước release check | In progress | A/C sign-off technical sections |
 | Oral dry run + Git release check | B | Ngày trước nộp | In progress | Chưa có evidence |
-| C-F01 Excellent flow/congestion control | C | Trước C-F02/C-F03 | In progress | Chốt Go-Back-N window 4; B review wire contract/test |
+| C-F01 Excellent flow/congestion control | C | Trước C-F02/C-F03 | Done | Chốt Go-Back-N window 4; B review wire contract/test hoàn tất |
 
 **Thời gian:** 09/08/2026–12/08/2026  
 **Mục tiêu:** hoàn tất, kiểm chứng, demo, nộp và vấn đáp được toàn bộ Project 1.

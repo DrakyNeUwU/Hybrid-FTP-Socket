@@ -441,5 +441,167 @@ class TestRDTProtocolLogic(unittest.TestCase):
         self.assertEqual(b"".join(received), b"ack-test")
 
 
+    def test_receiver_ignores_different_transfer_id(self):
+        from common.rdt_receiver import receive_chunks_rdt
+        pair = _UDPPair()
+        received: list[bytes] = []
+        done = threading.Event()
+
+        def _recv():
+            try:
+                for chunk in receive_chunks_rdt(
+                    pair.receiver_sock,
+                    transfer_id_hint=100,
+                    timeout_s=0.2,
+                    max_timeouts=3,
+                ):
+                    received.append(chunk)
+            except RuntimeError:
+                pass
+            finally:
+                done.set()
+
+        t = threading.Thread(target=_recv, daemon=True)
+        t.start()
+        time.sleep(0.02)
+
+        pkt_wrong = make_data_packet(200, 0, b"Wrong ID", is_fin=True)
+        pair.sender_sock.sendto(pkt_wrong, pair.receiver_addr)
+        time.sleep(0.02)
+
+        pkt_right = make_data_packet(100, 0, b"Right ID", is_fin=True)
+        pair.sender_sock.sendto(pkt_right, pair.receiver_addr)
+
+        done.wait(timeout=2)
+        t.join(timeout=2)
+        pair.close()
+
+        self.assertEqual(received, [b"Right ID"], "Receiver must ignore packets with different transfer_id")
+
+    def test_receiver_aborts_on_abort_packet(self):
+        from common.rdt_receiver import receive_chunks_rdt
+        pair = _UDPPair()
+        errors: list[str] = []
+        done = threading.Event()
+
+        def _recv():
+            try:
+                for chunk in receive_chunks_rdt(
+                    pair.receiver_sock,
+                    transfer_id_hint=500,
+                    timeout_s=0.2,
+                    max_timeouts=3,
+                ):
+                    pass
+            except RuntimeError as e:
+                errors.append(str(e))
+            finally:
+                done.set()
+
+        t = threading.Thread(target=_recv, daemon=True)
+        t.start()
+        time.sleep(0.02)
+
+        hdr = RDTHeader(transfer_id=500, seq_num=0, ack_num=0,
+                        flags=RDTHeader.FLAG_ABORT, length=0)
+        hdr.checksum = hdr.compute_checksum(b"")
+        pair.sender_sock.sendto(hdr.serialize(), pair.receiver_addr)
+
+        done.wait(timeout=2)
+        t.join(timeout=2)
+        pair.close()
+
+        self.assertTrue(any("aborted by sender" in err for err in errors), 
+                        f"Receiver must abort when ABORT flag is received. Errors: {errors}")
+
+    def test_receiver_graceful_fin_ack_retransmission(self):
+        from common.rdt_receiver import receive_chunks_rdt
+        pair = _UDPPair()
+        received: list[bytes] = []
+        done = threading.Event()
+
+        def _recv():
+            try:
+                for chunk in receive_chunks_rdt(
+                    pair.receiver_sock,
+                    transfer_id_hint=999,
+                    timeout_s=0.5,
+                    max_timeouts=3,
+                ):
+                    received.append(chunk)
+            except RuntimeError:
+                pass
+            finally:
+                done.set()
+
+        t = threading.Thread(target=_recv, daemon=True)
+        t.start()
+        time.sleep(0.02)
+
+        pkt_fin = make_data_packet(999, 0, b"Final Chunk", is_fin=True)
+        pair.sender_sock.sendto(pkt_fin, pair.receiver_addr)
+
+        pair.sender_sock.settimeout(0.5)
+        try:
+            ack1, _ = pair.sender_sock.recvfrom(1024)
+            hdr1 = RDTHeader.deserialize(ack1)
+            self.assertEqual(hdr1.ack_num, 0)
+            self.assertTrue(hdr1.flags & RDTHeader.FLAG_ACK)
+        except socket.timeout:
+            self.fail("Did not receive first ACK for FIN")
+
+        pair.sender_sock.sendto(pkt_fin, pair.receiver_addr)
+        try:
+            ack2, _ = pair.sender_sock.recvfrom(1024)
+            hdr2 = RDTHeader.deserialize(ack2)
+            self.assertEqual(hdr2.ack_num, 0)
+            self.assertTrue(hdr2.flags & RDTHeader.FLAG_ACK)
+        except socket.timeout:
+            self.fail("Did not receive duplicate ACK for retransmitted FIN in grace period")
+
+        done.wait(timeout=2)
+        t.join(timeout=2)
+        pair.close()
+        self.assertEqual(received, [b"Final Chunk"])
+
+    def test_receiver_drops_invalid_length_packet(self):
+        from common.rdt_receiver import receive_chunks_rdt
+        pair = _UDPPair()
+        received: list[bytes] = []
+        done = threading.Event()
+
+        def _recv():
+            try:
+                for chunk in receive_chunks_rdt(
+                    pair.receiver_sock,
+                    transfer_id_hint=777,
+                    timeout_s=0.2,
+                    max_timeouts=3,
+                ):
+                    received.append(chunk)
+            except RuntimeError:
+                pass
+            finally:
+                done.set()
+
+        t = threading.Thread(target=_recv, daemon=True)
+        t.start()
+        time.sleep(0.02)
+
+        hdr = RDTHeader(transfer_id=777, seq_num=0, ack_num=0,
+                        flags=RDTHeader.FLAG_DATA, length=100)
+        hdr.checksum = hdr.compute_checksum(b"")
+        pair.sender_sock.sendto(hdr.serialize(), pair.receiver_addr)
+        time.sleep(0.02)
+
+        pkt_right = make_data_packet(777, 0, b"Valid", is_fin=True)
+        pair.sender_sock.sendto(pkt_right, pair.receiver_addr)
+
+        done.wait(timeout=2)
+        t.join(timeout=2)
+        pair.close()
+
+        self.assertEqual(received, [b"Valid"], "Receiver must ignore packets with invalid payload length")
+
 if __name__ == "__main__":
     unittest.main()
