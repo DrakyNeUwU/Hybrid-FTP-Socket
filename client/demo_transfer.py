@@ -9,6 +9,20 @@ from client.cli_display import render_progress_bar
 from client.ftp_client import FTPClient
 
 
+def _console_safe(value: str, encoding: str | None = None) -> str:
+    """Return text printable by the active terminal without aborting a transfer."""
+    target_encoding = encoding or getattr(sys.stdout, "encoding", None) or "utf-8"
+    try:
+        value.encode(target_encoding)
+    except UnicodeEncodeError:
+        return value.encode(target_encoding, errors="replace").decode(target_encoding)
+    return value
+
+
+def _print_console(value: str) -> None:
+    print(_console_safe(value))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Hybrid FTP UDP/RDT demo")
     parser.add_argument("local_file", help="local file to upload")
@@ -21,19 +35,19 @@ def main() -> int:
     remote = args.remote or args.local_file.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
     def show_progress(direction: str, filename: str, transferred: int, total: int | None) -> None:
         total_bytes = total if total is not None else transferred
-        print(render_progress_bar(f"{direction}: {filename}", transferred, total_bytes))
+        _print_console(render_progress_bar(f"{direction}: {filename}", transferred, total_bytes))
 
     client = FTPClient(args.host, args.port, progress_callback=show_progress)
     try:
-        print(client.connect().strip())
+        _print_console(client.connect().strip())
         client.login()
         if not client.upload_file(args.local_file, remote, mode=args.mode):
-            print("Upload failed")
+            _print_console("Upload failed")
             return 1
         if not client.download_file(remote, mode=args.mode):
-            print("Download failed")
+            _print_console("Download failed")
             return 1
-        print(f"Success: {args.mode} upload + download for {remote}")
+        _print_console(f"Success: {args.mode} upload + download for {remote}")
         return 0
     finally:
         client.close()

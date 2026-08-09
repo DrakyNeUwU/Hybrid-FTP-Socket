@@ -23,6 +23,7 @@ from client.cli_display import (
     render_progress_bar,
     render_directory_list,
 )
+from client.demo_transfer import _console_safe
 
 
 class TestCLIDisplay:
@@ -75,3 +76,7 @@ class TestCLIDisplay:
         assert "docs" in output
         assert "image.png" in output
         assert "1.00 MB" in output
+
+    def test_demo_console_falls_back_when_code_page_cannot_render_progress(self):
+        assert _console_safe("[██░░]", "cp1252") == "[????]"
+        assert _console_safe("plain text", "cp1252") == "plain text"

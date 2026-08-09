@@ -1,0 +1,24 @@
+# Two-machine LAN PASV SHA-256 — 09/08/2026
+
+Source (client):
+`b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  demo.bin`
+
+Downloaded file (client):
+`b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  client/downloads/final-lan-pasv.bin`
+
+Stored file (server):
+`b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  ./ftp_root/final-lan-pasv.bin`
+
+Result: PASV upload and download over two machines preserved byte-for-byte SHA-256 integrity.
+
+Client run evidence: `docs/evidence/final-lan-pasv.log` records the `220` banner,
+upload/download progress from 0% to 100% for a 250.00 KB file, and
+`Success: PASV upload + download for final-lan-pasv.bin`.
+
+Server run evidence: `docs/evidence/final-lan-pasv-server.log` records server
+`172.18.0.48`, client `172.18.0.49`, PASV `227`, STOR/RETR `150 -> 226` and
+256000-byte successful transfers. One bounded Go-Back-N retry occurred during
+RETR and recovered successfully.
+
+Still required: optional screenshots for presentation quality and the separate
+ACTIVE-LAN run.

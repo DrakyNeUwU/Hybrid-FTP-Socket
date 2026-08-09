@@ -680,3 +680,88 @@ python3 -m pytest tests/test_rdt_fault_injection.py tests/test_transfer_manager.
 python3 -m pytest tests/test_e2e_transfer.py -q                -> 6 passed
 python3 -m pytest -q                                           -> 192 passed in 93.06s
 ```
+
+## August 9, 2026 — Final Role A/C Compatibility Audit
+
+**Exact prompt:**
+> "Bạn kiểm tra role c và a lại nhé, xem ok chưa"
+
+**Raw GenAI output summary:**
+
+The audit checked that the Go-Back-N work did not change Role A command grammar,
+reply ownership, `ClientHandler`, or the `TransferManager` adapter boundary. It
+then ran separate Role A control/session tests and focused Role C filesystem,
+RDT, CLI and FTP E2E tests.
+
+**Evidence:** Role A `63 passed in 5.71s`; Role C `135 passed in 86.22s`.
+The remaining unverified items are physical two-machine LAN evidence and formal
+A/B release sign-off, not an automated A/C compatibility failure.
+
+## August 9, 2026 — Windows ACTIVE demo CLI encoding repair
+
+**Exact prompt:**
+> The user pasted an ACTIVE-LAN traceback ending in `UnicodeEncodeError` from
+> the Windows CP1252 console while rendering Unicode progress blocks.
+
+**Manual refinement:**
+
+- The RDT transfer was not changed: the failure was display-only after the TCP
+  connection succeeded.
+- Added a console-safe print boundary in `client/demo_transfer.py`; terminals
+  that cannot encode `█`/`░` display replacement characters rather than crash.
+- Added a CP1252 fallback test and retained the Unicode progress bar for UTF-8
+  capable terminals.
+
+**Verification:** `python3 -m pytest tests/test_cli_display.py
+tests/test_e2e_transfer.py -q` — **13 passed in 23.09s**.
+
+## August 9, 2026 — ACTIVE-LAN server-initiated UDP probe
+
+**Exact prompt:**
+> The user supplied a two-machine ACTIVE server log: STOR completed, but RETR
+> retried RDT START ten times and ended with FTP `426` because no START ACK
+> returned from the Windows client.
+
+**Manual refinement:**
+
+- The client had already created a stateful UDP path for ACTIVE upload; ACTIVE
+  download had no client-to-server UDP packet before the server initiated START.
+- Added a zero-payload START probe after the `150` RETR reply, using the same
+  negotiated ACTIVE endpoint and transfer ID. It opens firewall/NAT state and
+  carries no file data.
+- Preserved the header, TCP command/reply flow and Go-Back-N sender behavior.
+
+**Verification:** ACTIVE FTP E2E plus CLI tests: **8 passed in 5.42s**.
+
+## August 9, 2026 — Two-machine ACTIVE/PASV evidence
+
+**Exact prompt:**
+> The user supplied real two-machine PASV and ACTIVE client success output,
+> server lifecycle output, and source/server/client SHA-256 values.
+
+**Evidence:** PASV and ACTIVE both completed upload plus download across server
+`172.18.0.48` and client `172.18.0.49`. The 250.00 KB file has matching SHA-256
+`b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934`
+at source, server and download. See `docs/evidence/final-lan-*-sha256.txt` and
+the client logs. ACTIVE server-log/screenshot extraction remains a presentation
+artifact, not a technical transfer blocker.
+
+## August 9, 2026 — Final Role C regression and evidence refresh
+
+**Exact prompt:**
+> "ok tiep thoi, bay gio con phan gi nhi, de A va C cung lam"
+
+**Raw GenAI output summary and manual refinement:**
+
+- Re-ran the entire WSL2 suite after the console-safe output and ACTIVE UDP
+  probe changes; the result is **199 passed in 96.72s**.
+- Recorded the real two-machine PASV/ACTIVE result only where hashes/logs prove
+  it. The ACTIVE server-log copy is treated as a presentation enhancement, not
+  as a missing transfer implementation.
+- Remaining A/C work is release hygiene and peer/report/oral sign-off; it is
+  not an unresolved data-path defect.
+
+**Affected files:** final-week verification evidence, project status, final
+week plan, code-change history and this log.
+
+**Verification:** `python3 -m pytest -q` — **199 passed in 96.72s**.

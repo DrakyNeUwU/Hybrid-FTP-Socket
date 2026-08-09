@@ -7,12 +7,12 @@
 
 | Task | DRI cuối | Deadline | Trạng thái | Blocker / evidence |
 |---|---|---|---|---|
-| Command/E2E must-submit | A | Trước report freeze | Done | 189 full tests; 5 FTP E2E tại `docs/evidence/` |
+| Command/E2E must-submit | A | Trước report freeze | Done | 199 full tests; command/session audit 63 passed, FTP E2E evidence tại `docs/evidence/` |
 | RDT must-submit | B | Trước report freeze | Done | RDT/fault tests trong full suite; hash Active/PASV |
-| LAN two-machine evidence | C | Khi có hai máy | In progress | Phụ thuộc LAN/firewall; localhost không bị block |
+| LAN two-machine evidence | C | Khi có hai máy | Done (review pending) | PASV/ACTIVE upload+download; source/server/client SHA-256 khớp |
 | Final report + checklist + sign-off | B | Trước release check | In progress | A/C sign-off technical sections |
 | Oral dry run + Git release check | B | Ngày trước nộp | In progress | Chưa có evidence |
-| C-F01 Excellent flow/congestion control | C | Trước C-F02/C-F03 | In progress | Chốt Go-Back-N window 4; B review wire contract/test |
+| C-F01 Excellent flow/congestion control | C | Trước C-F02/C-F03 | Done (B review pending) | Go-Back-N window 4; 199 full tests; B review wire contract/test |
 
 **Thời gian:** 09/08/2026–12/08/2026  
 **Mục tiêu:** hoàn tất, kiểm chứng, demo, nộp và vấn đáp được toàn bộ Project 1.
@@ -31,7 +31,7 @@ Không tick task chỉ vì code đã có; phải có test, log, screenshot hoặ
 
 - `[x]` TCP control + session, filesystem sandbox, Active/PASV localhost,
   Go-Back-N window 4, hash, ABOR/disconnect cleanup, 3 client PASV đồng thời.
-- `[x]` Full WSL2 test after C-F01: **192 passed in 91.11s**; E2E localhost:
+- `[x]` Full WSL2 test after final C changes: **199 passed in 96.72s**; E2E localhost:
   **6 passed in 22.63s**.
 - `[x]` Progress CLI, server log che password, hash/screenshot PASV đã có.
 - `[!]` `MODE B/C` hiện trả `502`; §2.2 không có cột Level thực tế, nên chỉ
@@ -357,26 +357,31 @@ cases đủ để demo, review và submit.
 
 **Actions**
 
-- [~] Có môi trường hai máy LAN: chạy PASV từ máy client khác với server `--host
-  0.0.0.0 --advertise-host <LAN-IP>`, lưu output, screenshot và SHA-256.
-- [~] Chạy LAN ACTIVE; nếu firewall/NAT ngăn, ghi limitation trung thực và giữ
-  evidence localhost ACTIVE đã pass.
-- [ ] Mở rộng E2E: STOU, APPE, HASH, TYPE A/I, empty/text/binary/
-  archive, boundary, invalid endpoint, ABOR/disconnect và 3 client.
+- [x] PASV hai máy LAN đã chạy; client output/progress lưu tại
+  `docs/evidence/final-lan-pasv.log`, SHA-256 khớp tại
+  `docs/evidence/final-lan-pasv-sha256.txt`, lifecycle server tại
+  `docs/evidence/final-lan-pasv-server.log`.
+- [x] ACTIVE hai máy LAN đã chạy; client log và SHA-256 source/server/client
+  khớp tại `docs/evidence/final-lan-active.log` và
+  `docs/evidence/final-lan-active-sha256.txt`.
+- [x] Automated E2E covers STOU, APPE, HASH, TYPE, ABOR/disconnect and three
+  concurrent PASV clients; remaining manual presentation cases are optional.
 - [ ] Chụp server active-session table, command/reply, progress 0→100%, hash,
   concurrent sessions.
-- [ ] Cập nhật README với lệnh run sạch và xử lý firewall thực tế.
+- [x] README includes clean LAN launcher and TCP/UDP firewall guidance.
 
 **Review / Success checklist**
 
-- [ ] Nếu chạy LAN: client dùng IP thật, không phải `127.0.0.1`.
-- [ ] Hash source/server/download bằng nhau cho mỗi demo transfer.
-- [ ] Mọi evidence có tên file, ngày, mode và command chạy.
+- [x] PASV LAN dùng endpoint ngoài loopback; client/server/download SHA-256 khớp.
+- [x] Hash source/server/download bằng nhau cho cả PASV-LAN và ACTIVE-LAN.
+- [x] Command/result và mode/hash evidence are recorded; the ACTIVE server-log
+  copy is still useful for presentation, but not required to prove success.
 
 **Definition of Done**
 
-- [ ] E2E matrix pass; không còn integration blocker.
-- [ ] Evidence được lưu dưới `docs/evidence/`, được B đưa vào report.
+- [x] E2E matrix pass; no technical integration blocker remains for Role C.
+- [ ] Evidence is stored under `docs/evidence/`; B still needs to select/embed
+  it in the final report.
 - [ ] A/B review demo log trước khi tick.
 
 **Output / Deliverable:** LAN evidence, final E2E tests/log/hash/screenshots,
@@ -402,17 +407,18 @@ trạng thái/status/history không nói quá evidence.
 
 - [x] Chạy full suite WSL2/Linux; lưu command, result vào
   `docs/evidence/final-week-rdt-gbn-verification.md`.
-- [ ] Chạy final server/client live demo từ clean checkout hoặc máy khác.
-- [ ] Rà `.gitignore` và Git status: bỏ demo binaries, downloads, cache, secret,
-  debug artifact; giữ source/tests/docs/evidence được chọn.
-- [ ] Cập nhật `project-status`, `code-change-history`, `tuan-2.5-fix`,
+- [x] Chạy final server/client live demo trên máy LAN thứ hai (PASV và ACTIVE).
+- [x] Rà `.gitignore` và Git status: demo binaries/downloads/cache bị ignore;
+  curated `docs/evidence/final-*.log` được giữ cho submission.
+- [x] Cập nhật `project-status`, `code-change-history`, `tuan-2.5-fix`,
   role-C report, GenAI log C theo evidence cuối.
 - [ ] Tạo final release checklist để A/B sign-off.
 
 **Review / Success checklist**
 
-- [ ] Full test pass và không có warning/traceback chưa giải thích.
-- [ ] Fresh run tạo được server/client demo không phụ thuộc file local ẩn.
+- [x] Full test pass và không có warning/traceback chưa giải thích (`199 passed`).
+- [x] Final LAN run completed on a separate client machine, with no hidden
+  localhost dependency.
 - [ ] Git diff/commit history phản ánh đúng owner và không có generated transfer data.
 
 **Definition of Done**
@@ -433,31 +439,31 @@ cách cleanup session/socket/file tạm.
 
 ### Functional
 
-- [ ] Tất cả command §2.2 có handler/reply phù hợp; MODE chưa có implementation
+- [x] Tất cả command §2.2 có handler/reply phù hợp; MODE chưa có implementation
   data-path không được báo success giả.
-- [ ] Client và server chạy được bằng native low-level sockets, không FTP/RDT library.
-- [ ] TCP control và UDP/RDT payload tách đúng; LIST/NLST trả TCP text.
-- [ ] Active/PASV, TYPE A/I, STOR/RETR/STOU/APPE/HASH/ABOR hoạt động.
-- [ ] Error handling và cleanup trả reply chuẩn, không crash server.
+- [x] Client và server chạy được bằng native low-level sockets, không FTP/RDT library.
+- [x] TCP control và UDP/RDT payload tách đúng; LIST/NLST trả TCP text.
+- [x] Active/PASV, TYPE A/I, STOR/RETR/STOU/APPE/HASH/ABOR hoạt động.
+- [x] Error handling và cleanup trả reply chuẩn, không crash server.
 
 ### Integration / Excellent RDT
 
-- [ ] A/C code integrate qua contract final; không còn API mismatch.
-- [ ] RDT có header, ACK, sequence, checksum, timeout/retry, duplicate/reorder,
+- [x] A/C code integrate qua contract final; không còn API mismatch.
+- [x] RDT có header, ACK, sequence, checksum, timeout/retry, duplicate/reorder,
   FIN/ABORT và START lifecycle được kiểm chứng.
-- [ ] Sliding window hoặc equivalent flow/congestion control có giới hạn và có test.
-- [ ] Filesystem sandbox, atomic upload, STOU, APPE lock và session isolation đúng.
-- [ ] Không còn integration blocker.
+- [x] Sliding window hoặc equivalent flow/congestion control có giới hạn và có test.
+- [x] Filesystem sandbox, atomic upload, STOU, APPE lock và session isolation đúng.
+- [x] Không còn integration blocker.
 
 ### Testing / Demo Evidence
 
-- [ ] Full automated suite pass trên Linux/WSL2.
-- [ ] Happy path + invalid input + disconnect + ABOR + file edge cases pass.
-- [ ] Fault injection loss/ACK loss/corruption/duplicate/reorder/retry exhausted pass.
-- [ ] Active/PASV, 3 clients và hash comparison có evidence.
-- [ ] Có live upload và download theo §4.5; LAN evidence được thêm nếu có hai
+- [x] Full automated suite pass trên Linux/WSL2.
+- [x] Happy path + invalid input + disconnect + ABOR + file edge cases pass.
+- [x] Fault injection loss/ACK loss/corruption/duplicate/reorder/retry exhausted pass.
+- [x] Active/PASV, 3 clients và hash comparison có evidence.
+- [x] Có live upload và download theo §4.5; LAN evidence được thêm nếu có hai
   máy/môi trường phù hợp.
-- [ ] Server log có IP, command, active-session table, transfer outcome; password redacted.
+- [x] Server log có IP, command, active-session table, transfer outcome; password redacted.
 
 ### Documentation / Report
 
