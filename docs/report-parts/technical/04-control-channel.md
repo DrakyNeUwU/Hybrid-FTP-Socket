@@ -64,8 +64,8 @@ Hệ thống hỗ trợ đầy đủ 28 lệnh FTP tiêu chuẩn theo yêu cầu
 | 10 | `DELE` | Xóa file | Bắt buộc | `250 File deleted` / `501`, `530`, `550` |
 | 11 | `RNFR` | Chọn file để đổi tên | Bắt buộc | `350 Ready for RNTO` / `501`, `530`, `550` |
 | 12 | `RNTO` | Đổi tên file đã chọn | Bắt buộc | `250 Rename successful` / `501`, `503`, `530`, `550` |
-| 13 | `LIST` | Xem chi tiết danh sách file (Unix detailed) | Tuỳ chọn | TCP text reply: `150 ... 226 Directory send OK` (inline trong một reply TCP, không qua UDP/RDT) / `530`, `550` |
-| 14 | `NLST` | Xem danh sách tên file | Tuỳ chọn | TCP text reply: `150 ... 226 Directory send OK` (inline trong một reply TCP, không qua UDP/RDT) / `530`, `550` |
+| 13 | `LIST` | Xem chi tiết danh sách file (Unix detailed) | Tuỳ chọn | TCP textual listing reply; không dùng UDP/RDT / `530`, `550` |
+| 14 | `NLST` | Xem danh sách tên file | Tuỳ chọn | TCP textual name-list reply; không dùng UDP/RDT / `530`, `550` |
 | 15 | `SIZE` | Kích thước file (bytes) | Bắt buộc | `213 <size>` / `501`, `530`, `550` |
 | 16 | `MDTM` | Thời gian sửa đổi file | Bắt buộc | `213 YYYYMMDDhhmmss` / `501`, `530`, `550` |
 | 17 | `STAT` | Trạng thái server / file | Tuỳ chọn | `211-FTP Server status` / `530` |
@@ -83,9 +83,9 @@ Hệ thống hỗ trợ đầy đủ 28 lệnh FTP tiêu chuẩn theo yêu cầu
 
 > **Transport của `LIST`/`NLST` (theo `docs/api-contract.md` §6.1):** listing là
 > metadata/command output, không phải file payload. Toàn bộ text listing được gửi
-> trên TCP control trong reply lệnh (với marker `150 … 226` inline trong một reply),
-> **không** cần data channel/UDP/RDT transfer ID. UDP chỉ dùng cho payload file
-> thực (`RETR`/`STOR`/`STOU`/`APPE`).
+> trực tiếp trên TCP control reply, **không** cần data channel, UDP/RDT transfer
+> ID, hoặc lifecycle `150`/`226`. UDP chỉ dùng cho payload file thực
+> (`RETR`/`STOR`/`STOU`/`APPE`).
 
 ---
 

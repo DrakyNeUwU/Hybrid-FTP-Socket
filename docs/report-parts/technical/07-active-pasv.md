@@ -3,7 +3,8 @@
 **Trạng thái:** Hoàn thành  
 **Mục tiêu:** Chốt UDP endpoint negotiation and lifecycle.  
 **Requirement:** RQ-02, RQ-05, RQ-10. **Owner:** A/B. **Reviewer:** C.  
-**Source:** `../../api-contract.md`, [`../../report_role_a_week2.md`](../../report_role_a_week2.md) §3.6/§8.7/§8.8.  
+**Source:** `../../api-contract.md`, `../../requirement-checklist.md`, and
+`../../evidence/final-lan-pasv-sha256.txt` / `final-lan-active-sha256.txt`.
 **Code:** `server/command_handler.py`, `common/rdt_utils.py`.
 
 ## 7.1 PORT — Active Mode (Role A)
