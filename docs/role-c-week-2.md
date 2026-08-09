@@ -133,3 +133,26 @@ downloaded client copy.
 - Full WSL2 verification is complete: `python3 -m pytest -q` collected 189
   tests and reported `189 passed in 106.91s` on 08/08/2026. Output is stored
   in `docs/evidence/week-2.5-pytest.log`.
+
+## Final Week — Go-Back-N Excellent Completion
+
+Role C replaced the production Stop-and-Wait send loop with a bounded Go-Back-N
+window of four packets. `START` now requires a valid ACK before data opens; the
+sender retries it finitely. DATA/FIN ACKs are cumulative. On timeout, the sender
+retransmits every unacknowledged packet from the window base. The receiver still
+commits only the expected sequence, re-ACKs the last contiguous sequence for a
+duplicate/future packet, and never writes the same payload twice.
+
+The change preserves the RDT header layout, `TransferContext` adapter boundary,
+FTP command grammar and A-owned replies. Filesystem ownership is unchanged:
+timeout/cancel failure reaches `TransferResult(426)`, which preserves the old
+target and removes the `.part` upload file.
+
+**Verification:** protocol tests `27 passed in 14.76s`; fault, transfer-manager
+and FTP E2E tests `22 passed in 70.44s`; expanded FTP E2E (STOU/APPE/HASH/TYPE)
+`6 passed in 22.63s`; final WSL2 regression `192 passed in 93.06s`. See
+`docs/evidence/final-week-rdt-gbn-verification.md`.
+
+**Remaining external evidence:** run PASV and ACTIVE from the second LAN machine
+and save terminal output, screenshots and source/server/client SHA-256. This is
+not verified by localhost automation.

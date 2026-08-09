@@ -26,6 +26,7 @@ class TransferContext:
     timeout_seconds: float = 0.5
     retry_limit: int = 10
     max_timeouts: int = 10
+    window_size: int = 4
     total_bytes: int | None = None
 
 

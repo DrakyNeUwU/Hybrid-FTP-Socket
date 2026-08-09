@@ -9,17 +9,19 @@
 | Hạng mục | Trạng thái | Owner cuối | Evidence / blocker |
 |---|---|---|---|
 | TCP control, parser, session, command lifecycle | Done | A | Full suite và FTP E2E; xem `docs/evidence/week-2.5-pytest.log` |
-| UDP/RDT Stop-and-Wait và integrity | Done | B | RDT/fault tests trong full suite; hash Active/PASV khớp |
+| UDP/RDT Go-Back-N window 4 và integrity | Done (B review pending) | C/B | START ACK/retry, protocol/fault/E2E; 192 full tests in 93.06s |
 | Filesystem sandbox, atomic upload, cleanup, concurrency | Done | C | FTP E2E gồm 3 PASV clients, ABOR và disconnect |
 | Active/PASV localhost | Done | C | `5 passed in 18.03s`; `docs/evidence/week-2.5-e2e-transfer.log` |
-| Active/PASV hai máy LAN | In progress | C | Cần hai máy cùng mạng và evidence thủ công; không phải blocker của localhost E2E |
+| Active/PASV hai máy LAN | In progress | C | Có môi trường theo xác nhận nhóm nhưng cần run artifact thủ công; không phải blocker của localhost E2E |
 | Report nộp cuối và acceptance checklist | In progress | B | A/C phải sign-off phần kỹ thuật của mình |
 | Oral/dry run và Git release check | In progress | B | Chưa có evidence dry run/release check |
-| C-F01 flow/congestion control (Excellent) | Deferred | C | Chỉ thực hiện sau must-submit gates |
+| C-F01 Go-Back-N flow/congestion control (Excellent) | Done (B review pending) | C/B | Window 4, cumulative ACK, bounded retry; 192 full tests in 93.06s |
 
 ## Sự thật đã xác minh
 
-- WSL2 full regression: `python3 -m pytest -q` — **189 passed in 106.91s**; log: `docs/evidence/week-2.5-pytest.log`.
+- Final WSL2 full regression: `python3 -m pytest -q` — **192 passed in 93.06s**; evidence: `docs/evidence/final-week-rdt-gbn-verification.md`.
+- Go-Back-N protocol verification: `python3 -m pytest tests/test_rdt.py -q` — **27 passed in 14.76s**; START ACK retry and four-packet in-flight behavior are direct tests.
+- Fault + transfer-manager + FTP E2E verification: `python3 -m pytest tests/test_rdt_fault_injection.py tests/test_transfer_manager.py tests/test_e2e_transfer.py -q` — **22 passed in 70.44s**; expanded FTP E2E separately: **6 passed in 22.63s**.
 - FTP E2E localhost: `python3 -m pytest tests/test_e2e_transfer.py -v` — **5 passed in 18.03s** (Active, PASV, ba PASV clients, ABOR, disconnect); log: `docs/evidence/week-2.5-e2e-transfer.log`.
 - SHA-256 source/server/client khớp cho Active và PASV: `docs/evidence/week-2.5-active-sha256.txt`, `docs/evidence/week-2.5-pasv-sha256.txt`.
 - Progress, safe server logging và PASV screenshots: `docs/evidence/week-2.5-cli-logging.log`, `docs/evidence/screenshots/`.

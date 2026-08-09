@@ -73,6 +73,35 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
         downloaded = os.path.join(self.client.download_dir, "active.bin")
         self.assertEqual(compute_hash(source), compute_hash(downloaded))
 
+    def test_pasv_stou_appe_hash_and_type_lifecycle(self):
+        """Role C transfer lifecycle covers unique store, atomic append and HASH."""
+        initial = os.path.join(self.temp_dir.name, "initial.txt")
+        addition = os.path.join(self.temp_dir.name, "addition.txt")
+        unique = os.path.join(self.temp_dir.name, "unique.bin")
+        write_file(initial, b"first-")
+        write_file(addition, b"second")
+        write_file(unique, bytes(range(32)))
+
+        self.assertTrue(self.client.command("TYPE I").startswith("200"))
+        self.assertTrue(self.client.upload_file(initial, "append-target.txt", mode="PASV"))
+        self.assertTrue(
+            self.client.upload_file(addition, "append-target.txt", cmd="APPE", mode="PASV")
+        )
+        remote = os.path.join(self.root, "append-target.txt")
+        self.assertEqual(read_file_bytes(remote), b"first-second")
+        self.assertEqual(
+            self.client.command("HASH append-target.txt").strip(),
+            f"213 SHA256 {compute_hash(remote)}",
+        )
+        self.assertTrue(self.client.command("TYPE A").startswith("200"))
+
+        before = set(os.listdir(self.root))
+        self.assertTrue(self.client.upload_unique_file(unique, mode="PASV"))
+        created = set(os.listdir(self.root)) - before
+        self.assertEqual(len(created), 1)
+        unique_path = os.path.join(self.root, created.pop())
+        self.assertEqual(compute_hash(unique), compute_hash(unique_path))
+
     def test_three_pasv_clients_transfer_independently(self):
         """Three sessions transfer in parallel without mixing file contents."""
         client_count = 3

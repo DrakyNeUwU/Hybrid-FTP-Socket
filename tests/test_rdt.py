@@ -207,6 +207,84 @@ class TestRDTSendReceiveIntegration(unittest.TestCase):
 
 class TestRDTProtocolLogic(unittest.TestCase):
 
+    def test_go_back_n_sends_window_before_first_cumulative_ack(self):
+        """A four-packet window must be in flight before the first ACK arrives."""
+        from common.rdt_sender import send_chunks_rdt
+
+        pair = _UDPPair()
+        transfer_id = 0xA11CE001
+        first_window: list[int] = []
+        errors: list[str] = []
+
+        def _receiver() -> None:
+            try:
+                data, peer = pair.receiver_sock.recvfrom(4096)  # START
+                start = RDTHeader.deserialize(data)
+                pair.receiver_sock.sendto(make_ack_packet(transfer_id, start.seq_num), peer)
+                while len(first_window) < 4:
+                    data, peer = pair.receiver_sock.recvfrom(4096)
+                    first_window.append(RDTHeader.deserialize(data).seq_num)
+                pair.receiver_sock.sendto(make_ack_packet(transfer_id, 3), peer)
+            except (OSError, ValueError) as exc:
+                errors.append(str(exc))
+
+        thread = threading.Thread(target=_receiver, daemon=True)
+        thread.start()
+        try:
+            sent = send_chunks_rdt(
+                iter((b"a", b"b", b"c", b"d")),
+                "127.0.0.1", pair.receiver_addr[1], transfer_id,
+                udp_socket=pair.sender_sock, timeout_s=0.2, retry_limit=3,
+                window_size=4,
+            )
+        finally:
+            thread.join(timeout=2)
+            pair.close()
+
+        self.assertEqual(errors, [])
+        self.assertEqual(first_window, [0, 1, 2, 3])
+        self.assertEqual(sent, 4)
+
+    def test_start_ack_loss_retries_before_data_window(self):
+        """A lost START ACK retries metadata and does not open the data window early."""
+        from common.rdt_sender import send_chunks_rdt
+
+        pair = _UDPPair()
+        transfer_id = 0xA11CE002
+        start_count = 0
+        received: list[bytes] = []
+
+        def _receiver() -> None:
+            nonlocal start_count
+            while True:
+                data, peer = pair.receiver_sock.recvfrom(4096)
+                header = RDTHeader.deserialize(data)
+                if header.flags == RDTHeader.FLAG_START:
+                    start_count += 1
+                    if start_count == 2:
+                        pair.receiver_sock.sendto(make_ack_packet(transfer_id, 0), peer)
+                    continue
+                payload = data[RDTHeader.size:]
+                received.append(payload)
+                pair.receiver_sock.sendto(make_ack_packet(transfer_id, header.seq_num), peer)
+                if header.flags & RDTHeader.FLAG_FIN:
+                    return
+
+        thread = threading.Thread(target=_receiver, daemon=True)
+        thread.start()
+        try:
+            sent = send_chunks_rdt(
+                iter((b"start",)), "127.0.0.1", pair.receiver_addr[1], transfer_id,
+                udp_socket=pair.sender_sock, timeout_s=0.05, retry_limit=4,
+            )
+        finally:
+            thread.join(timeout=2)
+            pair.close()
+
+        self.assertEqual(start_count, 2)
+        self.assertEqual(received, [b"start"])
+        self.assertEqual(sent, 5)
+
     def test_checksum_covers_header_fields(self):
         p = b"data"
         h0 = RDTHeader(transfer_id=1, seq_num=0, ack_num=0,

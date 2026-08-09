@@ -636,3 +636,47 @@ report drafts by technical content versus submission material.
 - Repository search confirms no operational `filephanchiacv/` reference remains;
   the exact user prompt above intentionally retains the historical folder name.
 - `git diff --check` is run after the moves and link updates.
+
+## August 9, 2026 — Final-week Go-Back-N Excellent RDT completion
+
+**Exact prompt:**
+> "Implement the plan." followed by the group decision: "ok chốt" for the
+> simplest sliding-window mechanism, Go-Back-N with window 4.
+
+**Raw GenAI output summary:**
+
+The proposed implementation retained the public RDT header and adapter APIs,
+added a `window_size` transfer-context setting, made `START` wait for a valid
+ACK with a finite retry limit, and replaced the one-packet send loop with a
+bounded Go-Back-N loop using cumulative ACKs and retransmission from the oldest
+unacknowledged packet.
+
+**Manual refinement:**
+
+- Selected Go-Back-N instead of Selective Repeat because the existing receiver
+  already commits only in-order packets; this avoids adding a reorder buffer.
+- Fixed receiver behavior so repeated START receives an ACK, duplicate/future
+  packets re-ACK the last contiguous sequence, and no duplicate payload is
+  yielded.
+- Added direct protocol tests proving four data packets are sent before the
+  first cumulative ACK and that a lost START ACK causes retry before DATA.
+- Added production FTP E2E coverage for STOU, APPE, HASH and TYPE; preserved
+  existing ABOR/disconnect atomic-cleanup tests.
+- Did not claim two-machine LAN success because that needs a physical second
+  machine and saved artifacts.
+
+**Affected files:**
+
+- `common/rdt_context.py`, `common/rdt_sender.py`, `common/rdt_receiver.py`
+- `tests/test_rdt.py`, `tests/test_e2e_transfer.py`
+- `docs/api-contract.md`, Role C status/history/evidence documents
+
+**Verification:**
+
+```text
+python3 -m pytest tests/test_rdt.py -q                         -> 27 passed
+python3 -m pytest tests/test_rdt_fault_injection.py tests/test_transfer_manager.py tests/test_e2e_transfer.py -q
+                                                               -> 22 passed
+python3 -m pytest tests/test_e2e_transfer.py -q                -> 6 passed
+python3 -m pytest -q                                           -> 192 passed in 93.06s
+```
