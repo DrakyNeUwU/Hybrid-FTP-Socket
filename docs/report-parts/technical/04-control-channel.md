@@ -64,8 +64,8 @@ Hệ thống hỗ trợ đầy đủ 28 lệnh FTP tiêu chuẩn theo yêu cầu
 | 10 | `DELE` | Xóa file | Bắt buộc | `250 File deleted` / `501`, `530`, `550` |
 | 11 | `RNFR` | Chọn file để đổi tên | Bắt buộc | `350 Ready for RNTO` / `501`, `530`, `550` |
 | 12 | `RNTO` | Đổi tên file đã chọn | Bắt buộc | `250 Rename successful` / `501`, `503`, `530`, `550` |
-| 13 | `LIST` | Xem chi tiết danh sách file (Unix detailed) | Tuỳ chọn | `150 ... 226 Directory send OK` / `530`, `550` |
-| 14 | `NLST` | Xem danh sách tên file | Tuỳ chọn | `150 ... 226 Directory send OK` / `530`, `550` |
+| 13 | `LIST` | Xem chi tiết danh sách file (Unix detailed) | Tuỳ chọn | TCP text reply: `150 ... 226 Directory send OK` (inline trong một reply TCP, không qua UDP/RDT) / `530`, `550` |
+| 14 | `NLST` | Xem danh sách tên file | Tuỳ chọn | TCP text reply: `150 ... 226 Directory send OK` (inline trong một reply TCP, không qua UDP/RDT) / `530`, `550` |
 | 15 | `SIZE` | Kích thước file (bytes) | Bắt buộc | `213 <size>` / `501`, `530`, `550` |
 | 16 | `MDTM` | Thời gian sửa đổi file | Bắt buộc | `213 YYYYMMDDhhmmss` / `501`, `530`, `550` |
 | 17 | `STAT` | Trạng thái server / file | Tuỳ chọn | `211-FTP Server status` / `530` |
@@ -80,6 +80,12 @@ Hệ thống hỗ trợ đầy đủ 28 lệnh FTP tiêu chuẩn theo yêu cầu
 | 26 | `STOU` | Upload file tên duy nhất | Tuỳ chọn | `150 ... 226 Transfer complete` / `425`, `450`, `426`, `550` |
 | 27 | `APPE` | Upload nối tiếp vào file | Bắt buộc | `150 ... 226 Transfer complete` / `425`, `450`, `426`, `550` |
 | 28 | `ABOR` | Hủy tiến trình truyền dữ liệu | Không có | `226 Abort successful` / `501`, `530` |
+
+> **Transport của `LIST`/`NLST` (theo `docs/api-contract.md` §6.1):** listing là
+> metadata/command output, không phải file payload. Toàn bộ text listing được gửi
+> trên TCP control trong reply lệnh (với marker `150 … 226` inline trong một reply),
+> **không** cần data channel/UDP/RDT transfer ID. UDP chỉ dùng cho payload file
+> thực (`RETR`/`STOR`/`STOU`/`APPE`).
 
 ---
 
@@ -113,4 +119,8 @@ Toàn bộ chức năng của Kênh điều khiển TCP được bảo đảm b�
 - `tests/test_command_parser.py`: Phân tích cú pháp lệnh.
 - `tests/test_session.py`: Cô lập dữ liệu giữa các session client.
 - `tests/test_commands.py`: Bao phủ toàn bộ 28 lệnh FTP, bao gồm TCP framing, argument validation, auth reset, anti-FTP bounce PORT check, và `TestModeComplianceRoleA` / `TestCommandMatrix28RoleA`.
+- `tests/test_threaded_server.py`: Thread-per-client, session registry và cleanup.
+
+**Evidence cuối (09/08/2026):** Final Role A control/session audit
+`python3 -m pytest tests/test_command_parser.py tests/test_commands.py tests/test_session.py tests/test_threaded_server.py -q` — **63 passed in 5.71s**; full WSL2 regression `python3 -m pytest -q` — **199 passed in 96.72s** (gồm E2E transfer). Chi tiết tại `docs/evidence/final-week-rdt-gbn-verification.md`.
 
