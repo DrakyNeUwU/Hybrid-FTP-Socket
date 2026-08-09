@@ -765,3 +765,29 @@ artifact, not a technical transfer blocker.
 week plan, code-change history and this log.
 
 **Verification:** `python3 -m pytest -q` — **199 passed in 96.72s**.
+
+## August 9, 2026 — Role C Content Migration into Report Parts
+
+**Exact prompt:**
+> "à bạn giúp tôi viết các nội dung trong role-c-week-2 vào từng component trong folder report-parts, bao gồm những gì mà role c đã thực hiện trong final week ở phần planning vào trong đó sao cho đủ cái từng file bảo nha, sau đó xoá file role-c-week-2 plan"
+
+**Raw GenAI output summary and manual refinement:**
+
+- Mapped Role C implementation into technical components 01, 03, 06, 08 and 09;
+  mapped test, contribution, limitation and provenance material into submission
+  components 10–13.
+- Used final evidence rather than stale Week 2 TODOs: 199 full tests, 6 expanded
+  E2E tests, Go-Back-N verification and two-machine PASV/ACTIVE SHA-256.
+- Kept `docs/report.md` untouched for Role B; removed the duplicated Role C
+  Week 2 source only after its material had destinations in report-parts.
+
+**Affected files:**
+
+- `docs/report-parts/technical/01-introduction.md`, `03-system-architecture.md`,
+  `06-filesystem-security.md`, `08-concurrency-integration.md`,
+  `09-client-cli-logging.md`
+- `docs/report-parts/submission/10-testing-results.md` through
+  `13-genai-usage.md`, `docs/role-c-week-2.md`
+
+**Verification:** Evidence links resolve to `docs/evidence/final-week-rdt-gbn-verification.md`
+and final LAN artifacts; `git diff --check` and reference search are run at handoff.

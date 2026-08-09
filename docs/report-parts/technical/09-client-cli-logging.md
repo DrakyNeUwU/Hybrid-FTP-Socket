@@ -1,18 +1,27 @@
 # 9. Client, CLI and Logging
 
-**Trạng thái:** Hoàn thành một phần
-**Mục tiêu:** Report network state, commands, replies, mode and progress safely.  
-**Requirement:** RQ-01, RQ-08. **Owner:** C. **Reviewer:** A.  
-**Source:** `../../api-contract.md`, `../../../second-brain.md`.  
-**Code:** `client/client.py`, `client/cli_display.py`, `server/threaded_server.py`.
+**Trạng thái:** Hoàn thành phần Role C; chờ reviewer chọn artifact để đưa vào report.
+**Owner:** C. **Reviewer:** A.
+**Nguồn:** `client/cli_display.py`, `client/demo_transfer.py`, `server/logging_utils.py`.
 
-**Diagram/table:** event/log schema and CLI progress sample.  
-**Test/evidence:** `FTPClient` receives real RDT progress for upload/download;
-`client.demo_transfer` renders it with `cli_display`. Server logs connection IP,
-redacted PASS command, reply, session/transfer ID, active-session table, mode,
-byte count and result. Command/server/E2E/CLI tests: **62 passed in 22.16s**;
-log `docs/evidence/week-2.5-cli-logging.log`.
+CLI nhận callback progress trực tiếp từ RDT cho upload/download. `TransferContext`
+truyền total bytes đã validate cho RETR START, vì vậy download hiển thị tổng thực
+0→100% thay vì coi từng chunk là hoàn thành. Output có fallback encoding-safe để
+không crash trên Windows CP1252.
 
-**TODO(C):** Save one manual screenshot of the progress and sanitized server
-log during final demo.
-**DoD:** Every displayed/logged transfer fact comes from live state.
+Server log theo lifecycle: client IP, command đã redact `PASS`, FTP reply,
+session ID, transfer ID, mode, byte count, outcome và active-session snapshot.
+Các dữ kiện hiển thị/logged đều đến từ live transfer state; không log credential.
+
+ACTIVE LAN được tăng tính ổn định bằng zero-payload UDP START probe trước RETR
+và sau reply `150`; thay đổi này không đổi TCP command/reply hay RDT header.
+
+| Evidence | Kết quả |
+|---|---|
+| CLI + E2E regression | 13 passed in 23.09s sau CP1252/ACTIVE diagnosis |
+| ACTIVE probe regression | 1 passed in 5.47s |
+| LAN logs | Progress và success cho PASV/ACTIVE ở `../../evidence/final-lan-*.log` |
+| Screenshot | PASV progress/server/success ở `../../evidence/screenshots/` |
+
+**DoD:** PASS luôn redact; progress dùng total thật; log cho phép examiner lần
+theo session/transfer nhưng không để lộ credential.
