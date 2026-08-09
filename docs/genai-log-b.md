@@ -114,3 +114,22 @@ AI đã phân tích mã nguồn và cung cấp hướng dẫn kiểm tra thiết
 **Refinement:**
 - Đã xác thực lệnh chạy trực tiếp các test cases thành công và không bị deselected các bài test khác.
 
+---
+
+## 2026-08-09 — Final RDT verification (Phiên 6)
+
+**Prompt:**
+> "kiểm tra lại toàn bộ role B sau khi đã sửa và ghi lại evidence cho report"
+
+**Raw output:**
+AI đã đối chiếu lại implementation với planning và tài liệu Role B week 2, sau đó đề xuất cập nhật các draft báo cáo cho phần UDP/RDT. Mã nguồn được kiểm tra qua các module `common/RDTHeader.py`, `common/rdt_sender.py`, `common/rdt_receiver.py`, cùng bộ test `tests/test_rdt.py` và `tests/test_rdt_fault_injection.py`.
+
+**Verification thực tế:**
+- Chạy lệnh: `python3 -m pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q`
+- Kết quả: **45 passed in 67.09s**
+
+**Refinement:**
+- Đây là bằng chứng chính để ghi vào các file report-parts cho Role B: technical draft, testing results, requirement compliance và contribution matrix.
+- Việc dùng `python3 -m pytest` thay vì `pytest` giúp tránh nhầm môi trường Python và phù hợp với môi trường WSL2 hiện tại.
+- Những phần liên quan đến B-F02/B-F03 cần ghi rõ là đã có evidence thực tế, không còn là placeholder.
+
