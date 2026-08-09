@@ -396,6 +396,12 @@ STOU, APPE, ABOR
 `tests/test_command_parser.py`, `tests/test_session.py` and
 `tests/test_transfer_manager.py`.
 
+**Final week (09/08/2026):** Role A tasks A-F01 (MODE compliance) and A-F02
+(28-command matrix) completed. Final Role A control/session audit
+`tests/test_command_parser.py tests/test_commands.py tests/test_session.py
+tests/test_threaded_server.py` — **63 passed in 5.71s**; full WSL2 regression —
+**199 passed in 96.72s**; evidence `docs/evidence/final-week-rdt-gbn-verification.md`.
+
 ---
 
 ## 6. GenAI Usage & Code Refinement Log
@@ -441,6 +447,18 @@ STOU, APPE, ABOR
 | Session isolation | ✅ Complete, tested |
 | Unit tests ≥ 48 passing | ✅ 48 passed |
 | End-to-end RETR/STOR via RDT | ⏳ Pending Role B adapter |
+
+### 7.3 Final Week Status (09/08/2026)
+
+| Component | Status |
+|-----------|--------|
+| MODE S → `200 Mode Stream` | ✅ Complete, tested |
+| MODE B/C → `502 Mode not implemented` (no false success) | ✅ Complete, tested |
+| MODE invalid / unauthenticated / session isolation | ✅ Complete, tested |
+| 28-command compliance matrix (§2.2) | ✅ Complete, tested |
+| Transfer lifecycle `150 → 226/4xx` (RETR/STOR/STOU/APPE) | ✅ Complete, tested |
+| Role A control/session audit | ✅ 63 passed in 5.71s |
+| Full WSL2 regression | ✅ 199 passed in 96.72s |
 
 Terminal screenshots and Telnet logs will be attached in the final submission.
 
@@ -778,3 +796,77 @@ Lập command-spec table áp dụng chung cho dispatcher:
 | Start/stop server trên Linux/WSL2 | ⏳ Chưa xác nhận |
 | End-to-end RETR/STOR qua RDT production | ⏳ Chờ chốt adapter với Role B |
 | Multi-client + concurrency test | ⏳ Chờ Phase 3 |
+
+---
+
+## 9. Tuần cuối (Final Week) — 09/08/2026–12/08/2026
+
+> Đối chiếu trực tiếp từ `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md`,
+> task **A-F01** và **A-F02**. Trạng thái hiện tại duy nhất ở `docs/project-status.md`.
+
+---
+
+### 9.1 A-F01 — Rà command compliance và `MODE` theo requirement
+
+**Yêu cầu (§2.2 `MODE {S|B|C}`, §2.3 reply codes):** không trả thành công giả cho
+MODE chưa có data-path; giữ `MODE S` hoạt động; kiểm tra B/C và ghi limitation
+đúng theo requirement thay vì tự thiết kế codec ngoài đề.
+
+**Đã hoàn thành:**
+
+- `MODE S` → `200 Mode Stream\r\n`, cập nhật `session.transfer_mode = "S"`
+  (`server/command_handler.py:245`).
+- `MODE B` / `MODE C` → `502 Mode not implemented\r\n` — không trả 200 vì bài tập
+  không yêu cầu block/compressed data-path và bảng §2.2 không có cột Level.
+- `MODE X` (không hợp lệ) → `501`; chưa đăng nhập → `530`; thiếu tham số → `501`.
+- Session isolation: MODE lưu độc lập trong từng `Session`, đổi mode ở client A
+  không ảnh hưởng client B (`tests/test_commands.py:669`).
+
+**Kiểm chứng:** `TestModeComplianceRoleA` (5 tests) pass; `MODE B/C` không bao giờ
+trả 200 trong toàn bộ suite.
+
+**Oral:** giải thích MODE khác Active/PASV — MODE mô tả cấu trúc byte stream trên
+data channel (Stream/Block/Compressed), Active/PASV mô tả ai khởi tạo kết nối
+data; `502` trung thực tốt hơn `200` cho chức năng chưa có.
+
+---
+
+### 9.2 A-F02 — Command matrix qua TCP và transfer lifecycle cuối
+
+**Yêu cầu (§2.2 toàn bộ command, §2.3 reply codes, §4.5 live demo):** chứng minh
+mọi command được đề duyệt parse/validate/reply đúng qua TCP; các command transfer
+chạy xuyên suốt thay vì chỉ có unit dispatch.
+
+**Đã hoàn thành:**
+
+- Lập command matrix 28 lệnh (USER…ABOR) tại `docs/report-parts/technical/04-control-channel.md`
+  mục 4.2: tham số (bắt buộc/tuỳ chọn/không có) + reply ba chữ số thực tế.
+- `TestCommandMatrix28RoleA` (`tests/test_commands.py:680`): đủ 28 lệnh; `HELP` →
+  `214` liệt kê lệnh hỗ trợ; lệnh ngoài đề (`SITE`) → `502`.
+- Xác nhận luồng `150 → 226/4xx`: check endpoint (PORT/PASV) → `425` nếu thiếu;
+  gửi `150` trên TCP control thread; worker daemon gửi `226`/`426`/`550` sau RDT
+  thực; `ABOR` gọi `TransferManager.cancel(session)` (mục 4.4).
+- Xác nhận `LIST`/`NLST` luôn trả text qua TCP; chỉ file payload đi UDP/RDT.
+
+**Kiểm chứng:** Final Role A audit `test_command_parser.py test_commands.py
+test_session.py test_threaded_server.py` — **63 passed in 5.71s**; full WSL2
+regression — **199 passed in 96.72s** (`docs/evidence/final-week-rdt-gbn-verification.md`).
+
+**Oral:** mô tả từ `COMMAND\r\n` qua parser/session/handler đến reply; phân biệt
+`150`, `226`, `425`, `426`, `450`, `550`.
+
+---
+
+### 9.3 Tổng kết trạng thái sau tuần cuối
+
+| Hạng mục | Trạng thái |
+|----------|-----------|
+| `MODE S` → 200; `MODE B/C` → 502 (không success giả) | ✅ Hoàn thành |
+| Session isolation cho MODE | ✅ Hoàn thành |
+| 28-command compliance matrix + reply mapping | ✅ Hoàn thành |
+| Transfer lifecycle `150 → 226/4xx` + ABOR cleanup | ✅ Hoàn thành |
+| Role A control/session audit (63 tests) | ✅ Hoàn thành |
+| Full WSL2 regression (199 tests) | ✅ Hoàn thành |
+| GenAI log A và report phần 4 cập nhật | ✅ Hoàn thành |
+| A sign-off phần control/command cho report nộp cuối (B-F02) | ⏳ Chờ B tổng hợp |
+| Oral dry run + live-code locator (B-F03) | ⏳ Chờ nhóm |

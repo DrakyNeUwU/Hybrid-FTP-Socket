@@ -684,7 +684,11 @@ def mode_cmd(self, arg, session):
 Và thêm class `TestModeComplianceRoleA` kiểm thử các trường hợp `MODE S`, `MODE B`, `MODE C`, `MODE X`, chưa login và session isolation.
 
 **Refinement:**
-Đã xác nhận và tích hợp `TestModeComplianceRoleA` vào `tests/test_commands.py`. Cập nhật phần 4 trong `docs/report-parts/technical/04-control-channel.md` với bảng lệnh và giải thích lý do trả mã `502` cho `MODE B/C` theo đúng tinh thần báo cáo trung thực.
+Đã xác nhận và tích hợp `TestModeComplianceRoleA` vào `tests/test_commands.py` (dòng 634). Cập nhật phần 4 trong `docs/report-parts/technical/04-control-channel.md` với bảng lệnh và giải thích lý do trả mã `502` cho `MODE B/C` theo đúng tinh thần báo cáo trung thực. Không thêm codec/framing nào ngoài yêu cầu đề — vì bảng §2.2 không có cột Level cho MODE, `502` trung thực tốt hơn trả `200` cho chức năng chưa có data-path. MODE không nhầm với Active/PASV (mode = cấu trúc byte stream trên data channel, Active/PASV = ai khởi tạo kết nối data).
+
+**Verification:**
+- `python3 -m pytest tests/test_commands.py -q` — `TestModeComplianceRoleA` 5 test pass: MODE S → 200, MODE B/C → 502, MODE X → 501, chưa login → 530, session isolation.
+- Final Role A audit: `python3 -m pytest tests/test_command_parser.py tests/test_commands.py tests/test_session.py tests/test_threaded_server.py -q` — **63 passed in 5.71s**; full suite — **199 passed in 96.72s**; evidence `docs/evidence/final-week-rdt-gbn-verification.md`.
 
 ---
 
@@ -697,4 +701,8 @@ Lập bảng ma trận kiểm thử tuân thủ cho toàn bộ 28 lệnh FTP the
 AI sinh danh sách 28 lệnh và ma trận test case trong `TestCommandMatrix28RoleA`, xác minh phản hồi lệnh `HELP` trả về `214` chứa đầy đủ danh sách lệnh hỗ trợ, các lệnh chưa hỗ trợ (như `SITE`) trả về `502`.
 
 **Refinement:**
-Đã tích hợp vào `tests/test_commands.py` và hoàn thiện `docs/report-parts/technical/04-control-channel.md`. Tất cả các test đều trôi qua 100%.
+Đã tích hợp vào `tests/test_commands.py` (dòng 680) và hoàn thiện `docs/report-parts/technical/04-control-channel.md` mục 4.2 (bảng 28 lệnh với tham số + reply) và 4.4 (luồng `150 -> 226/4xx`, xử lý `ABOR`). Ma trận reply ghi rõ reply ba chữ số thực tế của từng lệnh; `150 -> 226` chỉ xuất hiện sau transfer thực, lỗi map đúng `425`/`426`/`450`/`550`; `LIST`/`NLST` trả text qua TCP (chỉ file payload đi UDP/RDT).
+
+**Verification:**
+- `TestCommandMatrix28RoleA`: đủ 28 lệnh `USER...ABOR`, `HELP` → `214`, lệnh ngoài đề (`SITE`) → `502`.
+- Final Role A audit — **63 passed in 5.71s**; full WSL2 regression — **199 passed in 96.72s**; evidence `docs/evidence/final-week-rdt-gbn-verification.md`.
