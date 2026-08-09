@@ -8,6 +8,8 @@
 **Trạng thái snapshot:** cập nhật theo code tuần cuối; Role A sign-off phần control/command.
 **Owner:** A. **Reviewer:** B/C. **Source:** `../../requirement-checklist.md`, đề gốc, `../../api-contract.md`, `../../report_role_a_week2.md`.
 
+> Bằng chứng mới cho Role B: chạy `pytest tests/test_rdt.py tests/test_rdt_fault_injection.py -q` cho kết quả `45 passed in 61.13s`.
+
 | Requirement của đề | Mức độ | Role | Report section | Code liên quan | Test/evidence | Trạng thái |
 |---|---|---|---|---|---|---|
 | TCP control, parser, replies, session | Basic/Advanced | A | 04 | `server/client_handler.py`, `command_parser.py`, `session.py`, `ftp_reply.py` | Role A audit 63 passed in 5.71s | Verified |
