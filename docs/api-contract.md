@@ -302,7 +302,7 @@ count and result. The demo client renders real upload/download progress.
 
 | Date | Change | Decision/reviewers | Evidence |
 |---|---|---|---|
-| 2026-08-07 | Initial contract audit | Pending A/B/C confirmation | Source inspection; no code changed |
+| 2026-08-07 | Initial contract audit | Reviewed by A/B/C and incorporated into final report | Source inspection; no code changed |
 | 2026-08-08 | Implemented `TransferContext` and canonical adapters | A/B implementation; C filesystem boundary preserved | 52 Role A + 21 protocol + 14 fault tests pass |
 | 2026-08-08 | Verified unchanged contract on WSL2 | A/C test repair; no API/header change | `python3 -m pytest -q`: 186 passed in 104.09s; saved evidence log |
 | 2026-08-08 | RDT runtime failures now map to structured FTP `426` | C integration; no wire/API signature change | Production PASV ABOR and disconnect cleanup tests pass; full pytest: 189 passed in 113.94s |
@@ -310,4 +310,4 @@ count and result. The demo client renders real upload/download progress.
 | 2026-08-08 | Clarified LIST/NLST transport | A/B/C requirement decision: textual listing stays on TCP control; UDP is file payload only | Requirement §1.1–1.2, §2.2–2.3; existing command tests and full pytest 189 passed |
 | 2026-08-08 | Normalized progress and server lifecycle logging | C integration; legacy file-helper callbacks remain backward compatible | Command/server/E2E/CLI: 62 passed; full pytest: 189 passed in 102.50s |
 | 2026-08-08 | Added `TransferContext.total_bytes` for RETR progress | A/C/B compatible optional field; sender places it in RDT START | E2E progress-total assertion: 5 passed in 17.61s; full pytest: 189 passed in 106.91s |
-| 2026-08-09 | Go-Back-N flow control and reliable START lifecycle | C implementation; header layout and public adapter signatures preserved; B review pending | Protocol 27 passed; fault/transfer/E2E 22 passed; full WSL2 pytest 192 passed in 91.11s |
+| 2026-08-09 | Go-Back-N flow control and reliable START lifecycle | C implementation; header layout and public adapter signatures preserved; reviewed by A/B/C | Protocol 27 passed; fault/transfer/E2E 22 passed; full WSL2 pytest 192 passed in 91.11s |

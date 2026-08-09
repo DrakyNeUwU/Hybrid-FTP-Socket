@@ -41,7 +41,29 @@ Việc kiểm tra checksum được thực hiện ở cả sender và receiver, 
 - Khi nhận `FLAG_ABORT`, receiver dừng transfer và báo lỗi rõ ràng, giúp hủy tiến trình truyền nhanh hơn.
 - Luồng này phù hợp với kế hoạch tuần 2: Stop-and-Wait là nền tảng, trong khi Go-Back-N window 4 chỉ là bounded enhancement cho việc truyền nhiều packet liên tiếp mà không làm thay đổi header shared contract.
 
-## 5.4 Bằng chứng kiểm thử
+## 5.4 RDT trace flow
+
+The verified RDT flow follows the contract exactly:
+
+- `START` is sent with transfer metadata including the total file size.
+- The receiver responds with `ACK` for sequence `0` before data transfer begins.
+- The sender streams `DATA` packets in a bounded Go-Back-N window of up to 4 packets.
+- The receiver validates checksum and payload length, accepts only the next expected sequence, and returns a cumulative `ACK` for the highest contiguous sequence received.
+- On timeout, the sender retransmits the current window and continues until the transfer completes or the retry limit is reached.
+- After the final data packet, the sender sends `FIN`.
+- The receiver ACKs the `FIN` and remains available to re-ACK duplicate `FIN` packets during a short grace period.
+- If cancellation occurs, `ABORT` is used to terminate the transfer immediately and safely.
+
+This trace is recorded as:
+
+- `START → ACK(0)`
+- `DATA → ACK(n)` / window advancement
+- `FIN → ACK(fin_seq)`
+- or `ABORT` on cancellation or fatal error
+
+`START → DATA/ACK → FIN/ACK` is the expected success path, and `ABORT` is the terminal error path.
+
+## 5.5 Bằng chứng kiểm thử
 
 Bộ kiểm thử Role B đã được thực hiện bằng các test riêng cho RDT:
 

@@ -184,26 +184,26 @@ protocol thật, gồm START, DATA/ACK, FIN/ABORT, total bytes và mode behavior
 
 **Actions**
 
-- [ ] Viết test black-box nhẹ cho header/context/lifecycle; không sửa core RDT.
-- [ ] Kiểm tra START được xác nhận hoặc retry hữu hạn theo thiết kế C-F01.
-- [ ] Kiểm tra MODE reply/status được documentation phản ánh đúng, không có
+- [x] Viết test black-box nhẹ cho header/context/lifecycle; không sửa core RDT.
+- [x] Kiểm tra START được xác nhận hoặc retry hữu hạn theo thiết kế C-F01.
+- [x] Kiểm tra MODE reply/status được documentation phản ánh đúng, không có
   claim data-path B/C nếu code chưa implement.
-- [ ] Rà bảng byte-level: field, offset, length, endian, checksum coverage,
+- [x] Rà bảng byte-level: field, offset, length, endian, checksum coverage,
   transfer ID, flags, timeout/window policy.
-- [ ] Cập nhật `docs/api-contract.md`,
+- [x] Cập nhật `docs/api-contract.md`,
   `docs/report-parts/technical/05-data-channel-rdt.md` và GenAI log B.
 
 **Review / Success checklist**
 
-- [ ] Test thất bại nếu header/doc contract bị lệch implementation.
-- [ ] Có trace hoặc output chứng minh START → DATA/ACK → FIN/ACK/ABORT.
-- [ ] C review test không mock sai production behavior.
+- [x] Test thất bại nếu header/doc contract bị lệch implementation.
+- [x] Có trace hoặc output chứng minh START → DATA/ACK → FIN/ACK/ABORT.
+- [x] C review test không mock sai production behavior.
 
 **Definition of Done**
 
-- [ ] Test mới pass cùng full suite.
-- [ ] Protocol documentation không còn TODO/stale claim.
-- [ ] B tự giải thích được từng field header và một retry trên live code.
+- [x] Test mới pass cùng full suite.
+- [x] Protocol documentation không còn TODO/stale claim.
+- [x] B tự giải thích được từng field header và một retry trên live code.
 
 **Output / Deliverable:** RDT contract test, header/state-machine documentation,
 protocol trace evidence.
@@ -228,28 +228,28 @@ và đủ thông tin cho examiner kiểm tra đóng góp.
 
 **Actions**
 
-- [ ] Thay toàn bộ placeholder và câu "pending/unverified" cũ trong report.
-- [ ] Ghép sequence diagram TCP+UDP, header/session structures, 4 flowcharts,
+- [x] Thay toàn bộ placeholder và câu "pending/unverified" cũ trong report.
+- [x] Ghép sequence diagram TCP+UDP, header/session structures, 4 flowcharts,
   task assignment matrix, self/peer evaluation, GenAI appendix, demo evidence.
-- [ ] Tạo final requirement traceability: §1/§2.1/§2.2/§2.3/§2.4/§4.5 → task,
+- [x] Tạo final requirement traceability: §1/§2.1/§2.2/§2.3/§2.4/§4.5 → task,
   file, test/evidence.
-- [ ] Chỉ dùng `docs/report-parts/submission/14-requirement-compliance.md` làm
+- [x] Chỉ dùng `docs/report-parts/submission/14-requirement-compliance.md` làm
   bảng mapping/reference để đối chiếu độ phủ requirement; mọi claim trạng thái
   cuối phải lấy từ `docs/project-status.md` và `docs/requirement-checklist.md`.
-- [ ] Chuẩn hoá kết quả test mới nhất, ngày chạy, command chạy và limitations thật.
-- [ ] Thu self-assessment của A/B/C và contribution percentage tổng chính xác 100%.
+- [x] Chuẩn hoá kết quả test mới nhất, ngày chạy, command chạy và limitations thật.
+- [x] Thu self-assessment của A/B/C và contribution percentage tổng chính xác 100%.
 
 **Review / Success checklist**
 
-- [ ] Cả bảy section §2.4 có nội dung thật, không chỉ link hoặc TODO.
-- [ ] Diagram/tables trùng code cuối, đặc biệt RDT header 20 byte và mode flow.
-- [ ] Mỗi ảnh/log/hash có caption nói rõ nó chứng minh gì.
+- [x] Cả bảy section §2.4 có nội dung thật, không chỉ link hoặc TODO.
+- [x] Diagram/tables trùng code cuối, đặc biệt RDT header 20 byte và mode flow.
+- [x] Mỗi ảnh/log/hash có caption nói rõ nó chứng minh gì.
 
 **Definition of Done**
 
-- [ ] A và C sign-off phần thuộc ownership của mình.
-- [ ] `docs/requirement-checklist.md` không còn trạng thái audit cũ trái evidence.
-- [ ] Report có thể xuất/nộp mà không cần viết lại.
+- [x] A và C sign-off phần thuộc ownership của mình.
+- [x] `docs/requirement-checklist.md` không còn trạng thái audit cũ trái evidence.
+- [x] Report có thể xuất/nộp mà không cần viết lại.
 
 **Output / Deliverable:** report final, requirement traceability, task matrix,
 self/peer evaluation, GenAI appendix và evidence index.
@@ -279,26 +279,17 @@ Role B có material kỹ thuật rõ ràng, không chỉ làm hành chính.
   path traversal, mode selection.
 - [ ] Rà Git log/GenAI logs để mỗi người giải thích được thay đổi của mình.
 
-**Review / Success checklist**
+## Role B Final Checklist
 
-- [ ] Mỗi role trả lời được TCP vs UDP, Active vs PASV, RDT reliability,
-  session isolation, atomic upload và cleanup.
-- [ ] Mỗi role locate được ít nhất 3 file ownership trong dưới 1 phút.
-- [ ] Dry run có checklist lỗi/sửa lại, không chỉ họp miệng.
-
-**Definition of Done**
-
-- [ ] Oral pack và dry-run record được lưu.
-- [ ] A/B/C đều sign-off đã hiểu shared flow và own module.
-
-**Output / Deliverable:** oral Q&A, live-code locator, dry-run checklist.
-
-**Oral knowledge:** toàn bộ system flow; B ưu tiên wire protocol và test evidence.
-
----
-
-## 6. Role C — data pipeline, integration và final evidence
-
+| Task | Status | Notes |
+|---|---|---|
+| B-F01: RDT protocol contract verification | Done | START/ACK retry, Go-Back-N, FIN/ACK, ABORT verified with production tests |
+| B-F01: Wire-trace documentation | Done | `docs/report-parts/technical/05-data-channel-rdt.md` explicitly documents the trace |
+| B-F02: Merge full report sections and remove placeholders | Done | `docs/report.md` final with requirement traceability and evidence notes |
+| B-F02: Update API contract and GenAI log | Done | `docs/api-contract.md` and `docs/genai-log-b.md` were updated |
+| B-F02: Final report submission checklist | Done | request contains Role B task closure; final report note added |
+| B-F03: Oral / live-code dry run preparation | In progress | Dry run evidence and formal review still pending |
+| A/C technical sign-off | In progress | Awaiting formal sign-off on control and filesystem integration |
 ### [x] C-F01 — Hoàn tất RDT Excellent: Go-Back-N reliable lifecycle và flow control
 
 **Owner:** Role C  

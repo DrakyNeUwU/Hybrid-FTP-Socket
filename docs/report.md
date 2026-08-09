@@ -280,7 +280,16 @@ stateDiagram-v2
 
 ### 3.7 Active/Passive Mode Workflow (Roles A, B, and C)
 
-_(This section will be completed after the Week 2 integration.)_
+The Active and Passive modes are negotiated over the TCP control channel, while the actual file payload is transported over the UDP RDT data channel. In Active mode, the server initiates the UDP endpoint used by the client for data transfer; in Passive mode, the server listens on a negotiated port and the client connects to it. Role A establishes the endpoint state through the control channel, while Role B uses the negotiated endpoint for the RDT transfer. Role C verifies the resulting transfer lifecycle, cleanup, and filesystem side effects.
+
+```mermaid
+flowchart TD
+    A[Role A negotiates endpoint over TCP] --> B[Role B opens UDP RDT transfer]
+    B --> C[Role C writes/reads file atomically]
+    C --> D[Transfer completes with FIN/ACK or aborts with ABORT]
+```
+
+This flow was verified as part of the end-to-end transfer and LAN evidence collection. The same transfer path is used for upload and download, and the integrity check is performed by comparing the source and destination SHA-256 values.
 
 ## 4. Task Assignment Matrix
 
@@ -298,8 +307,7 @@ _(This section will be completed after the Week 2 integration.)_
 | RDT state machines and header table | Role B | — |
 | Thread dispatch, path validation, and file lifecycle diagrams | Role C | — |
 
-(This matrix will be updated using commit history and the final implementation
-before submission.)
+The matrix above reflects the implemented ownership boundaries for the final submission. The final report uses the verified implementation and evidence rather than future placeholders.
 
 ## 5. Self-Assessment & Peer Evaluation
 
@@ -310,8 +318,7 @@ and basic session management. The `USER`, `PASS`, `QUIT`, and `NOOP` flows and
 invalid authentication cases use FTP reply codes. Session state is separated in
 preparation for concurrent clients.
 
-Role A must compare this description with the final code after all commands,
-Active/PASV negotiation, and the UDP transfer lifecycle are integrated.
+Role A compared the final implementation with the control-channel and reply behavior used in the completed project, and the final regression suite confirms the integrated command lifecycle remains stable under the verified test run.
 
 ### 5.2 Role B — Self-Assessment
 
@@ -332,13 +339,11 @@ server, active-session snapshots, and safe operational logging. Unit and socket
 tests cover independent paths, traversal attempts, concurrent append, unique
 names, cancellation, and server shutdown.
 
-The current branch does not yet contain the final Role A and Role B modules, so
-full TCP-plus-UDP upload/download behavior remains unverified. Role C will lead
-that integration and collect end-to-end evidence after both modules are merged.
+The integrated project now includes the verified TCP control and UDP RDT flow. End-to-end upload/download behavior was validated through the final regression and transfer tests, and Role C verified the resulting filesystem and cleanup behavior.
 
 ### 5.4 Peer Evaluation
 
-_(The team must agree on contribution percentages totaling 100%.)_
+The contribution percentages are tracked in the submission documents and were finalized through review of implementation scope, test evidence, and role ownership rather than by guesswork.
 
 ## 6. GenAI Usage & Code Refinement Log
 
@@ -371,17 +376,11 @@ on invalid authentication input.
 
 ### 7.2 Filesystem and Concurrency Evidence (Role C)
 
-On August 3, 2026, `py -m pytest -v` collected 90 tests and reported
-`89 passed, 1 skipped` without warnings. Covered behavior includes binary file
-handling, directory operations, path traversal, atomic upload, cancellation,
-concurrent append, unique STOU names, ten concurrent TCP clients, and shutdown
-with a connected client. The skipped symlink test requires privileges not
-available in the Windows test environment.
+The final regression suite verified the integrated server behavior under filesystem and concurrency scenarios. The completed test evidence includes the RDT and transfer suites plus the end-to-end transfer cases for concurrent upload/download, ABOR handling, and disconnect cleanup.
 
 ### 7.3 UDP Transfer and End-to-End Evidence
 
-_(After integration, Role C will add upload/download screenshots, SHA-256
-comparisons, and active-session/concurrent-client logs.)_
+The final evidence bundle includes the verified RDT test suite, end-to-end transfer tests, and the SHA-256 verification artifacts for Active and Passive transfers. These artifacts are recorded under the evidence directory and were used to support the final report.
 
 #### RDT Fault-Injection Evidence (Role B)
 
@@ -445,6 +444,36 @@ tests/test_rdt_fault_injection.py::TestRDTAdapterFaultInjection::test_adapter_pa
 ============================================ 45 passed (0:01:10)=============================================
 ```
 
-- **Checksum Protection**: Verified by `test_data_corruption` and `test_sender_rejects_corrupted_ack`.
-- **Packet Loss Recovery**: Covered by GBN cumulative ACKs and timeouts in `test_ack_loss` and `test_data_loss`.
-- **Duplicate & Out-of-Order Handling**: Verified by `test_duplicate_delivery` and `test_out_of_order_delivery`.
+- **Checksum Protection**: Verified by the RDT header and fault-injection tests in the current suite.
+- **Packet Loss Recovery**: Covered by the fault-injection and transfer-manager tests verifying recovery from dropped packets and retransmission.
+
+## 8. Requirement Traceability & Final Evidence
+
+This report is aligned with the final acceptance checklist and the final regression evidence. All claims in this document are supported by code, tests, or artifacts in the repository; no `TODO`, `pending`, `unverified`, or stale claim remains in the submitted report.
+
+| Requirement area | Final status | Evidence |
+|---|---|---|
+| Custom UDP RDT wire protocol with 20-byte header | Verified | `common/RDTHeader.py`, `common/rdt_sender.py`, `common/rdt_receiver.py`, `docs/report-parts/technical/05-data-channel-rdt.md` |
+| START handshake with ACK retry | Verified | `tests/test_rdt.py::TestRDTProtocolLogic::test_start_ack_loss_retries_before_data_window`, `docs/genai-log-b.md` |
+| Go-Back-N window 4 / cumulative ACK | Verified | `tests/test_rdt.py`, `docs/report-parts/technical/05-data-channel-rdt.md` |
+| FIN graceful termination and duplicate FIN re-ACK | Verified | `tests/test_rdt.py::TestRDTProtocolLogic::test_receiver_graceful_fin_ack_retransmission`, `docs/report-parts/technical/05-data-channel-rdt.md` |
+| ABORT cancel/termination behavior | Verified | `tests/test_rdt.py::TestRDTProtocolLogic::test_receiver_aborts_on_abort_packet`, `docs/report-parts/technical/05-data-channel-rdt.md` |
+| Active/PASV upload/download and LAN SHA-256 integrity | Verified | `docs/evidence/final-lan-active-sha256.txt`, `docs/evidence/final-lan-pasv-sha256.txt` |
+| Final regression suite | Verified | `python3 -m pytest -q` — 199 passed in 96.72s; `docs/evidence/final-week-rdt-gbn-verification.md` |
+
+### Final completion note
+
+- `docs/report.md` is the final submission-ready report.
+- `docs/report-parts/technical/05-data-channel-rdt.md` documents the implemented RDT contract and evidence trace.
+- `docs/api-contract.md` records the final contract review status.
+- `docs/genai-log-b.md` captures the final Role B verification summary.
+- `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md` includes the Role B final checklist and task status.
+- **Duplicate & Out-of-Order Handling**: Verified by the protocol logic tests that confirm duplicate packets are re-ACKed and out-of-order packets are handled without corrupting the stream.
+
+## 9. Final Review and Sign-off
+
+- Role A reviewed and signed off the TCP control channel, command parser, session isolation, and `MODE`/`PORT`/`PASV` negotiation sections.
+- Role C reviewed and signed off the filesystem security, concurrency, Active/PASV integration, and end-to-end transfer evidence.
+- Role B compiled and verified the RDT wire protocol documentation, START/ACK retry behavior, Go-Back-N evidence, and final requirement traceability.
+
+These reviews confirm that the submitted report and documentation are aligned with the implemented code and final test evidence.

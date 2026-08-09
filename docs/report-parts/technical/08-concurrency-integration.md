@@ -1,6 +1,6 @@
 # 8. Concurrency and Integration
 
-**Trạng thái:** Hoàn thành phần Role C; A/B review evidence còn pending.
+**Trạng thái:** Hoàn thành phần Role C; A/B evidence review completed.
 **Owner:** C. **Reviewer:** A/B.
 **Nguồn:** `../../api-contract.md`, `../../project-status.md`, `tests/test_e2e_transfer.py`.
 

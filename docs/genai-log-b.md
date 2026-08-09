@@ -133,3 +133,17 @@ AI đã đối chiếu lại implementation với planning và tài liệu Role 
 - Việc dùng `python3 -m pytest` thay vì `pytest` giúp tránh nhầm môi trường Python và phù hợp với môi trường WSL2 hiện tại.
 - Những phần liên quan đến B-F02/B-F03 cần ghi rõ là đã có evidence thực tế, không còn là placeholder.
 
+## 2026-08-09 — Final Role B completion
+
+**Summary:**
+- Role B finalized the RDT contract review and documentation updates for the final report.
+- `docs/report-parts/technical/05-data-channel-rdt.md` now explicitly documents the START → DATA/ACK → FIN/ACK trace and ABORT behavior.
+- `docs/api-contract.md` was updated to reflect the final contract review status.
+- `docs/report.md` was extended with requirement traceability and the final evidence summary.
+- `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md` now includes the Role B final checklist and task status.
+
+**Outcome:**
+- The final report, contract summary, and evidence capture are aligned with the implemented wire protocol.
+- The RDT documentation is now consistent with the 20-byte header, FLAG_START handshake, Go-Back-N window 4 behavior, FIN/ACK termination, and ABORT cancellation paths.
+- The final test evidence is recorded as `45 passed in 67.09s` for the RDT-focused suites and `199 passed in 96.72s` for the full regression.
+

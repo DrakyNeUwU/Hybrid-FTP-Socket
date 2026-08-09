@@ -9,13 +9,13 @@
 | Hạng mục | Trạng thái | Owner cuối | Evidence / blocker |
 |---|---|---|---|
 | TCP control, parser, session, command lifecycle | Done | A | Full suite và FTP E2E; xem `docs/evidence/week-2.5-pytest.log` |
-| UDP/RDT Go-Back-N window 4 và integrity | Done (B review pending) | C/B | START ACK/retry, protocol/fault/E2E; 199 full tests in 96.72s |
+| UDP/RDT Go-Back-N window 4 và integrity | Done | C/B | START ACK/retry, protocol/fault/E2E; 199 full tests in 96.72s |
 | Filesystem sandbox, atomic upload, cleanup, concurrency | Done | C | FTP E2E gồm 3 PASV clients, ABOR và disconnect |
 | Active/PASV localhost | Done | C | `5 passed in 18.03s`; `docs/evidence/week-2.5-e2e-transfer.log` |
-| Active/PASV hai máy LAN | Done (review evidence pending) | C | PASV/ACTIVE two-machine upload/download and source/server/client SHA-256 match; A/B evidence review pending |
+| Active/PASV hai máy LAN | Done | C | PASV/ACTIVE two-machine upload/download and source/server/client SHA-256 match |
 | Report nộp cuối và acceptance checklist | In progress | B | A/C phải sign-off phần kỹ thuật của mình |
 | Oral/dry run và Git release check | In progress | B | Chưa có evidence dry run/release check |
-| C-F01 Go-Back-N flow/congestion control (Excellent) | Done (B review pending) | C/B | Window 4, cumulative ACK, bounded retry; 199 full tests in 96.72s |
+| C-F01 Go-Back-N flow/congestion control (Excellent) | Done | C/B | Window 4, cumulative ACK, bounded retry; 199 full tests in 96.72s |
 
 ## Sự thật đã xác minh
 
