@@ -23,6 +23,7 @@
 - Chuyển PORT→PASV hoặc PASV→PORT thay thế endpoint cũ; `QUIT`/disconnect/shutdown reset toàn bộ data state trong `ClientHandler.cleanup()`.
 - Transfer command (`RETR`/`STOR`/`STOU`/`APPE`) chỉ gửi `150` khi có endpoint hợp lệ; thiếu → `425 Use PORT or PASV first`.
 - Endpoint do Role A quản lý trên TCP control; payload file đi UDP/RDT, `LIST`/`NLST` trả text qua TCP.
+- **ACTIVE UDP probe (fix LAN):** với Active Mode, client chưa gửi packet UDP nào trước khi server mở START cho RETR (NAT/firewall chưa mở luồng). Sau reply `150` RETR, server gửi một START probe zero-payload dùng đúng endpoint ACTIVE đã negotiation và transfer ID — mở state trên firewall/NAT mà không mang dữ liệu; sau đó luồng Go-Back-N bình thường. Không đổi header, TCP command/reply hay behavior sender.
 
 ## 7.4 Test / evidence
 
@@ -31,5 +32,6 @@
   - `docs/evidence/final-lan-pasv-sha256.txt`
   - `docs/evidence/final-lan-active-sha256.txt`
 - Log client/lifecycle: `docs/evidence/final-lan-pasv.log`, `docs/evidence/final-lan-active.log`, `docs/evidence/final-lan-pasv-server.log`.
+- ACTIVE download UDP probe: `python3 -m pytest tests/test_e2e_transfer.py::TestEndToEndPasvTransfer::test_active_upload_then_download_preserves_sha256 tests/test_cli_display.py -q` — **8 passed in 5.42s**; full regression **199 passed in 96.72s**.
 
 **DoD:** Bốn hướng transfer (Active/PASV × upload/download) pass với cleanup và không để endpoint stale.
