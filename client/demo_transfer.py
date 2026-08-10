@@ -28,6 +28,12 @@ def main() -> int:
     parser.add_argument("local_file", help="local file to upload")
     parser.add_argument("--remote", default=None, help="remote filename")
     parser.add_argument("--mode", choices=("PASV", "ACTIVE"), default="PASV")
+    parser.add_argument(
+        "--transfer-mode",
+        choices=("S", "B", "C"),
+        default="S",
+        help="FTP transmission mode: S=Stream, B=Block, C=Compressed",
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=2121)
     args = parser.parse_args()
@@ -37,17 +43,19 @@ def main() -> int:
         total_bytes = total if total is not None else transferred
         _print_console(render_progress_bar(f"{direction}: {filename}", transferred, total_bytes))
 
-    client = FTPClient(args.host, args.port, progress_callback=show_progress)
+    client = FTPClient(args.host, args.port, progress_callback=show_progress,
+                       transfer_mode=args.transfer_mode)
     try:
         _print_console(client.connect().strip())
         client.login()
+        _print_console(client.set_mode(args.transfer_mode).strip())
         if not client.upload_file(args.local_file, remote, mode=args.mode):
             _print_console("Upload failed")
             return 1
         if not client.download_file(remote, mode=args.mode):
             _print_console("Download failed")
             return 1
-        _print_console(f"Success: {args.mode} upload + download for {remote}")
+        _print_console(f"Success: {args.mode} {args.transfer_mode} upload + download for {remote}")
         return 0
     finally:
         client.close()

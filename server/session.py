@@ -17,8 +17,8 @@ class Session:
         self.rename_from = None
 
         # Transfer state
-        self.transfer_type = "I"   # mặc định binary
-        self.transfer_mode = "S"   # mặc định stream
+        self.transfer_type = "I"   # binary by default
+        self.transfer_mode = "S"   # stream by default
         self.data_host = None
         self.data_port = None
         self.data_socket = None

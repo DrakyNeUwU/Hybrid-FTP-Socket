@@ -1,35 +1,26 @@
 # 10. Testing Results
 
-**Trạng thái:** Hoàn thành evidence Role C; B chọn và embed artifact vào report.
-**Owner:** C. **Reviewer:** A/B.
-**Nguồn:** `tests/`, `../../requirement-checklist.md`, `../../evidence/`.
+Current full regression after the Role A implementation and C production audit:
+`python3 -m pytest -q` reported **271 passed, 357 subtests in 192.88s** (the
+post-handoff baseline was 205 passed in 103.08s). Focused Role C filesystem,
+transfer-manager, threaded-server and FTP E2E tests reported **24 passed in
+33.80s**. MODE-specific evidence: codec/command suite **83 passed, 338
+subtests**; transfer-manager mode integration **12 passed**; RDT fault
+injection over B/C-encoded payloads **19 passed, 11 subtests**; FTP E2E mode
+matrix **13 passed, 8 subtests**. Evidence is stored in
+`docs/evidence/final-code-fix-verification.md` and the curated LAN logs and
+SHA-256 artifacts. The additional production-review evidence is stored in
+`docs/evidence/role-a-production-review-2026-08-10.md`.
 
-## Automated verification
-
-| Command | Result | Coverage |
-|---|---:|---|
-| `python3 -m pytest tests/test_rdt.py -q` | 27 passed / 14.76s | Header, checksum, duplicate/reorder, window 4, START ACK retry |
-| RDT fault + transfer manager + FTP E2E | 22 passed / 70.44s | Loss, ACK loss, corruption, retry limit, atomic lifecycle, Active/PASV, ABOR/disconnect |
-| `python3 -m pytest tests/test_e2e_transfer.py -q` | 6 passed / 22.63s | STOU, APPE, HASH, TYPE và transfer matrix |
-| Focused C audit | 135 passed / 86.22s | Filesystem, RDT, fault, transfer, E2E, CLI |
-| `python3 -m pytest -q` | **199 passed / 96.72s** | Final WSL2 full regression |
-
-Exact commands và output được lưu tại
-`../../evidence/final-week-rdt-gbn-verification.md`.
-
-## Two-machine LAN verification
-
-Ngày 09/08/2026, server `172.18.0.48` và client `172.18.0.49` chạy PASV lẫn
-ACTIVE upload/download. Mỗi mode có SHA-256 source, FTP-root và downloaded
-client giống nhau (`b57b64b...ebb90934`).
-
-- PASV: `../../evidence/final-lan-pasv.log`, `final-lan-pasv-server.log`,
-  `final-lan-pasv-sha256.txt`.
-- ACTIVE: `../../evidence/final-lan-active.log`,
-  `final-lan-active-sha256.txt`.
-
-## Evidence selection
-
-Report cuối nên dùng full-regression log, một LAN hash table mỗi mode, một
-server lifecycle excerpt đã redact và screenshot PASV progress. ACTIVE server
-screenshot là artifact trình bày tùy chọn, không phải điều kiện functional pass.
+The test suite covers TCP commands, session isolation, filesystem-root safety,
+RDT checksum/retry/FIN/ABORT behavior, Active/PASV transfers, concurrent
+clients, cancellation, disconnect cleanup, CLI progress, log redaction, shared
+server filesystem locks, two-client same-file APPE without lost updates, and
+functional MODE S/B/C with PASV/ACTIVE SHA-256 round-trips, STOU/APPE codec
+paths, concurrent different-mode clients, logical-byte progress that never
+exceeds 100%, B/C payload recovery under loss/corruption/ACK-loss/duplicate/
+out-of-order, cancel and disconnect mid-block with the old file preserved, and
+server-stop mid-B-transfer cleanup. Strict authentication, buffered TCP replies,
+command-specific STAT/HELP/STOU behavior, atomic client downloads and MODE/TYPE
+mismatch rejection are now verified. Role B START-metadata review and Role A
+MODE B/C screenshots remain pending release evidence.

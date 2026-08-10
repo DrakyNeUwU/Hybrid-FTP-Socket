@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from common.RDTHeader import RDTHeader
+from common.rdt_context import decode_start_metadata, encode_start_metadata
 
 def make_data_packet(transfer_id: int, seq: int, payload: bytes, is_fin: bool = False) -> bytes:
     flags = RDTHeader.FLAG_FIN if is_fin else RDTHeader.FLAG_DATA
@@ -89,7 +90,7 @@ class TestRDTHeader(unittest.TestCase):
         self.assertNotEqual(
             hdr0.compute_checksum(payload),
             hdr1.compute_checksum(payload),
-            "Checksum phải cover seq_num trong header"
+            "Checksum must cover seq_num in the header"
         )
     def test_is_valid_flags_accepts_known_combinations(self):
         self.assertTrue(RDTHeader.is_valid_flags(RDTHeader.FLAG_DATA))
@@ -113,7 +114,7 @@ class TestRDTHeader(unittest.TestCase):
     def test_validate_length_overflow(self):
         hdr = RDTHeader(transfer_id=1, seq_num=0, ack_num=0,
                         flags=RDTHeader.FLAG_DATA, length=100)
-        packet = hdr.serialize() + b"short"  # length=100 nhưng chỉ 5 bytes payload
+        packet = hdr.serialize() + b"short"  # length=100 but only 5 payload bytes
         self.assertFalse(hdr.validate_length(packet))
 
     def test_validate_length_zero(self):
@@ -340,7 +341,7 @@ class TestRDTProtocolLogic(unittest.TestCase):
         t.join(timeout=3)
         pair.close()
 
-        self.assertEqual(received, [b"X"], f"Phải yield đúng 1 lần, thực tế: {received}")
+        self.assertEqual(received, [b"X"], f"Must yield exactly once; got: {received}")
 
     def test_out_of_order_dropped_then_recovered(self):
         from common.rdt_receiver import receive_chunks_rdt
@@ -602,6 +603,25 @@ class TestRDTProtocolLogic(unittest.TestCase):
         pair.close()
 
         self.assertEqual(received, [b"Valid"], "Receiver must ignore packets with invalid payload length")
+
+class TestStartMetadata(unittest.TestCase):
+    def test_roundtrip_carries_logical_size_mode_and_type(self):
+        payload = encode_start_metadata(1234, "C", "A")
+        self.assertEqual(decode_start_metadata(payload), (1234, "C", "A"))
+        self.assertEqual(len(payload), 10)
+
+    def test_invalid_mode_or_type_is_rejected(self):
+        with self.assertRaises(ValueError):
+            encode_start_metadata(1, "X", "I")
+        with self.assertRaises(ValueError):
+            encode_start_metadata(1, "S", "X")
+
+    def test_legacy_size_metadata_remains_detectable(self):
+        self.assertEqual(
+            decode_start_metadata(struct.pack("!Q", 42)),
+            (42, None, None),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

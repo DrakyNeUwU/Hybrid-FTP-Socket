@@ -1,102 +1,104 @@
 # Code Change History — Hybrid FTP
 
-Tài liệu này ghi lại các thay đổi theo tuần để dùng làm minh chứng tiến độ.
-Các trạng thái chỉ dựa trên code/test đã có, không thay thế demo end-to-end.
+This history records evidence-backed changes. It does not replace end-to-end
+demo evidence or `docs/project-status.md`.
 
-## Tuần 1 — Nền tảng và phân chia module
+## Week 1 — Foundation and module split
 
-| Role | Công việc | Kết quả |
+| Role | Work | Result |
 |---|---|---|
-| A | Tách TCP server, command parser, command handler và session | Có cấu trúc xử lý command theo từng client |
-| B | Tạo RDT header, sender/receiver cơ bản | Có sequence, ACK, checksum và FIN |
-| C | Xây filesystem helper/service và FTP root | Có xử lý file binary và path cơ bản |
+| A | Split TCP server, parser, command handler, and session | Per-client command-processing structure |
+| B | Created basic RDT header, sender, and receiver | Sequence, ACK, checksum, and FIN support |
+| C | Built filesystem helpers/service and FTP root | Binary-safe file handling and basic path safety |
 
-## Tuần 2 — Chức năng chính
+## Week 2 — Core functions
 
-| Role | Công việc | Kết quả |
+| Role | Work | Result |
 |---|---|---|
-| A | Bổ sung USER/PASS, directory command, PORT/PASV, RETR/STOR và reply | TCP command matrix được mở rộng |
-| B | Bổ sung retransmission, duplicate và checksum handling | RDT có stop-and-wait cơ bản |
-| C | Bổ sung root confinement, atomic upload và metadata | Filesystem không ghi trực tiếp ngoài FTP root |
+| A | Added login, directory commands, PORT/PASV, RETR/STOR, and replies | Expanded TCP command matrix |
+| B | Added retransmission, duplicate handling, and checksums | Basic Stop-and-Wait RDT |
+| C | Added root confinement, atomic upload, and metadata | Filesystem cannot write outside the FTP root |
 
-## Tuần 2.5 — Audit và sửa lỗi tích hợp
+## Week 2.5 and final week — Integration and verification
 
-| Role | Vấn đề phát hiện | Thay đổi đã thực hiện | Bằng chứng |
+The team added transfer guards, a shared `TransferContext`, strict RDT
+flag/length/checksum/peer/transfer-ID validation, bounded receiver timeouts,
+atomic failure/cancellation cleanup, Active/PASV end-to-end tests, concurrent
+PASV-client coverage, ABOR/disconnect cleanup, LAN endpoint configuration, CLI
+progress, server log redaction, total-size progress reporting, and Go-Back-N
+window four with START ACK/retry.
+
+Final evidence includes `python3 -m pytest -q` — **199 passed in 96.72s**,
+protocol/fault/E2E evidence, and two-machine LAN source/server/client SHA-256
+artifacts. See `docs/evidence/final-week-rdt-gbn-verification.md` and the
+curated files under `docs/evidence/`.
+
+## 10/08/2026 — Final A/C correctness pass
+
+| Role | Problem | Files / behavior changed | Verification |
 |---|---|---|---|
-| A | Transfer chồng nhau ghi đè session state | Thêm guard trả `450 Transfer already in progress` | Test Role A pass |
-| A/B | `TransferManager` truyền Event nhưng adapter cần context | Thêm `common/rdt_context.py` và truyền `TransferContext` | Adapter clean transfer pass |
-| B | Server còn dùng adapter RDT cũ | `server/rdt_adapter.py` chuyển thành compatibility export | Import dùng cùng implementation |
-| B | Header/ACK chưa kiểm tra chặt | Validate flags, length, checksum, peer, transfer ID và ACK sequence | Header/protocol 21/21 pass |
-| B | Out-of-order test làm crash do log Unicode | Đổi log runtime sang ASCII | Protocol test pass |
-| B | Receiver chờ vô hạn khi sender mất | Giới hạn receiver timeout mặc định | Max-retry test pass |
-| C | Filesystem lifecycle cần giữ nguyên khi RDT fail/cancel | Giữ `FilesystemService` làm nơi commit và cleanup | Transfer manager tests |
-| C | Cần evidence demo thật cho tích hợp | Chạy Active upload + download bằng `client.demo_transfer` | Client nhận 220 và `Success: ACTIVE upload + download` |
-| C | Cần xác nhận hai data modes | Chạy PASV demo thủ công sau Active | Người chạy demo xác nhận PASV pass; giữ hash/video để nộp |
-| C | Cần evidence integrity cho hai mode | Lưu SHA-256 source/server/download cho Active và PASV | Hai file trong `docs/evidence/` có ba hash trùng khớp mỗi mode |
-| A/C | Full suite WSL2 có 3 test fail | Sửa TCP/IP address fallback và thay test debug ECHO bằng FTP `NOOP` | `python3 -m pytest -q`: 186 passed in 104.09s; log lưu trong `docs/evidence/` |
-| C | Chưa có bằng chứng transfer đa client | Thêm test 3 client PASV đồng thời, download directory riêng cho mỗi client và kiểm tra hash source/server/client | Test riêng: 1 passed in 5.34s; toàn bộ E2E: 3 passed in 15.47s; logs `docs/evidence/week-2.5-three-client.log`, `week-2.5-e2e-transfer.log` |
-| C | ABOR/disconnect chưa được chứng minh giữa transfer | Map `RuntimeError` từ RDT sang `TransferResult(426)`; thêm PASV upload chờ UDP rồi ABOR/disconnect, kiểm tra `.part`, file cũ và session registry | E2E: 5 passed in 18.03s; full WSL2: 189 passed in 113.94s; `docs/evidence/week-2.5-*.log` |
-| C | Server chỉ có entry point localhost, PASV LAN có thể quảng bá sai IP | Thêm `--host`, `--port`, `--ftp-root`, `--advertise-host`; session ưu tiên địa chỉ quảng bá cấu hình | `python3 -m server.threaded_server --help`; threaded + E2E: 10 passed in 21.56s |
-| C | `tuan-2.5-fix.md` trộn audit cũ với trạng thái mới, tạo checklist mâu thuẫn | Viết lại thành checklist hiện tại theo Role A/B/C, dependency, DoD và evidence links | Review đối chiếu full pytest 189 passed, E2E 5 passed và các evidence đã lưu |
-| A/B/C | LIST/NLST bị để thành dependency dù đề chỉ yêu cầu command/reply TCP | Đối chiếu đề §1.1–1.2, §2.2–2.3 và chốt listing là TCP textual result; UDP chỉ mang file payload | `docs/api-contract.md` §6.1; command tests và full pytest 189 passed |
-| C | CLI progress chỉ là UI helper; server chưa có lifecycle log đủ để demo | Nối RDT progress vào `FTPClient`/demo; log IP, command redact, reply, session/transfer, table, mode/bytes/result | 62 focused tests passed in 22.16s; full pytest 189 passed in 102.50s |
-| C | Download progress coi mỗi chunk là 100% vì RETR sender không biết tổng file size | Thêm `TransferContext.total_bytes`; TransferManager lấy size đã validate và sender đưa vào RDT START | E2E 5 passed in 17.61s; full pytest 189 passed in 106.91s |
-| C | Cần evidence trực quan cho progress/server observability | Người chạy demo PASV lưu screenshot server log, progress 0→100% và success dưới `docs/evidence/screenshots/` | User confirmation 08/08/2026; text logs/hash đã lưu trong `docs/evidence/` |
+| A | Unknown users could authenticate; STAT/HELP/STOU semantics were incomplete | Strict credential matching, path STAT, command HELP, STOU argument rejection | Command/framing focused suite |
+| A | TCP client assumed one `recv()` equaled one reply; legacy modules failed clean imports | Buffered CRLF/multiline/listing replies; removed unused broken modules | FTP client tests, import smoke and compileall |
+| C | Per-client filesystem services did not share path locks | Server-owned `FilesystemService`; all handlers borrow one lock registry | Same-file two-client APPE and handler identity tests |
+| C | Active-session snapshot was emitted before handler start | Start handler before connection/session snapshot | Active sessions report `alive=True` |
 
-## Trạng thái kiểm chứng hiện tại — 08/08/2026
+Final verification: `python3 -m pytest -q` — **212 passed, 28 subtests passed
+in 97.52s**. Detailed evidence: `docs/evidence/final-code-fix-verification.md`.
 
-- Role A regression: **52 tests pass**.
-- RDT header/protocol logic: **21 tests pass**.
-- RDT fault injection + adapter fault injection: **14 tests pass**.
-- Localhost TCP + UDP/RDT integration: **2 tests pass** (Active/PASV upload,
-  download, and SHA-256 comparison).
-- Tổng các nhóm đã chạy: **87 test pass**; một số test có cảnh báo resource
-  từ test cũ nhưng không fail.
-- Full pytest trên WSL2/Linux: **189 passed in 113.94s**; log đã lưu trong
-  `docs/evidence/week-2.5-pytest.log`.
-- Active/PASV localhost đã có test và demo; 3 client PASV đồng thời,
-  ABOR/disconnect đang chờ UDP đã có evidence end-to-end. Demo khác máy vẫn
-  chưa có bằng chứng.
+## 10/08/2026 — MODE S/B/C negotiation completion
 
-## Cách dùng làm minh chứng
+| Role | Problem | Files / behavior changed | Verification |
+|---|---|---|---|
+| A | MODE B/C returned 502 although the required command surface lists S/B/C | Accept S/B/C on TCP and keep selected mode per session | Command state, auth, invalid-input and session-isolation tests |
+| C | MODE change needed integration proof without changing RDT contract | Added upload after MODE B and download after MODE C using the common RDT path | Focused 61 passed + 28 subtests; SHA-256 E2E assertion |
 
-Khi nộp báo cáo, đính kèm:
+Final verification: `python3 -m pytest -q` — **213 passed, 28 subtests passed
+in 108.71s**. The RDT 20-byte header, flags and Go-Back-N behavior are unchanged.
 
-1. File này để chứng minh lịch sử thay đổi.
-2. `docs/project-status.md` để chứng minh trạng thái hiện tại.
-3. `docs/api-contract.md` để chứng minh contract A–B–C.
-4. Output các lệnh test ở phần hướng dẫn chạy trong câu trả lời bàn giao.
+## 10/08/2026 — Role A final-fix reverted for owner handoff
 
-Không ghi “hoàn thành toàn bộ” cho Active/PASV hoặc FTP end-to-end nếu chưa có
-log client/server và hash nguồn/đích.
+| Role | Decision | Current result | Verification |
+|---|---|---|---|
+| A | Revert AI-applied auth/STAT/HELP/STOU, TCP reply framing, legacy cleanup and MODE B/C changes | Tasks returned to Role A; current MODE B/C reply is 502 | Fresh A implementation/evidence pending |
+| C | Retain shared filesystem locks, thread/session ordering and transfer integration | C production path remains verified | Focused 24 passed in 33.80s |
 
-## 09/08/2026 — Final-week documentation source-of-truth consolidation
+Current post-handoff full regression: **205 passed in 103.08s**. Earlier
+212/213-test records above describe superseded code and must not be used as the
+current release claim.
 
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| C (documentation integration) | Nhiều file trạng thái/report cũ mâu thuẫn với full regression và FTP E2E đã có | `README.md`, `docs/project-status.md`, `docs/requirement-checklist.md`, `planning/`, `docs/report-parts/`, tài liệu tuần và final-week plan | Chỉ định một status hiện hành và một checklist acceptance; tổ chức planning thành requirement/ownership, status navigation và weekly plans; tổ chức report drafts thành technical/submission; cập nhật README theo commands và tài liệu hiện tại. `docs/report.md` được để nguyên cho Role B hoàn thiện. | Đối chiếu `189 passed in 106.91s`, FTP E2E `5 passed in 18.03s`, hash Active/PASV; kiểm tra Git và tìm stale claims trong tài liệu hiện hành |
+## 10/08/2026 — Role C oral guide and evidence refresh
 
-## 09/08/2026 — Role C Go-Back-N Excellent RDT lifecycle
+| Role | Problem | Files / behavior changed | Verification |
+|---|---|---|---|
+| C | Oral material had to follow the live rubric/code and avoid filling unimplemented features from stale docs | Added a reproducible 20-section Vietnamese Word guide; its MODE B/C notes reflected the pre-pull handoff baseline and must be refreshed against the implementation below | Focused Role C suite: 24 passed in 31.37s; final Word render: 19/19 pages visually inspected |
 
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| C, with B wire-contract review pending | Sender was Stop-and-Wait and START metadata had no ACK/retry | `common/rdt_context.py`, `common/rdt_sender.py`, `common/rdt_receiver.py`, `tests/test_rdt.py`, Role C/status/contract docs | Implement bounded, streaming-safe Go-Back-N window 4, cumulative ACK, finite START retry and maintain atomic cleanup without changing header or TCP command interfaces | WSL2: final focused 50 passed in 85.01s; full suite 192 passed in 93.06s; `docs/evidence/final-week-rdt-gbn-verification.md` |
-| C | Windows CP1252 output crashed during ACTIVE progress; server-initiated ACTIVE RETR UDP traffic could be blocked until the client created state | `client/demo_transfer.py`, `client/ftp_client.py`, `tests/test_cli_display.py`, evidence/status docs | Make progress output encoding-safe and send zero-payload START probes before `RETR` and after `150`, without changing TCP or RDT header contracts | WSL2 full regression: 199 passed in 96.72s; physical LAN PASV and ACTIVE upload/download both succeeded with matching source/server/client SHA-256 |
+This documentation-only change did not alter production code, public APIs or
+the RDT wire format. The later Role A integration below supersedes the oral
+guide's earlier MODE B/C pending note.
 
-## 09/08/2026 — Role C report-component migration
+## 10/08/2026 — Role A functional MODE S/B/C (post-handoff)
 
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| C | Week 2 Role C document duplicated integration/evidence material needed by report components | `docs/report-parts/technical/01,03,06,08,09`, `docs/report-parts/submission/10–13`, checklist/status/contract docs; removed `docs/role-c-week-2.md` | Move ownership-scoped technical narrative and final evidence into the report workspace; preserve one evidence-backed source per report component | Cross-check against final verification: 199 full tests, 6 expanded E2E, LAN PASV/ACTIVE SHA-256 artifacts; link and diff audit pending handoff |
+| Role | Problem | Files / behavior changed | Verification |
+|---|---|---|---|
+| A | Handoff left MODE as negotiation-only; B/C had no codec | `common/mode_codec.py` (Stream passthrough, RFC-959 Block, FTP RLE Compressed, streaming); `server/command_handler.py` `mode_cmd` (200/501/530, per-session); `server/transfer_manager.py` TransferContext mode, encode-before-RDT/decode-after-RDT, atomic `.part` kept | `tests/test_mode_codec.py`, `tests/test_commands.py` |
+| A | Wire chunks must fit the RDT/receiver budget | `encode_chunks` batches Block and Compressed output to ≤1024-byte wire chunks; decoders buffer split headers/runs | `test_wire_chunks_never_exceed_budget`, one-byte-at-a-time decode tests |
+| A | Client must negotiate once and count logical progress | `client/ftp_client.py` `_negotiated_mode`/`_ensure_transfer_mode`; `common/rdt_sender.py` and `common/rdt_receiver.py` report logical (decoded) bytes so progress never exceeds 100% | `tests/test_e2e_transfer.py::test_mode_progress_counts_logical_bytes` |
+| A | B/C-encoded payloads must survive RDT faults and malformed streams must not commit partial files | Added mode-aware adapter fault tests (loss/corrupt/ACK-loss/duplicate/out-of-order); malformed stream → 426 with old file intact and no `.part`; cancel/disconnect mid-block tests | `tests/test_rdt_fault_injection.py`, `tests/test_transfer_manager.py` |
+| A | PASV/ACTIVE × S/B/C must round-trip unchanged | E2E matrix, STOU/APPE block codec, concurrent different-mode clients, server-stop mid-B-transfer cleanup | `tests/test_e2e_transfer.py` |
 
-## 09/08/2026 — Remove role-week-2 sources and repair report references
+## 10/08/2026 — C production audit of A-owned control/MODE path
 
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| A/B/C documentation | Role A/B/C Week 2 documents were intentionally removed, leaving report-part source links broken; contribution matrix also duplicated merge content | Report parts 02, 04, 05, 07, 11 and 14 | Use surviving requirement, API contract and evidence files as canonical sources; make LIST/NLST documentation match the TCP-only contract; consolidate contribution ownership | Reference search and `git diff --check` run after the edit |
+| Role | Problem | Files / behavior changed | Verification |
+|---|---|---|---|
+| A owner; C reviewer/fixer | Raw MODE could desynchronize client/server and silently decode valid-looking bytes with the wrong codec | FTPClient tracks successful raw/convenience MODE/TYPE; START payload carries logical size + MODE + TYPE and rejects mismatch with `426`; 20-byte RDT header unchanged | Crafted mismatch E2E returns `426`; E2E 14 passed + 8 subtests |
+| A owner; C reviewer/fixer | Malformed client download deleted an existing destination; TCP client assumed one `recv()` per reply | Same-directory atomic `.part` + `os.replace`; persistent CRLF/multiline/listing reply buffer | `tests/test_ftp_client.py`; targeted 140 passed + 338 subtests |
+| A owner; C reviewer/fixer | Unknown-user password fallback, STAT/HELP argument handling, STOU syntax and broken legacy modules contradicted the command contract | Strict credential lookup, filesystem-backed STAT, command-specific HELP, early STOU validation; removed unreferenced broken legacy modules | Command/compile/import checks; full 271 passed + 357 subtests in 192.88s |
+| A/C/B shared | MODE C filler and transfer logging did not distinguish representation/logical bytes | TYPE A space filler, TYPE I NUL filler; RETR result logs logical size | Codec golden tests, transfer-manager assertions, fault 19 passed + 11 subtests |
 
-## 09/08/2026 — Final-week plan aligned to the report workspace
+The randomized full run initially had one MODE-B loss/corruption subtest exceed
+its retry limit. The isolated rerun passed, followed by a complete all-green
+run. Role B START-payload review and Role A screenshots remain pending.
 
-| Role owner | Problem | Files changed | Reason | Verification evidence |
-|---|---|---|---|---|
-| C (documentation integration) | Final-week actions still named deleted Role Week 2 files and did not distinguish the requirement-mapping draft from the current project status | `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md` | Point B/C work to the report-parts workspace; define `submission/14` as mapping/reference only, with final claims sourced from project status and the acceptance checklist | Manual path/reference review; `git diff --check` passed |
+Final verification: `python3 -m pytest -q` — **256 passed, 357 subtests passed
+in 167.08s**. The RDT 20-byte header, flags and Go-Back-N behavior are unchanged
+(RDT progress reporting order was adjusted only for logical-byte accounting).

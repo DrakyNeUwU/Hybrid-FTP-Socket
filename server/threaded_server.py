@@ -9,6 +9,7 @@ import time
 
 from server.client_handler import ClientHandler
 from server.logging_utils import redact_command as _redact_command, safe_log
+from common.filesystem_service import FilesystemService
 
 
 
@@ -19,11 +20,11 @@ class FTPServer:
     """
     TCP Control Server.
     
-    Nhiệm vụ:
-    - listen TCP
-    - accept client
-    - tạo ClientHandler thread
-    - quản lý session
+    Responsibilities:
+    - listen for TCP connections
+    - accept clients
+    - create ClientHandler threads
+    - manage sessions
     """
 
 
@@ -38,8 +39,13 @@ class FTPServer:
 
         self.host = host
         self.port = port
-        self.ftp_root = ftp_root
+        self.ftp_root = os.path.abspath(ftp_root)
         self.advertised_host = advertised_host
+
+        # One service per FTP server is required so path locks coordinate file
+        # operations across all client sessions, not only within one client.
+        os.makedirs(self.ftp_root, exist_ok=True)
+        self.filesystem_service = FilesystemService(self.ftp_root)
 
 
         self.server_socket = None
@@ -48,7 +54,7 @@ class FTPServer:
         self.is_running = False
 
 
-        # danh sách client đang kết nối
+        # Connected clients.
 
         self.active_clients = []
 
@@ -57,7 +63,7 @@ class FTPServer:
 
 
 
-        # tạo session id
+        # Generate session IDs.
 
         self._session_ids = itertools.count(1)
 
@@ -131,15 +137,14 @@ class FTPServer:
                     handler
                 )
 
+                handler.start()
+
                 safe_log(
                     f"Client connected session={handler.session_id} "
                     f"ip={client_addr[0]}:{client_addr[1]} "
                     f"active={self.get_active_client_count()}"
                 )
                 safe_log(f"Active sessions={self.get_active_sessions()}")
-
-
-                handler.start()
 
 
 

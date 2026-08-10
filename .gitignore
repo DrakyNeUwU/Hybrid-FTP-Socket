@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+.pytest_cache/
 .venv/
 venv/
 env/
@@ -35,6 +36,7 @@ AGENTS.md
 # File phân chia công việc — chỉ dùng nội bộ nhóm, không nộp
 Socket Role.md
 tuan-1-chi-tiet-socket.md
+RoleC
 
 # Planning documents are shared project artifacts and must be tracked.
 !planning/Socket Role.md

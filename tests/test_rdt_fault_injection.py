@@ -16,12 +16,16 @@ class NetworkProxy(threading.Thread):
         drop_rate: float = 0.0,
         corrupt_rate: float = 0.0,
         drop_ack_rate: float = 0.0,
+        dup_rate: float = 0.0,
+        ooo_rate: float = 0.0,
     ):
         super().__init__(daemon=True)
         self.target_port = target_port
         self.drop_rate = drop_rate
         self.corrupt_rate = corrupt_rate
         self.drop_ack_rate = drop_ack_rate
+        self.dup_rate = dup_rate
+        self.ooo_rate = ooo_rate
         self.running = True
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -30,6 +34,18 @@ class NetworkProxy(threading.Thread):
         self.sock.settimeout(0.3)
 
         self._client_map: dict[int, tuple] = {}
+        self._pending: tuple[bytes, tuple] | None = None
+
+    def _deliver(self, data: bytes, dest: tuple) -> None:
+        if self.corrupt_rate > 0 and random.random() < self.corrupt_rate:
+            if len(data) > 10:
+                ba = bytearray(data)
+                ba[-1] ^= 0xFF
+                data = bytes(ba)
+        try:
+            self.sock.sendto(data, dest)
+        except OSError:
+            pass
 
     def run(self) -> None:
         while self.running:
@@ -50,23 +66,29 @@ class NetworkProxy(threading.Thread):
                 if not self._client_map:
                     continue
                 dest = next(iter(self._client_map.values()))
-                
+
                 if random.random() < self.drop_ack_rate:
                     continue
-               
+
                 if random.random() < self.drop_rate:
                     continue
 
-            if self.corrupt_rate > 0 and random.random() < self.corrupt_rate:
-                if len(data) > 10:
-                    ba = bytearray(data)
-                    ba[-1] ^= 0xFF
-                    data = bytes(ba)
+            if not from_receiver:
+                # Out-of-order injection: hold this packet and deliver it only
+                # after the next one arrives, so the receiver sees a gap.
+                if self._pending is not None:
+                    pending_data, pending_dest = self._pending
+                    self._pending = None
+                    self._deliver(pending_data, pending_dest)
+                    self._deliver(data, dest)
+                    continue
+                if self.ooo_rate > 0 and random.random() < self.ooo_rate:
+                    self._pending = (data, dest)
+                    continue
 
-            try:
-                self.sock.sendto(data, dest)
-            except OSError:
-                break
+            if self.dup_rate > 0 and random.random() < self.dup_rate:
+                self._deliver(data, dest)
+            self._deliver(data, dest)
 
     def stop(self) -> None:
         self.running = False
@@ -88,12 +110,16 @@ class _SimpleContext:
         timeout_seconds: float = 0.5,
         retry_limit: int = 15,
         max_timeouts: int = 20,
+        transfer_mode: str = "S",
+        transfer_type: str = "I",
     ):
         self.transfer_id = transfer_id
         self.timeout_seconds = timeout_seconds
         self.retry_limit = retry_limit
         self.max_timeouts = max_timeouts
         self.cancel_event = threading.Event()
+        self.transfer_mode = transfer_mode
+        self.transfer_type = transfer_type
 
 def _run_transfer(
     src_path: str,
@@ -150,10 +176,12 @@ def _run_transfer_adapter(
     drop_rate: float = 0.0,
     corrupt_rate: float = 0.0,
     drop_ack_rate: float = 0.0,
+    dup_rate: float = 0.0,
+    ooo_rate: float = 0.0,
     timeout: float = 20.0,
     retry_limit: int = 15,
 ) -> tuple[bool, bool]:
- 
+  
     transfer_id = random.randint(1, 0xFFFFFFFF)
 
     rec_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -166,12 +194,14 @@ def _run_transfer_adapter(
     proxy: NetworkProxy | None = None
     dest_port = receiver_port
 
-    if drop_rate > 0 or corrupt_rate > 0 or drop_ack_rate > 0:
+    if drop_rate > 0 or corrupt_rate > 0 or drop_ack_rate > 0 or dup_rate > 0 or ooo_rate > 0:
         proxy = NetworkProxy(
             target_port=receiver_port,
             drop_rate=drop_rate,
             corrupt_rate=corrupt_rate,
             drop_ack_rate=drop_ack_rate,
+            dup_rate=dup_rate,
+            ooo_rate=ooo_rate,
         )
         proxy.start()
         dest_port = proxy.listen_port
@@ -226,6 +256,90 @@ def _run_transfer_adapter(
     recv_ok = bool(recv_ok_flag) and os.path.exists(dst_path)
     return send_ok, recv_ok
 
+def _run_transfer_adapter_mode(
+    src_path: str,
+    dst_path: str,
+    mode: str,
+    drop_rate: float = 0.0,
+    corrupt_rate: float = 0.0,
+    drop_ack_rate: float = 0.0,
+    dup_rate: float = 0.0,
+    ooo_rate: float = 0.0,
+    timeout: float = 20.0,
+    retry_limit: int = 15,
+) -> tuple[bool, bool]:
+    """Production-shaped transfer: MODE encoder before RDT, decoder after RDT."""
+    from common.mode_codec import decode_chunks, encode_chunks
+
+    transfer_id = random.randint(1, 0xFFFFFFFF)
+
+    rec_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    rec_sock.bind(("127.0.0.1", 0))
+    receiver_port = rec_sock.getsockname()[1]
+
+    send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    send_sock.bind(("127.0.0.1", 0))
+
+    proxy: NetworkProxy | None = None
+    dest_port = receiver_port
+
+    if drop_rate > 0 or corrupt_rate > 0 or drop_ack_rate > 0 or dup_rate > 0 or ooo_rate > 0:
+        proxy = NetworkProxy(
+            target_port=receiver_port,
+            drop_rate=drop_rate,
+            corrupt_rate=corrupt_rate,
+            drop_ack_rate=drop_ack_rate,
+            dup_rate=dup_rate,
+            ooo_rate=ooo_rate,
+        )
+        proxy.start()
+        dest_port = proxy.listen_port
+
+    endpoint = _SimpleEndpoint("127.0.0.1", dest_port)
+    ctx_send = _SimpleContext(
+        transfer_id, retry_limit=retry_limit, transfer_mode=mode
+    )
+    ctx_recv = _SimpleContext(transfer_id, transfer_mode=mode)
+
+    recv_ok_flag: list[bool] = []
+
+    def _recv():
+        try:
+            wire_chunks = RDTReceiverAdapter().receive(rec_sock, endpoint, ctx_recv)
+            write_file_from_chunks(dst_path, decode_chunks(wire_chunks, mode))
+            recv_ok_flag.append(True)
+        except RuntimeError:
+            pass
+
+    rec_thread = threading.Thread(target=_recv, daemon=True)
+    rec_thread.start()
+    time.sleep(0.05)
+
+    send_ok = False
+    try:
+        encoded_chunks = encode_chunks(read_file_chunks(src_path), mode)
+        RDTSenderAdapter().send(encoded_chunks, send_sock, endpoint, ctx_send)
+        send_ok = True
+    except RuntimeError:
+        pass
+
+    rec_thread.join(timeout=timeout)
+
+    if proxy:
+        proxy.stop()
+
+    try:
+        send_sock.close()
+    except OSError:
+        pass
+    try:
+        rec_sock.close()
+    except OSError:
+        pass
+
+    recv_ok = bool(recv_ok_flag) and os.path.exists(dst_path)
+    return send_ok, recv_ok
+
 class TestRDTFaultInjection(unittest.TestCase):
 
     TEST_DIR = os.path.dirname(__file__)
@@ -249,22 +363,22 @@ class TestRDTFaultInjection(unittest.TestCase):
 
     def test_clean_transfer_sha256(self):
         send_ok, recv_ok = _run_transfer(self.test_src, self.test_dst)
-        self.assertTrue(send_ok, "Sender báo fail")
-        self.assertTrue(recv_ok, "Receiver báo fail")
+        self.assertTrue(send_ok, "Sender reported failure")
+        self.assertTrue(recv_ok, "Receiver reported failure")
         self.assertTrue(os.path.exists(self.test_dst))
         self.assertEqual(self.src_hash, compute_hash(self.test_dst),
-                         "SHA-256 không khớp sau transfer sạch")
+                         "SHA-256 does not match after a clean transfer")
 
     def test_packet_loss_recovery(self):
         send_ok, recv_ok = _run_transfer(self.test_src, self.test_dst, drop_rate=0.15)
-        self.assertTrue(send_ok, "Sender fail khi có drop 15%")
-        self.assertTrue(recv_ok, "Receiver fail khi có drop 15%")
+        self.assertTrue(send_ok, "Sender failed with 15% packet loss")
+        self.assertTrue(recv_ok, "Receiver failed with 15% packet loss")
         self.assertEqual(self.src_hash, compute_hash(self.test_dst))
 
     def test_corruption_recovery(self):
         send_ok, recv_ok = _run_transfer(self.test_src, self.test_dst, corrupt_rate=0.10)
-        self.assertTrue(send_ok, "Sender fail khi có corrupt 10%")
-        self.assertTrue(recv_ok, "Receiver fail khi có corrupt 10%")
+        self.assertTrue(send_ok, "Sender failed with 10% corruption")
+        self.assertTrue(recv_ok, "Receiver failed with 10% corruption")
         self.assertEqual(self.src_hash, compute_hash(self.test_dst))
 
     def test_loss_and_corruption_recovery(self):
@@ -322,8 +436,8 @@ class TestRDTFaultInjection(unittest.TestCase):
                 is_cancelled=lambda: True,
             )
             elapsed = time.time() - start
-            self.assertFalse(result, "Sender phải trả False khi bị cancel")
-            self.assertLess(elapsed, 3.0, "Cancel phải dừng nhanh, không timeout hết")
+            self.assertFalse(result, "Sender must return False when cancelled")
+            self.assertLess(elapsed, 3.0, "Cancellation must stop promptly, not exhaust the timeout")
         finally:
             rec_sock.close()
 
@@ -333,8 +447,8 @@ class TestRDTFaultInjection(unittest.TestCase):
             drop_ack_rate=0.20,
             retry_limit=20,
         )
-        self.assertTrue(send_ok, "Sender fail khi mất ACK 20%")
-        self.assertTrue(recv_ok, "Receiver fail khi mất ACK 20%")
+        self.assertTrue(send_ok, "Sender failed with 20% ACK loss")
+        self.assertTrue(recv_ok, "Receiver failed with 20% ACK loss")
         self.assertEqual(self.src_hash, compute_hash(self.test_dst))
 
     def test_max_retry_exhausted_is_finite(self):
@@ -346,8 +460,8 @@ class TestRDTFaultInjection(unittest.TestCase):
             timeout=10.0,
         )
         elapsed = time.time() - start
-        self.assertFalse(send_ok, "Sender phải fail khi drop 100%")
-        self.assertLess(elapsed, 8.0, "Phải kết thúc hữu hạn, không treo")
+        self.assertFalse(send_ok, "Sender must fail with 100% packet loss")
+        self.assertLess(elapsed, 8.0, "Must finish in finite time without hanging")
 
 class TestRDTAdapterFaultInjection(unittest.TestCase):
     TEST_DIR = os.path.dirname(__file__)
@@ -371,8 +485,8 @@ class TestRDTAdapterFaultInjection(unittest.TestCase):
 
     def test_adapter_clean_transfer_sha256(self):
         send_ok, recv_ok = _run_transfer_adapter(self.test_src, self.test_dst)
-        self.assertTrue(send_ok, "Adapter sender báo fail")
-        self.assertTrue(recv_ok, "Adapter receiver báo fail")
+        self.assertTrue(send_ok, "Adapter sender reported failure")
+        self.assertTrue(recv_ok, "Adapter receiver reported failure")
         self.assertEqual(self.src_hash, compute_hash(self.test_dst))
 
     def test_adapter_packet_loss_recovery(self):
@@ -421,7 +535,7 @@ class TestRDTAdapterFaultInjection(unittest.TestCase):
 
         endpoint = _SimpleEndpoint("127.0.0.1", dest_port)
         ctx = _SimpleContext(transfer_id, retry_limit=5)
-        ctx.cancel_event.set()  # cancel ngay từ đầu
+        ctx.cancel_event.set()  # cancel immediately
 
         try:
             start = time.time()
@@ -433,10 +547,103 @@ class TestRDTAdapterFaultInjection(unittest.TestCase):
                     ctx,
                 )
             elapsed = time.time() - start
-            self.assertLess(elapsed, 3.0, "Cancel phải dừng nhanh")
+            self.assertLess(elapsed, 3.0, "Cancellation must stop promptly")
         finally:
             rec_sock.close()
             send_sock.close()
+
+    def test_adapter_mode_clean_sha256(self):
+        for mode in ("S", "B", "C"):
+            with self.subTest(mode=mode):
+                dst = self._path(f"_adp_mode_{mode}_dst.dat")
+                try:
+                    send_ok, recv_ok = _run_transfer_adapter_mode(
+                        self.test_src, dst, mode, timeout=10.0
+                    )
+                    self.assertTrue(send_ok)
+                    self.assertTrue(recv_ok)
+                    self.assertEqual(self.src_hash, compute_hash(dst))
+                finally:
+                    if os.path.exists(dst):
+                        os.remove(dst)
+
+    def test_adapter_mode_loss_and_corruption_recovery(self):
+        """B/C encoded payloads must survive RDT loss/corruption and decode back."""
+        for mode in ("B", "C"):
+            with self.subTest(mode=mode):
+                dst = self._path(f"_adp_mode_{mode}_fault_dst.dat")
+                try:
+                    send_ok, recv_ok = _run_transfer_adapter_mode(
+                        self.test_src, dst, mode,
+                        drop_rate=0.15, corrupt_rate=0.10,
+                        retry_limit=20, timeout=25.0,
+                    )
+                    self.assertTrue(send_ok, f"Sender failed for mode {mode}")
+                    self.assertTrue(recv_ok, f"Receiver failed for mode {mode}")
+                    self.assertEqual(
+                        self.src_hash, compute_hash(dst),
+                        f"SHA-256 mismatch for mode {mode} under faults",
+                    )
+                finally:
+                    if os.path.exists(dst):
+                        os.remove(dst)
+
+    def test_adapter_mode_ack_loss_recovery(self):
+        for mode in ("B", "C"):
+            with self.subTest(mode=mode):
+                dst = self._path(f"_adp_mode_{mode}_ack_dst.dat")
+                try:
+                    send_ok, recv_ok = _run_transfer_adapter_mode(
+                        self.test_src, dst, mode,
+                        drop_ack_rate=0.20,
+                        retry_limit=20, timeout=25.0,
+                    )
+                    self.assertTrue(send_ok)
+                    self.assertTrue(recv_ok)
+                    self.assertEqual(self.src_hash, compute_hash(dst))
+                finally:
+                    if os.path.exists(dst):
+                        os.remove(dst)
+
+    def test_adapter_mode_duplicate_recovery(self):
+        for mode in ("B", "C"):
+            with self.subTest(mode=mode):
+                dst = self._path(f"_adp_mode_{mode}_dup_dst.dat")
+                try:
+                    send_ok, recv_ok = _run_transfer_adapter_mode(
+                        self.test_src, dst, mode,
+                        dup_rate=0.20,
+                        retry_limit=20, timeout=25.0,
+                    )
+                    self.assertTrue(send_ok, f"Sender failed for mode {mode}")
+                    self.assertTrue(recv_ok, f"Receiver failed for mode {mode}")
+                    self.assertEqual(
+                        self.src_hash, compute_hash(dst),
+                        f"SHA-256 mismatch for mode {mode} with duplicates",
+                    )
+                finally:
+                    if os.path.exists(dst):
+                        os.remove(dst)
+
+    def test_adapter_mode_out_of_order_recovery(self):
+        for mode in ("B", "C"):
+            with self.subTest(mode=mode):
+                dst = self._path(f"_adp_mode_{mode}_ooo_dst.dat")
+                try:
+                    send_ok, recv_ok = _run_transfer_adapter_mode(
+                        self.test_src, dst, mode,
+                        ooo_rate=0.20,
+                        retry_limit=20, timeout=25.0,
+                    )
+                    self.assertTrue(send_ok, f"Sender failed for mode {mode}")
+                    self.assertTrue(recv_ok, f"Receiver failed for mode {mode}")
+                    self.assertEqual(
+                        self.src_hash, compute_hash(dst),
+                        f"SHA-256 mismatch for mode {mode} with reordering",
+                    )
+                finally:
+                    if os.path.exists(dst):
+                        os.remove(dst)
 
 if __name__ == "__main__":
     unittest.main()

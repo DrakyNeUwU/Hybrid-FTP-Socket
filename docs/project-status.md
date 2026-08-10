@@ -1,37 +1,43 @@
 # Project Status — Hybrid FTP
 
-**Nguồn trạng thái duy nhất:** tài liệu này.
-**Ngày cập nhật:** 09/08/2026
-**Mục tiêu hiện tại:** hoàn tất *must-submit* trước; C-F01 Excellent chỉ bắt đầu sau khi mọi gate bắt buộc xanh.
+**Source of truth for current status.**
+**Updated:** 10/08/2026
 
-## Dashboard hiện tại
-
-| Hạng mục | Trạng thái | Owner cuối | Evidence / blocker |
+| Item | Status | Final owner | Evidence / blocker |
 |---|---|---|---|
-| TCP control, parser, session, command lifecycle | Done | A | Full suite và FTP E2E; xem `docs/evidence/week-2.5-pytest.log` |
-| UDP/RDT Go-Back-N window 4 và integrity | Done | C/B | START ACK/retry, protocol/fault/E2E; 199 full tests in 96.72s |
-| Filesystem sandbox, atomic upload, cleanup, concurrency | Done | C | FTP E2E gồm 3 PASV clients, ABOR và disconnect |
-| Active/PASV localhost | Done | C | `5 passed in 18.03s`; `docs/evidence/week-2.5-e2e-transfer.log` |
-| Active/PASV hai máy LAN | Done | C | PASV/ACTIVE two-machine upload/download and source/server/client SHA-256 match |
-| Report nộp cuối và acceptance checklist | In progress | B | A/C phải sign-off phần kỹ thuật của mình |
-| Oral/dry run và Git release check | In progress | B | Chưa có evidence dry run/release check |
-| C-F01 Go-Back-N flow/congestion control (Excellent) | Done | C/B | Window 4, cumulative ACK, bounded retry; 199 full tests in 96.72s |
+| TCP control, parser, session, command lifecycle | Integrated | A; C review | Strict auth, STAT/HELP/STOU and buffered client framing verified; screenshots/release review pending |
+| MODE S/B/C functional codec + integration | Integrated | A; C review | MODE/TYPE START validation, atomic client/server paths and 271-pass regression verified; B review/A screenshots pending |
+| UDP/RDT Go-Back-N window 4 and integrity | Done | C/B | START ACK/retry; protocol, fault, and E2E tests |
+| Filesystem sandbox, atomic upload, cleanup, concurrency | Done | C | Shared server locks, same-file APPE, three clients, ABOR and disconnect |
+| Active/PASV localhost and two-machine LAN | Done | C | Matching source/server/client SHA-256 artifacts |
+| Final report, peer evaluation, and contribution percentages | In progress | B | Team percentage and release sign-off are pending |
+| Oral preparation and clean Git release check | In progress | B | Release check is pending |
 
-## Sự thật đã xác minh
+## Verified facts
 
-- Final WSL2 full regression: `python3 -m pytest -q` — **199 passed in 96.72s**; evidence: `docs/evidence/final-week-rdt-gbn-verification.md`.
-- Go-Back-N protocol verification: `python3 -m pytest tests/test_rdt.py -q` — **27 passed in 14.76s**; START ACK retry and four-packet in-flight behavior are direct tests.
-- Fault + transfer-manager + FTP E2E verification: `python3 -m pytest tests/test_rdt_fault_injection.py tests/test_transfer_manager.py tests/test_e2e_transfer.py -q` — **22 passed in 70.44s**; expanded FTP E2E separately: **6 passed in 22.63s**.
-- FTP E2E localhost: `python3 -m pytest tests/test_e2e_transfer.py -v` — **5 passed in 18.03s** (Active, PASV, ba PASV clients, ABOR, disconnect); log: `docs/evidence/week-2.5-e2e-transfer.log`.
-- SHA-256 source/server/client khớp cho Active và PASV: `docs/evidence/week-2.5-active-sha256.txt`, `docs/evidence/week-2.5-pasv-sha256.txt`.
-- PASV hai máy LAN: source/server/download SHA-256 khớp; `docs/evidence/final-lan-pasv-sha256.txt`.
-- ACTIVE hai máy LAN: source/server/download SHA-256 khớp; `docs/evidence/final-lan-active-sha256.txt`.
-- Progress, safe server logging và PASV screenshots: `docs/evidence/week-2.5-cli-logging.log`, `docs/evidence/screenshots/`.
+- Post-handoff WSL2 regression: `python3 -m pytest -q` — **205 passed in
+  103.08s**; Role C focused regression — **24 passed in 33.80s**.
+- Full regression after Role A MODE S/B/C: `python3 -m pytest -q` —
+  **271 passed, 357 subtests in 192.88s** after production review hardening.
+- Production audit reproduced silent MODE mismatch corruption, client destination
+  deletion, TCP framing and command gaps. C applied the integration fixes; see
+  `docs/evidence/role-a-production-review-2026-08-10.md`. Role B START-metadata
+  review and Role A screenshots remain pending, so these rows are not Accepted.
+- MODE behavior now functional: `MODE S → 200 Mode Stream`,
+  `MODE B → 200 Mode Block`, `MODE C → 200 Mode Compressed`; invalid/missing/
+  unauthenticated return `501`/`530` without changing session mode.
+  Implementation: `common/mode_codec.py`, `server/command_handler.py`,
+  `server/transfer_manager.py`, `client/ftp_client.py`.
+- Protocol verification: `tests/test_rdt.py` — **27 passed in 14.76s**.
+- Fault, transfer-manager, and FTP E2E verification — **22 passed in 70.44s**;
+  expanded FTP E2E — **6 passed in 22.63s**; MODE E2E matrix (PASV/ACTIVE S/B/C,
+  STOU/APPE block, concurrent different-mode clients, progress logical bytes) —
+  **13 passed, 8 subtests in 77.13s** (thêm server-stop mid-B-upload).
+- Active and PASV localhost/LAN SHA-256 values match across source, server, and
+  client artifacts under `docs/evidence/`.
+- Role C oral-guide refresh: focused filesystem/transfer/thread/E2E suite —
+  **24 passed in 31.37s**; final `Role-C-Oral-Guide.docx` — **19/19 pages
+  visually inspected**. Pending A/B/team items remain blank in that guide.
 
-## Quy ước cập nhật mỗi tối
-
-1. Cập nhật dashboard đầu `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md`: owner, deadline, blocker và evidence link.
-2. Cập nhật tài liệu này khi trạng thái thực tế đổi; mọi hàng `Done` phải có evidence.
-3. Cập nhật `docs/requirement-checklist.md` và evidence tương ứng; report chỉ được nhận claim đã có ở đây.
-
-Tài liệu tuần và `docs/report-parts/` là lịch sử/nháp, không được dùng để kết luận tiến độ hiện tại.
+Update this document only when real status changes. Every `Done` claim must
+have command, log, hash, screenshot, or other concrete evidence.

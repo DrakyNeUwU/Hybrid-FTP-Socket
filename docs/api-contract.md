@@ -1,25 +1,25 @@
 # Shared API Contract — Hybrid FTP
 
-**Nguồn chuẩn duy nhất cho A–B–C:** tài liệu này.  
-**Trạng thái:** contract được chốt ở mức tài liệu; phần ghi `Proposed` hoặc
-`Needs change` chưa được xem là đã triển khai.  
-**Nguồn requirement:** `docs/requirement-checklist.md` và
-`planning/Project1_SocketProgramming_2026.md`.
+**Single source of truth for A–B–C:** this document.
+**Status:** the documented contract is agreed; items marked `Proposed` or
+`Needs change` are not considered implemented.
+**Requirement source:** `docs/requirement-checklist.md` and
+`planning/reference/Project1_SocketProgramming_2026.md`.
 
-## 1. Ownership và nguyên tắc
+## 1. Ownership and principles
 
-| Role | Owner chính | Không tự ý làm thay |
+| Role | Primary owner | Must not take over |
 |---|---|---|
-| A | TCP control, parser, FTP replies, session, transfer command orchestration | Không tự resolve/write client path, không tự định nghĩa RDT packet |
-| B | UDP endpoint use, RDT packet, ACK, sequence, retry, FIN/ABORT | Không tự quyết định FTP reply hoặc filesystem commit |
-| C | FTP-root filesystem, atomic file lifecycle, locks, threaded server, CLI/logging, integration | Không tự đổi command grammar/RDT format |
+| A | TCP control, parser, FTP replies, session, transfer command orchestration | Must not resolve/write client paths or define RDT packets alone |
+| B | UDP endpoint use, RDT packet, ACK, sequence, retry, FIN/ABORT | Must not decide FTP replies or filesystem commits alone |
+| C | FTP-root filesystem, atomic file lifecycle, locks, threaded server, CLI/logging, integration | Must not change command grammar or RDT format alone |
 
-Mọi thay đổi API/header/reply/cleanup phải được A, B, C review và cập nhật trong
-file này trước khi sửa report hoặc code.
+Every API, header, reply, or cleanup change must be reviewed by A, B, and C and
+recorded here before changing the report or code.
 
 ## 2. API Role A → Role C: filesystem
 
-**Module/class hiện có:** `common.filesystem_service.FilesystemService`.  
+**Existing module/class:** `common.filesystem_service.FilesystemService`.
 **Resource owner:** C owns the service and all resolved paths/file handles;
 A owns only session command state.  **Status:** `Existing` for listed methods;
 `Needs change` where integration has not been wired.
@@ -62,6 +62,11 @@ class FilesystemService:
   and `os.replace`.
 - Thread safety: path locks serialize related writes/rename/delete; unrelated paths
   can proceed concurrently.
+- Server-wide ownership: `FTPServer` constructs exactly one `FilesystemService`
+  for its FTP root. Every `ClientHandler` and `TransferManager` borrows that
+  instance so the path-lock registry coordinates writes across client sessions.
+  Creating one service per client is forbidden because it creates independent
+  locks for the same server path.
 - Cleanup: C removes temporary files and releases path locks; A clears command state.
 - FTP mapping: 501 invalid argument, 550 unsafe/unavailable path, 451 local
   failure, 426 cancelled transfer.
@@ -115,9 +120,10 @@ class TransferManager:
 - Cleanup: B closes/neutralizes worker-side UDP resources; C removes `.part`; A
   clears transfer state and sends final reply.
 
-**Cần xác nhận — requirement yêu cầu production A/B/C transfer, code hiện tại
-đang có `TransferManager` gọi `send/receive` adapter nhưng `common.rdt_sender`
-và `common.rdt_receiver` expose filepath/save-path helpers khác signature.**
+**Confirmation required — the requirement expects a production A/B/C transfer.
+`TransferManager` calls send/receive adapters, while `common.rdt_sender` and
+`common.rdt_receiver` expose file-path/save-path helpers with different
+signatures.**
 
 ## 4. Context objects
 
@@ -141,6 +147,8 @@ class TransferContext:
     max_timeouts: int
     window_size: int = 4
     total_bytes: int | None
+    transfer_mode: str = "S"
+    transfer_type: str = "I"
 
 @dataclass(frozen=True)
 class TransferResult:
@@ -153,7 +161,10 @@ class TransferResult:
 
 `transfer_id` is generated per transfer by the session/command lifecycle and is
 copied into every RDT packet as a normalized unsigned 32-bit wire value.
-**Status:** Existing and covered by protocol plus FTP E2E tests.
+`transfer_mode` and `transfer_type` are copied from the authenticated session;
+they are validated against the RDT START metadata before a receiver publishes
+decoded bytes. **Status:** Implemented and verified; Role B contract review of
+the START payload extension remains pending.
 
 ## 5. FTP reply mapping
 
@@ -165,8 +176,16 @@ copied into every RDT packet as a normalized unsigned 32-bit wire value.
 | Timeout, protocol error, ABOR/disconnect | 426 | A from result | Existing |
 | Invalid/unsafe/missing path | 501 or 550 | C error, A mapping | Existing in C; A integration needed |
 | Local transient filesystem error | 451 | C error, A mapping | Existing in C; integration needed |
-| Unsupported MODE B/C | 502 | A | Existing behavior |
+| `MODE S` | 200 | A | Existing and tested |
+| `MODE B` | 200 Mode Block | A | Functional codec, tested 10/08/2026 |
+| `MODE C` | 200 Mode Compressed | A | Functional codec, tested 10/08/2026 |
+| `MODE <invalid>` | 501 | A | Tested |
+| `MODE` without argument | 501 | A | Tested |
 | Not authenticated | 530 | A | Existing in several handlers |
+| `STAT <path>` metadata success | 213 | A formats C metadata | Existing and tested |
+| `HELP` / `HELP <known-command>` success | 214 | A | Existing and tested |
+| Extra argument to `STOU` or malformed command argument | 501 | A | Existing and tested |
+| `HELP <unknown-command>` | 502 | A | Existing and tested |
 
 `150` must precede real data transfer; `226` is forbidden before RDT and atomic
 commit finish.
@@ -189,8 +208,8 @@ commit finish.
   `--host 0.0.0.0`; old UDP sockets are closed before replacement.
 - Status: localhost and two-machine LAN Active/PASV are verified. Saved PASV
   and ACTIVE client/server output plus source/server/client SHA-256 are under
-  `docs/evidence/final-lan-*`; B review/sign-off remains required before final
-  report submission.
+  `docs/evidence/final-lan-*`; B-F01 technical wire-contract review is complete.
+  Final team release approval remains pending the release checklist.
 
 ## 6.1 LIST/NLST transport decision
 
@@ -208,7 +227,36 @@ file payload.
 - Owner: A handles command/reply; C supplies the validated filesystem listing.
 
 **Status:** Existing and aligned with
-`planning/Project1_SocketProgramming_2026.md` §2.2–2.3.
+`planning/reference/Project1_SocketProgramming_2026.md` §2.2–2.3.
+
+## 6.2 TCP client reply framing
+
+`FTPClient` maintains a persistent byte buffer and consumes replies by CRLF
+lines. A normal reply ends after one line; an `xyz-` multiline reply ends at
+the matching `xyz ` line. Bytes for later replies remain buffered, so TCP may
+split or coalesce `150` and `226` without changing transfer lifecycle order.
+`LIST`/`NLST` use a dedicated reader that collects the textual body through its
+final `226`; RETR/STOR still return after `150` so UDP transfer can proceed.
+
+**Status:** Existing and verified by `tests/test_ftp_client.py` split,
+coalesced, multiline and listing tests on 10/08/2026.
+
+## 6.3 MODE handoff boundary
+
+`MODE S` (stream passthrough), `MODE B` (RFC 959 block framing) and `MODE C`
+(FTP RLE compression) are implemented as functional streaming codecs in
+`common/mode_codec.py` and are per-session state (`Session.transfer_mode`).
+Mode encoding happens before RDT packetization and decoding happens after
+ordered, checksum-validated RDT delivery, so the FTP root only ever stores
+logical decoded bytes. This implementation remains entirely outside the
+canonical 20-byte RDT header.
+
+TYPE A uses the RFC ASCII space filler in compressed mode; TYPE I uses NUL.
+The START payload carries MODE/TYPE so a mismatched encoder is rejected with
+`426` before publication. **Status:** integrated and verified (exact replies,
+state, codec round-trips, PASV/ACTIVE SHA-256 E2E, mismatch/malformed → atomic
+`426`, and RDT fault recovery). Role B review and Role A screenshots remain
+pending before final acceptance.
 
 ## 7. RDT packet contract
 
@@ -221,16 +269,21 @@ file payload.
 | sequence | 4 bytes | DATA/FIN sequence |
 | acknowledgement | 4 bytes | ACK sequence |
 | flags | 2 bytes | DATA, ACK, FIN, START or ABORT |
+| checksum | 4 bytes | CRC-32 over agreed header fields + payload |
 | payload_length | 2 bytes | exact payload bytes after header |
-| checksum | 4 bytes | CRC/hash over agreed header fields + payload |
 
 The checksum covers transfer ID, sequence, acknowledgement, flags, payload
 length and payload. The project requirement does not prescribe transfer-ID width;
 the fixed 32-bit normalized value preserves the established public API without a
 wire-breaking header redesign.
 
-Flags: `START`, `DATA`, `ACK`, `FIN`, `ABORT`; illegal combinations are dropped.
-`START` carries transfer metadata; `DATA` carries bytes; `ACK` carries the exact
+Flag values are DATA `0x01`, ACK `0x02`, FIN `0x04`, START `0x08` and ABORT
+`0x10`; illegal combinations are dropped.
+`START` carries a 10-byte metadata payload: unsigned 64-bit logical size, one
+ASCII MODE byte (`S/B/C`) and one ASCII TYPE byte (`A/I`). This extends the
+former size-only payload without changing the canonical 20-byte header. Direct
+low-level receivers can identify the legacy 8-byte size payload; production
+transfers require matching MODE/TYPE metadata. `DATA` carries bytes; `ACK` carries the exact
 acknowledged sequence; `FIN` explicitly closes data; `ABORT` cancels.
 
 Policy: sender accepts ACK only from the expected UDP peer, matching transfer ID
@@ -286,7 +339,7 @@ client thread except `cancel_event`, which is the explicitly synchronized A/B/C
 handoff. Server logging now records connected client IP, redacted command,
 reply, session ID, transfer ID, active-session snapshot, transfer mode, byte
 count and result. The demo client renders real upload/download progress.
-**Status:** Existing; screenshots remain manual evidence.
+**Status:** Existing; curated server/client logs and SHA-256 files are submission evidence.
 
 ## 11. Contract change procedure
 
@@ -311,3 +364,8 @@ count and result. The demo client renders real upload/download progress.
 | 2026-08-08 | Normalized progress and server lifecycle logging | C integration; legacy file-helper callbacks remain backward compatible | Command/server/E2E/CLI: 62 passed; full pytest: 189 passed in 102.50s |
 | 2026-08-08 | Added `TransferContext.total_bytes` for RETR progress | A/C/B compatible optional field; sender places it in RDT START | E2E progress-total assertion: 5 passed in 17.61s; full pytest: 189 passed in 106.91s |
 | 2026-08-09 | Go-Back-N flow control and reliable START lifecycle | C implementation; header layout and public adapter signatures preserved; reviewed by A/B/C | Protocol 27 passed; fault/transfer/E2E 22 passed; full WSL2 pytest 192 passed in 91.11s |
+| 2026-08-10 | Final A/C correctness pass: server-owned filesystem locks, strict auth/command syntax and buffered TCP replies | A owns control/client behavior; C owns shared filesystem/concurrency; RDT wire layout unchanged | Focused 71 passed + 28 routing subtests; full WSL2 212 passed + 28 subtests in 97.52s |
+| 2026-08-10 | Accepted MODE S/B/C as per-session TCP negotiation labels | A command state; C integration review; unified RDT data path and wire layout unchanged | MODE/E2E 61 passed + 28 subtests; full WSL2 213 passed + 28 subtests in 108.71s |
+| 2026-08-10 | Reverted AI-applied Role A final-fix for owner handoff | A scope returned to A; C shared filesystem/concurrency changes retained | Role C focused 24 passed in 33.80s; current full WSL2 205 passed in 103.08s |
+| 2026-08-10 | Functional MODE S/B/C codecs on the production path | A implementation; encode before RDT, decode after RDT; canonical 20-byte RDT header unchanged; C filesystem/atomic `.part`/locks retained | Codec/command 83 passed + 338 subtests; transfer-manager 12 passed; RDT fault over B/C 19 passed + 11 subtests; E2E matrix 13 passed + 8 subtests; full pytest 256 passed, 357 subtests in 167.08s |
+| 2026-08-10 | Production review hardening for MODE/TYPE state and failure atomicity | C integration fix of A-owned requirements; START payload now includes logical size + MODE + TYPE, header stays 20 bytes; B review pending | Targeted 140 passed + 338 subtests; E2E 14 passed + 8 subtests; fault 19 passed + 11 subtests; full 271 passed + 357 subtests in 192.88s |

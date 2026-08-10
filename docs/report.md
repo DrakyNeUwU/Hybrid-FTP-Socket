@@ -17,10 +17,66 @@ client may issue control commands. The server parses each request, validates the
 session state, performs the operation, and returns the corresponding FTP reply.
 `QUIT` ends the session and closes the control connection safely.
 
-The complete TCP-plus-UDP sequence diagram will be finalized during integration.
-Role A owns the TCP lifecycle, Role B adds UDP DATA/ACK/retransmission behavior,
-and Role C verifies threading, filesystem operations, and cleanup against the
-integrated implementation.
+The TCP-plus-UDP sequence diagram in this report describes the integrated
+implementation. Role A owns the TCP lifecycle, Role B owns UDP
+DATA/ACK/retransmission behavior, and Role C verifies threading, filesystem
+operations, and cleanup.
+
+```mermaid
+sequenceDiagram
+    participant Client as FTP Client
+    participant Control as FTP Server (TCP control)
+    participant Sender as UDP/RDT Sender
+    participant Receiver as UDP/RDT Receiver
+    participant FS as Filesystem Service
+
+    Client->>Control: TCP connect
+    Control-->>Client: 220 Service ready
+    Client->>Control: USER / PASS
+    Control-->>Client: 331 / 230
+
+    alt Passive mode
+        Client->>Control: PASV
+        Control-->>Client: 227 server UDP endpoint
+    else Active mode
+        Client->>Control: PORT client UDP endpoint
+        Control-->>Client: 200 endpoint accepted
+    end
+
+    Client->>Control: STOR or RETR filename
+    Control-->>Client: 150 Opening data connection; transfer_id
+
+    alt STOR upload
+        Client->>Sender: Read local file chunks
+        Sender->>Receiver: UDP START(metadata, total bytes)
+        Receiver-->>Sender: ACK(0)
+        loop Go-Back-N window, maximum 4 packets
+            Sender->>Receiver: DATA(sequence, payload, checksum)
+            Receiver-->>Sender: Cumulative ACK
+        end
+        Sender->>Receiver: FIN
+        Receiver-->>Sender: ACK(FIN)
+        Receiver->>FS: Validate path, write .part, atomic replace
+    else RETR download
+        Sender->>FS: Read validated file chunks
+        Sender->>Receiver: UDP START(metadata, total bytes)
+        Receiver-->>Sender: ACK(0)
+        loop Go-Back-N window, maximum 4 packets
+            Sender->>Receiver: DATA(sequence, payload, checksum)
+            Receiver-->>Sender: Cumulative ACK
+        end
+        Sender->>Receiver: FIN
+        Receiver-->>Sender: ACK(FIN)
+        Receiver->>Client: Write downloaded file
+    end
+
+    alt Transfer succeeds
+        Control-->>Client: 226 Transfer complete
+    else Timeout, ABOR, or RDT failure
+        Sender->>Receiver: ABORT / bounded retry exhausted
+        Control-->>Client: 426 Transfer failed or aborted
+    end
+```
 
 ## 2. Project-Wide Data Structures
 
@@ -78,16 +134,18 @@ The custom RDT protocol uses a fixed-size header of **20 bytes** serialized in n
 | `transfer_id` | 4 | 32-bit unsigned int | Unique transfer transaction identifier generated per connection. |
 | `sequence` | 4 | 32-bit unsigned int | Sequence number of the data or control packet. |
 | `acknowledgement`| 4 | 32-bit unsigned int | Cumulative acknowledgment number. |
-| `flags` | 2 | 16-bit unsigned int | Protocol control flags: `START` (0x08), `DATA` (0x40), `ACK` (0x02), `FIN` (0x01), `ABORT` (0x04). |
+| `flags` | 2 | 16-bit unsigned int | Protocol control flags: `DATA` (0x01), `ACK` (0x02), `FIN` (0x04), `START` (0x08), `ABORT` (0x10). |
+| `checksum` | 4 | 32-bit unsigned int | CRC-32 over transfer ID, sequence, ACK, flags, payload length and payload; the checksum field itself is excluded. |
 | `payload_length` | 2 | 16-bit unsigned int | Size of the payload following the header in bytes (0 to 1024). |
-| `checksum` | 4 | 32-bit unsigned int | Checksum computed over header fields (with checksum field set to 0) + payload. |
 
 The flags control the packet lifecycle:
-- **`START` (0x08)**: Negotiates metadata (e.g. total file size) before transmission.
-- **`DATA` (0x40)**: Indicates the packet contains a segment of file payload.
+- **`START` (0x08)**: Negotiates a 10-byte payload containing logical file size,
+  MODE (`S/B/C`) and TYPE (`A/I`) before transmission. The fixed RDT header
+  remains 20 bytes.
+- **`DATA` (0x01)**: Indicates the packet contains a segment of file payload.
 - **`ACK` (0x02)**: Confirms receipt of packets up to the sequence number.
-- **`FIN` (0x01)**: Gracefully terminates the data connection.
-- **`ABORT` (0x04)**: Instantly halts transfer due to errors or cancellation.
+- **`FIN` (0x04)**: Gracefully terminates the data connection.
+- **`ABORT` (0x10)**: Instantly halts transfer due to errors or cancellation.
 
 ## 3. Functional Workflows (Flowcharts)
 
@@ -282,6 +340,14 @@ stateDiagram-v2
 
 The Active and Passive modes are negotiated over the TCP control channel, while the actual file payload is transported over the UDP RDT data channel. In Active mode, the server initiates the UDP endpoint used by the client for data transfer; in Passive mode, the server listens on a negotiated port and the client connects to it. Role A establishes the endpoint state through the control channel, while Role B uses the negotiated endpoint for the RDT transfer. Role C verifies the resulting transfer lifecycle, cleanup, and filesystem side effects.
 
+FTP MODE is separate from Active/PASV endpoint selection. All three transfer
+modes are implemented by Role A: `MODE S` (stream passthrough), `MODE B` (RFC
+959 block framing) and `MODE C` (FTP RLE compression), negotiated over TCP with
+`200` replies and verified end-to-end for Active/PASV and STOR/RETR/STOU/APPE.
+Encoding happens before RDT packetization; decoding happens only after RDT
+checksum and ordering validation, and the FTP root stores logical decoded
+bytes. This does not change the existing 20-byte RDT header owned by B/C.
+
 ```mermaid
 flowchart TD
     A[Role A negotiates endpoint over TCP] --> B[Role B opens UDP RDT transfer]
@@ -325,7 +391,7 @@ Role A compared the final implementation with the control-channel and reply beha
 Role B successfully designed, implemented, and verified the Reliable Data Transfer (RDT) protocol running over UDP, achieving full compliance with the C-F01 requirement level:
 
 1. **Protocol Integrity**: Designed a robust 20-byte header format. Verified serialization and deserialization correctness, ensuring correct big-endian conversion (Network Byte Order).
-2. **Reliable Initialization (START Handshake)**: Replaced best-effort START delivery with a reliable handshake. The sender transmits file size metadata via a `START` packet, waiting for its corresponding `ACK` (sequence 0). Implemented a finite retry mechanism (`retry_limit`) and socket timeout to safely raise a `RuntimeError` if the peer is unresponsive, preventing hanging resources.
+2. **Reliable Initialization (START Handshake)**: Replaced best-effort START delivery with a reliable handshake. The sender transmits logical size plus negotiated MODE/TYPE via a `START` packet and waits for ACK 0. The receiver rejects a mismatch before publishing decoded bytes. A finite retry limit and socket timeout prevent hanging resources.
 3. **Flow Control & Congestion Mitigation**: Developed a Go-Back-N (GBN) sliding window protocol with a window size of 4. Correctly implemented cumulative acknowledgment parsing and fast retransmission of the active window upon socket timeout.
 4. **Error Recovery**: Used CRC-32 checksum calculations covering all header fields and payload bytes. Out-of-order packets and corrupted packets are successfully detected and dropped, forcing GBN retransmissions.
 5. **Termination Safety**: Implemented `FIN` transmission with a grace period (`_fin_grace()`). This guarantees that if the final ACK is lost in transit, the receiver remains active to re-ACK duplicate FIN packets, avoiding half-closed connections.
@@ -343,7 +409,9 @@ The integrated project now includes the verified TCP control and UDP RDT flow. E
 
 ### 5.4 Peer Evaluation
 
-The contribution percentages are tracked in the submission documents and were finalized through review of implementation scope, test evidence, and role ownership rather than by guesswork.
+Contribution percentages must be agreed by A, B, and C, total exactly 100%, and
+be recorded with the final release sign-off. They are not inferred from file
+count or self-assessment; see `docs/report-parts/submission/11-contribution.md`.
 
 ## 6. GenAI Usage & Code Refinement Log
 
@@ -360,6 +428,9 @@ report does not replace exact prompts and raw output.
 
 ## 7. Application Demo Evidence
 
+![Full regression — 271 passed](evidence/screenshots/01-full-pytest-271-passed.png)
+*Figure: Full WSL2 regression passed; this verifies the integrated suite.*
+
 ### 7.1 TCP Control and Authentication (Role A)
 
 The TCP control test uses the project client or Netcat (`nc`) to:
@@ -370,17 +441,75 @@ The TCP control test uses the project client or Netcat (`nc`) to:
 4. Send `NOOP` and other implemented control commands.
 5. Send `QUIT`, receive `221`, and confirm safe session cleanup.
 
-Role A's report must include actual terminal output or screenshots before final
-submission. The server should return the expected FTP replies without crashing
-on invalid authentication input.
+The embedded LAN server excerpt shows the real client IP, redacted login,
+executed commands and the `150 → 226` upload/download lifecycle:
+
+```text
+Client connected session=S000002 ip=172.18.0.49:56595 active=1
+Command session=S000002 ip=172.18.0.49 command=USER admin
+Command session=S000002 ip=172.18.0.49 command=PASS ********
+Command session=S000002 ip=172.18.0.49 command=PASV
+Command session=S000002 ip=172.18.0.49 command=STOR final-lan-pasv.bin
+Transfer session=S000002 transfer_id=T000001 operation=STOR mode=PASSIVE result=success bytes=256000
+Command session=S000002 ip=172.18.0.49 command=RETR final-lan-pasv.bin
+Transfer session=S000002 transfer_id=T000002 operation=RETR mode=PASSIVE result=success bytes=256000
+```
+
+After the final concurrency fix, the active-session test records live handlers:
+
+```text
+Active sessions=[{'session_id': 'S000001', 'ip': '127.0.0.1', 'port': 57756, 'alive': True}]
+Active sessions=[{'session_id': 'S000002', 'ip': '127.0.0.1', 'port': 57768, 'alive': True}]
+1 passed in 1.10s
+```
+
+Source: `docs/evidence/final-lan-server.log` and
+`docs/evidence/final-code-fix-verification.md`.
+
+![PASV LAN server lifecycle](evidence/screenshots/02-lan-pasv-server-lifecycle.png)
+*Figure: LAN PASV server lifecycle showing the live client sessions and the `150 → 226` transfer flow.*
 
 ### 7.2 Filesystem and Concurrency Evidence (Role C)
 
-The final regression suite verified the integrated server behavior under filesystem and concurrency scenarios. The completed test evidence includes the RDT and transfer suites plus the end-to-end transfer cases for concurrent upload/download, ABOR handling, and disconnect cleanup.
+The final regression verifies filesystem/concurrency, ABOR and disconnect cleanup.
+It also includes both independent-client and shared-file contention tests:
+
+```text
+test_three_pasv_clients_transfer_independently PASSED
+1 passed in 5.34s
+
+test_two_clients_append_same_file_without_lost_update PASSED
+1 passed in 3.96s
+```
+
+The second test confirms that the server-owned filesystem lock prevents lost
+updates when two sessions append to the same path.
 
 ### 7.3 UDP Transfer and End-to-End Evidence
 
-The final evidence bundle includes the verified RDT test suite, end-to-end transfer tests, and the SHA-256 verification artifacts for Active and Passive transfers. These artifacts are recorded under the evidence directory and were used to support the final report.
+The two-machine PASV and ACTIVE runs produced the same SHA-256 at source,
+server and downloaded destination:
+
+```text
+PASV source:     b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+PASV server:     b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+PASV download:   b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+ACTIVE source:   b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+ACTIVE server:   b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+ACTIVE download: b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+```
+
+![SHA-256 comparison for PASV and ACTIVE](evidence/screenshots/03-sha256-pasv-active.png)
+*Figure: source, server and downloaded SHA-256 values match for both PASV and ACTIVE transfers.*
+
+![Three PASV clients transferring independently](evidence/screenshots/04-three-pasv-clients.png)
+*Figure: three independent PASV clients completed their transfers without blocking each other.*
+
+![PASV upload and download success](evidence/screenshots/final-lan-pasv.png)
+*Figure: two-machine PASV upload/download completed with client progress.*
+
+![ACTIVE SHA-256 comparison](evidence/screenshots/active-demo-success.png)
+*Figure: ACTIVE source, server and downloaded SHA-256 values match.*
 
 #### RDT Fault-Injection Evidence (Role B)
 
@@ -449,7 +578,12 @@ tests/test_rdt_fault_injection.py::TestRDTAdapterFaultInjection::test_adapter_pa
 
 ## 8. Requirement Traceability & Final Evidence
 
-This report is aligned with the final acceptance checklist and the final regression evidence. All claims in this document are supported by code, tests, or artifacts in the repository; no `TODO`, `pending`, `unverified`, or stale claim remains in the submitted report.
+The technical claims below are aligned with the final regression evidence. This
+report is ready for final team review, but submission remains pending the release
+checklist: report-claim review, contribution percentage/sign-off, and clean Git
+release verification. Oral preparation uses the locator pack; no dry-run record
+is required. The current acceptance decision is recorded
+only in `docs/project-status.md` and `docs/requirement-checklist.md`.
 
 | Requirement area | Final status | Evidence |
 |---|---|---|
@@ -459,21 +593,40 @@ This report is aligned with the final acceptance checklist and the final regress
 | FIN graceful termination and duplicate FIN re-ACK | Verified | `tests/test_rdt.py::TestRDTProtocolLogic::test_receiver_graceful_fin_ack_retransmission`, `docs/report-parts/technical/05-data-channel-rdt.md` |
 | ABORT cancel/termination behavior | Verified | `tests/test_rdt.py::TestRDTProtocolLogic::test_receiver_aborts_on_abort_packet`, `docs/report-parts/technical/05-data-channel-rdt.md` |
 | Active/PASV upload/download and LAN SHA-256 integrity | Verified | `docs/evidence/final-lan-active-sha256.txt`, `docs/evidence/final-lan-pasv-sha256.txt` |
-| Final regression suite | Verified | `python3 -m pytest -q` — 199 passed in 96.72s; `docs/evidence/final-week-rdt-gbn-verification.md` |
+| Post-handoff regression suite (pre-MODE baseline) | Verified | `python3 -m pytest -q` — 205 passed in 103.08s; Role C focused — 24 passed in 33.80s; `docs/evidence/final-code-fix-verification.md` |
+| MODE S/B/C functional codecs (RFC 959 §3.4) | Integrated; release evidence pending | `common/mode_codec.py`, `server/transfer_manager.py`, `client/ftp_client.py`; TYPE A/I filler, START MODE/TYPE mismatch rejection, atomic client/server paths; targeted 140 passed + 338 subtests, RDT fault 19 passed + 11 subtests, E2E 14 passed + 8 subtests, full 271 passed + 357 subtests in 192.88s; `docs/evidence/role-a-production-review-2026-08-10.md` |
 
-### Final completion note
+### Final release note
 
-- `docs/report.md` is the final submission-ready report.
+- `docs/report.md` is the release-candidate report; it becomes submission-ready
+  only after the final checklist is completed.
 - `docs/report-parts/technical/05-data-channel-rdt.md` documents the implemented RDT contract and evidence trace.
 - `docs/api-contract.md` records the final contract review status.
 - `docs/genai-log-b.md` captures the final Role B verification summary.
 - `planning/weekly-plans/tuan-cuoi-ngay-tai-phan-chia.md` includes the Role B final checklist and task status.
 - **Duplicate & Out-of-Order Handling**: Verified by the protocol logic tests that confirm duplicate packets are re-ACKed and out-of-order packets are handled without corrupting the stream.
 
-## 9. Final Review and Sign-off
+## 9. Technical Audit Review and Release Sign-off
 
-- Role A reviewed and signed off the TCP control channel, command parser, session isolation, and `MODE`/`PORT`/`PASV` negotiation sections.
-- Role C reviewed and signed off the filesystem security, concurrency, Active/PASV integration, and end-to-end transfer evidence.
-- Role B compiled and verified the RDT wire protocol documentation, START/ACK retry behavior, Go-Back-N evidence, and final requirement traceability.
+- **Role A technical audit: MODE S/B/C implemented and verified.** Functional
+  Stream/Block/Compressed codecs, exact `MODE` replies/state, encode-before-RDT/
+  decode-after-RDT integration, PASV/ACTIVE SHA-256 round-trips, STOU/APPE,
+  concurrent different-mode clients and logical-byte progress are covered by
+  codec/command/transfer-manager/fault-injection/E2E tests (full suite
+  **271 passed, 357 subtests in 192.88s**). The C production audit also verified
+  strict authentication, STAT/HELP/STOU behavior, buffered client framing,
+  MODE/TYPE mismatch rejection and atomic client downloads. Role B review of
+  START metadata and Role A MODE screenshots remain pending; this is not final
+  team/release approval.
+- **Role C technical audit: passed.** Reviewed FTP-root/atomic lifecycle,
+  concurrency/cleanup, Active/PASV and LAN evidence against the focused audit
+  (**135 passed in 86.22s**), final regression, LAN SHA-256 logs and
+  `docs/evidence/final-lan-server.log`.
+- **Role B technical verification: passed.** The 20-byte RDT contract,
+  START/ACK retry, Go-Back-N, FIN/ABORT and fault handling are supported by
+  RDT/fault tests (**45 passed in 67.09s**) and final regression evidence.
 
-These reviews confirm that the submitted report and documentation are aligned with the implemented code and final test evidence.
+These are documentation technical-audit results, not personal A/B/C signatures.
+Final team release approval remains pending contribution percentages and a clean
+Git release check; the current acceptance decision is in the status and
+requirement-checklist documents.
