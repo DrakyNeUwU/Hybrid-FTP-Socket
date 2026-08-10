@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Project-specific: dữ liệu test transfer, không commit file test lớn
+tests/sample_files/*
+!tests/sample_files/.gitkeep
+client/downloads/
+
+# Logs
+*.log
+# Curated final evidence belongs in the submission pack; runtime logs elsewhere
+# remain ignored.
+!docs/evidence/final-*.log
+
+# Personal notes — không commit lên repo
+second-brain.md
+AGENTS.md
+
+# Editor / Workspace settings
+*.code-workspace
+
+# File phân chia công việc — chỉ dùng nội bộ nhóm, không nộp
+Socket Role.md
+tuan-1-chi-tiet-socket.md
+
+# Planning documents are shared project artifacts and must be tracked.
+!planning/Socket Role.md
+!planning/weekly-plans/tuan-1-chi-tiet-socket.md
