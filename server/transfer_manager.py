@@ -19,6 +19,7 @@ from common.filesystem_service import (
     FilesystemService,
     TransferCancelledError,
 )
+from common.mode_codec import decode_chunks, encode_chunks
 from common.rdt_context import Endpoint, TransferContext
 from common.RDTHeader import RDTHeader
 
@@ -79,6 +80,9 @@ class TransferManager:
             service, cwd, client_path = self._target(service_path=filepath, session=session)
             if chunks is None:
                 chunks = self._receive(data_socket, endpoint, context)
+            chunks = decode_chunks(
+                chunks, self._mode_for(session), self._type_for(session)
+            )
             result = service.store(cwd, client_path, chunks, event)
             return TransferResult(True, 226, result.bytes_written, result.path)
         except TransferCancelledError as error:
@@ -108,6 +112,9 @@ class TransferManager:
             service, cwd, client_path = self._target(service_path=filepath, session=session)
             if chunks is None:
                 chunks = self._receive(data_socket, endpoint, context)
+            chunks = decode_chunks(
+                chunks, self._mode_for(session), self._type_for(session)
+            )
             result = service.append(cwd, client_path, chunks, event)
             return TransferResult(True, 226, result.bytes_written, result.path)
         except (TransferCancelledError, FilesystemOperationError) as error:
@@ -134,6 +141,9 @@ class TransferManager:
             service = self._service_for(session)
             if chunks is None:
                 chunks = self._receive(data_socket, endpoint, context)
+            chunks = decode_chunks(
+                chunks, self._mode_for(session), self._type_for(session)
+            )
             result = service.store_unique(session.current_dir, chunks, event)
             return TransferResult(True, 226, result.bytes_written, result.path)
         except (TransferCancelledError, FilesystemOperationError) as error:
@@ -166,11 +176,19 @@ class TransferManager:
                     context,
                     endpoint=Endpoint(peer[0], peer[1], "PASSIVE"),
                 )
+            chunks = encode_chunks(
+                chunks, self._mode_for(session), self._type_for(session)
+            )
             transferred = self._send(chunks, data_socket, context.endpoint, context)
             if transferred is False:
                 return TransferResult(False, 426, error="RDT sender failed")
-            count = transferred if isinstance(transferred, int) else 0
-            return TransferResult(True, 226, count, service.prepare_retrieve(cwd, client_path))
+            logical_count = context.total_bytes or 0
+            return TransferResult(
+                True,
+                226,
+                logical_count,
+                service.prepare_retrieve(cwd, client_path),
+            )
         except TransferCancelledError as error:
             return self._failure(error)
         except FilesystemOperationError as error:
@@ -211,6 +229,16 @@ class TransferManager:
             raise ValueError("Transfer session has no FTP root")
         self.filesystem = FilesystemService(root)
         return self.filesystem
+
+    @staticmethod
+    def _mode_for(session: Any) -> str:
+        mode = getattr(session, "transfer_mode", "S") or "S"
+        return str(mode).strip().upper()
+
+    @staticmethod
+    def _type_for(session: Any) -> str:
+        transfer_type = getattr(session, "transfer_type", "I") or "I"
+        return str(transfer_type).strip().upper()
 
     def _target(self, service_path: str, session: Any):
         service = self._service_for(session)
@@ -284,6 +312,8 @@ class TransferManager:
             session_id=str(getattr(session, "session_id", "unknown")),
             endpoint=resolved,
             cancel_event=event,
+            transfer_mode=str(getattr(session, "transfer_mode", "S") or "S").strip().upper(),
+            transfer_type=str(getattr(session, "transfer_type", "I") or "I").strip().upper(),
         )
 
     @staticmethod

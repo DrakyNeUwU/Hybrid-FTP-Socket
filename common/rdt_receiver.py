@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from typing import Callable
 
 from common.RDTHeader import RDTHeader
-from common.rdt_context import normalize_transfer_id
+from common.rdt_context import decode_start_metadata, normalize_transfer_id
 
 
 DEFAULT_TIMEOUT_S: float = 1.0
@@ -32,6 +32,8 @@ class RDTReceiverAdapter:
 
         max_timeouts: int = int(getattr(context, "max_timeouts", DEFAULT_MAX_TIMEOUTS))
         cancel_event: threading.Event | None = getattr(context, "cancel_event", None)
+        expected_mode: str = getattr(context, "transfer_mode", "S")
+        expected_type: str = getattr(context, "transfer_type", "I")
 
         return receive_chunks_rdt(
             data_socket,
@@ -39,6 +41,8 @@ class RDTReceiverAdapter:
             timeout_s=timeout_s,
             max_timeouts=max_timeouts,
             cancel_event=cancel_event,
+            expected_mode=expected_mode,
+            expected_type=expected_type,
         )
 
 def receive_chunks_rdt(
@@ -49,6 +53,8 @@ def receive_chunks_rdt(
     max_timeouts: int = DEFAULT_MAX_TIMEOUTS,
     progress_cb: ProgressCallback | None = None,
     cancel_event: threading.Event | None = None,
+    expected_mode: str | None = None,
+    expected_type: str | None = None,
 ) -> Iterator[bytes]:
     if cancel_event is None:
         cancel_event = threading.Event()
@@ -116,15 +122,23 @@ def receive_chunks_rdt(
             if peer_addr is None:
                 peer_addr = addr
 
-            if len(start_payload) >= 8 and total_bytes is None:
-                import struct as _struct
-                try:
-                    (raw_size,) = _struct.unpack_from("!Q", start_payload)
-                    if raw_size > 0:
-                        total_bytes = raw_size
-                        print(f"[RDT][Start] File size: {total_bytes} bytes")
-                except Exception:
-                    pass
+            try:
+                raw_size, wire_mode, wire_type = decode_start_metadata(start_payload)
+            except ValueError as error:
+                raise RuntimeError(f"[RDT] Invalid START metadata: {error}") from error
+            if expected_mode is not None:
+                if wire_mode is None or wire_mode != expected_mode:
+                    raise RuntimeError(
+                        f"[RDT] MODE mismatch: expected {expected_mode}, got {wire_mode or 'legacy'}"
+                    )
+            if expected_type is not None:
+                if wire_type is None or wire_type != expected_type:
+                    raise RuntimeError(
+                        f"[RDT] TYPE mismatch: expected {expected_type}, got {wire_type or 'legacy'}"
+                    )
+            if total_bytes is None and raw_size > 0:
+                total_bytes = raw_size
+                print(f"[RDT][Start] File size: {total_bytes} bytes")
             # START is idempotent.  ACK it every time so sender retries are safe.
             _send_ack(udp_socket, peer_addr, transfer_id, 0)
             continue
@@ -144,7 +158,6 @@ def receive_chunks_rdt(
             peer_addr = addr
 
         if header.seq_num == expected_seq:
-            yield payload
             expected_seq += 1
             committed_bytes += len(payload)
 
@@ -152,6 +165,8 @@ def receive_chunks_rdt(
 
             if progress_cb:
                 progress_cb(str(transfer_id), committed_bytes, total_bytes)
+
+            yield payload
 
             if header.flags & RDTHeader.FLAG_FIN:
                 _fin_grace(udp_socket, peer_addr, transfer_id, header.seq_num, timeout_s)
@@ -174,9 +189,12 @@ def receive_file_rdt(
     is_cancelled=None,
     transfer_id: int | None = None,
     progress_callback: ProgressCallback | None = None,
+    mode: str = "S",
+    transfer_type: str = "I",
 ) -> bool:
     import os
-    from common.file_handler import write_file_from_chunks
+    from common.file_handler import write_file_from_chunks_atomic
+    from common.mode_codec import decode_chunks
 
     cancel_event: threading.Event
     if is_cancelled is not None:
@@ -187,33 +205,44 @@ def receive_file_rdt(
     else:
         cancel_event = threading.Event()
 
-    adapted_cb: ProgressCallback | None = None
-    if progress_cb is not None:
-        def adapted_cb(tid: str, committed: int, total: int | None) -> None:
-            progress_cb(committed)
+    # The RDT layer reports wire (encoded) bytes; the public progress_callback
+    # must count logical decoded bytes so a compressed transfer can reach 100%
+    # and a block transfer never overshoots it.
+    total_size: list[int | None] = [None]
 
-    def combined_cb(tid: str, committed: int, total: int | None) -> None:
-        if progress_callback is not None:
-            progress_callback(tid, committed, total)
+    def _rdt_progress_cb(tid: str, committed: int, total: int | None) -> None:
+        if total is not None:
+            total_size[0] = total
         if progress_cb is not None:
             progress_cb(committed)
+
+    def _counted(decoded_chunks):
+        committed = 0
+        for chunk in decoded_chunks:
+            committed += len(chunk)
+            if progress_callback is not None:
+                progress_callback(str(transfer_id), committed, total_size[0])
+            yield chunk
 
     try:
         chunks_gen = receive_chunks_rdt(
             udp_socket,
             transfer_id_hint=transfer_id,
-            progress_cb=combined_cb if (progress_callback or progress_cb) else None,
+            progress_cb=_rdt_progress_cb if (progress_callback or progress_cb) else None,
             cancel_event=cancel_event,
+            expected_mode=mode,
+            expected_type=transfer_type,
         )
-        write_file_from_chunks(save_path, chunks_gen)
+        write_file_from_chunks_atomic(
+            save_path,
+            _counted(decode_chunks(chunks_gen, mode, transfer_type)),
+        )
         return True
     except RuntimeError as exc:
         print(f"[RDT] {exc}")
-        try:
-            if os.path.exists(save_path):
-                os.remove(save_path)
-        except OSError:
-            pass
+        return False
+    except Exception as exc:
+        print(f"[MODE] {exc}")
         return False
 
 def _send_ack(
