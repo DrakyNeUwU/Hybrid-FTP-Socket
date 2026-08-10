@@ -1061,3 +1061,44 @@ tests, API contract, status/checklist/report, final plan and review evidence.
 **Verification:** targeted **140 passed + 338 subtests**; E2E **14 passed + 8
 subtests**; fault injection **19 passed + 11 subtests**; final full regression
 **271 passed + 357 subtests in 192.88s**.
+
+## August 10, 2026 — Role C Oral Guide Audit and Generation
+
+**Exact prompt:**
+> "Và các phần nào chưa thêm vào thì bạn để trống oral nhé, tôi thêm sau"
+
+The attached prompt was the full `TCREI Prompt — Tạo tài liệu Oral cho Role C`,
+requiring rubric mapping, architecture/execution flow, Role C code explanation,
+dependency/what-if analysis, tests/evidence, five levels of oral questions,
+teacher traps, rapid review and a final checklist.
+
+**Raw GenAI output summary:**
+AI audited the official rubric, current source, tests, API/status/report parts
+and Role C evidence, then generated a Vietnamese 20-section Word oral guide.
+It proposed leaving explicit blanks for features without current implementation
+or evidence instead of filling them from stale planning claims.
+
+**Manual refinement:**
+
+- Prioritized official requirement → current code → tests/evidence → docs →
+  planning and recorded current inconsistencies explicitly.
+- Left `MODE B/C`, `STAT <path>`, buffered TCP reply framing, final contribution
+  percentage and release hash/sign-off as `________` where an implementation
+  answer would be unverifiable.
+- Added exact Role C caller/callee, input/output, state, error and removal-impact
+  explanations for path validation, per-path locks, atomic upload, threaded
+  server/client lifecycle and transfer orchestration.
+- Rendered through Microsoft Word because LibreOffice was unavailable. The
+  first render exposed alternating headers and split rows/paragraphs; the
+  builder was corrected and all 19 final pages were inspected again.
+
+**Affected files:** `docs/Role-C-Oral-Guide.docx`,
+`docs/build_role_c_oral.py`, Role C weekly/evidence/status/history documents.
+
+**Verification:**
+
+- `wsl python3 -m pytest tests/test_filesystem_service.py
+  tests/test_transfer_manager.py tests/test_threaded_server.py
+  tests/test_e2e_transfer.py -q` — **24 passed in 31.37s**.
+- Microsoft Word PDF export + PyMuPDF PNG render — **19/19 pages inspected**;
+  no clipping, overlap or split table rows in the final build.

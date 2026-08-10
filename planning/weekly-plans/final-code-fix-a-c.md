@@ -280,16 +280,32 @@ passed** với 357 subtests. Evidence chi tiết:
 ## Screenshot evidence giao Role A
 
 - [ ] `role-a-mode-b-pasv-roundtrip.png`: hiện `200 Mode Block`, PASV upload +
-  download và SHA-256 source/server/client bằng nhau.
+  download và SHA-256 source/server/client bằng nhau. Lưu cùng
+  `docs/evidence/role-a-mode-b-pasv.log` và
+  `docs/evidence/role-a-mode-b-pasv-sha256.txt`.
 - [ ] `role-a-mode-c-active-roundtrip.png`: hiện `200 Mode Compressed`, ACTIVE
-  upload + download và SHA-256 bằng nhau.
+  upload + download và SHA-256 bằng nhau. Ưu tiên hai máy/LAN; nếu chỉ chạy
+  localhost phải ghi rõ. Lưu cùng `docs/evidence/role-a-mode-c-active.log` và
+  `docs/evidence/role-a-mode-c-active-sha256.txt`.
 - [ ] `role-a-concurrent-b-c-sessions.png`: hai client B/C đồng thời; server log
-  có client IP, command, kết quả transfer và active-session table.
+  có client IP, command, `MODE`, kết quả transfer và active-session table với
+  `alive: True`. Lưu terminal server sạch thành
+  `docs/evidence/role-a-concurrent-b-c-sessions.log`; ảnh phải thấy ít nhất hai
+  session đang active, không chỉ output pytest pass.
+- [ ] `role-a-control-command-evidence.png`: một terminal control-channel sạch
+  có `220`, `USER/PASS`, một login sai trả `530`, `STAT <path>`, `HELP MODE`,
+  `STOU extra → 501`, rồi `QUIT → 221`. Lưu transcript thành
+  `docs/evidence/role-a-control-command-evidence.log` để chứng minh các fix Role
+  A mới chạy thật, không chỉ unit test.
 - [ ] `role-a-final-pytest.png`: fresh full regression trên commit release; không
-  tái sử dụng ảnh `pytest-186-passed.png`.
+  tái sử dụng ảnh `pytest-186-passed.png`. Lưu output không cắt dòng thành
+  `docs/evidence/role-a-final-pytest.log` và ảnh phải hiện command + tổng pass.
 - [ ] Lưu ảnh trong `docs/evidence/screenshots/`, không lộ password/dữ liệu riêng;
   ghi ngày, commit hash, máy chạy và embed vào report §7. Screenshot không thay
   thế log/hash/test text.
+- [ ] Không dùng `final-lan-pasv-server.png` làm final evidence: ảnh đó có startup
+  `ModuleNotFoundError` và snapshot `alive: False`. Chỉ giữ như artifact lịch sử;
+  evidence mới phải là terminal không có lỗi startup.
 
 ## Phần ngoài scope Role C
 
@@ -299,3 +315,13 @@ các integration gap này và ghi attribution rõ trong evidence/history; việc
 không chuyển ownership từ A sang C.
 Session Structure, contribution percentage và GenAI historical backfill cũng
 không được tự động đóng trong checklist này.
+
+## Role C oral evidence — 10/08/2026
+
+- [x] Audit rubric, code hiện tại, tests và evidence theo đúng source priority.
+- [x] Tạo `docs/Role-C-Oral-Guide.docx` gồm đủ 20 mục TCREI.
+- [x] Để trống các phần chưa có implementation/evidence: MODE B/C, STAT path,
+  TCP buffered framing, contribution % và release commit/hash.
+- [x] Fresh focused Role C: **24 passed trong 31.37s**.
+- [x] Word/PDF render QA: **19/19 trang đã kiểm tra**, không clipping/overlap
+  hoặc split table row.

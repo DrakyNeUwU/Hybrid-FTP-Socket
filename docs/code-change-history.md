@@ -66,6 +66,16 @@ Current post-handoff full regression: **205 passed in 103.08s**. Earlier
 212/213-test records above describe superseded code and must not be used as the
 current release claim.
 
+## 10/08/2026 — Role C oral guide and evidence refresh
+
+| Role | Problem | Files / behavior changed | Verification |
+|---|---|---|---|
+| C | Oral material had to follow the live rubric/code and avoid filling unimplemented features from stale docs | Added a reproducible 20-section Vietnamese Word guide; its MODE B/C notes reflected the pre-pull handoff baseline and must be refreshed against the implementation below | Focused Role C suite: 24 passed in 31.37s; final Word render: 19/19 pages visually inspected |
+
+This documentation-only change did not alter production code, public APIs or
+the RDT wire format. The later Role A integration below supersedes the oral
+guide's earlier MODE B/C pending note.
+
 ## 10/08/2026 — Role A functional MODE S/B/C (post-handoff)
 
 | Role | Problem | Files / behavior changed | Verification |

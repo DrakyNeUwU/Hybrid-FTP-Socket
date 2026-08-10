@@ -35,6 +35,9 @@
   **13 passed, 8 subtests in 77.13s** (thêm server-stop mid-B-upload).
 - Active and PASV localhost/LAN SHA-256 values match across source, server, and
   client artifacts under `docs/evidence/`.
+- Role C oral-guide refresh: focused filesystem/transfer/thread/E2E suite —
+  **24 passed in 31.37s**; final `Role-C-Oral-Guide.docx` — **19/19 pages
+  visually inspected**. Pending A/B/team items remain blank in that guide.
 
 Update this document only when real status changes. Every `Done` claim must
 have command, log, hash, screenshot, or other concrete evidence.
