@@ -25,6 +25,7 @@ class FTPClient:
         download_dir: str = "./client/downloads",
         progress_callback: TransferProgressCallback | None = None,
         transfer_mode: str = "S",
+        transfer_type: str = "I",
     ):
         self.server_ip = server_ip
         self.control_port = control_port
@@ -32,9 +33,14 @@ class FTPClient:
         self.download_dir = download_dir
         self.progress_callback = progress_callback
         self.transfer_mode = transfer_mode.upper()
+        self.transfer_type = transfer_type.upper()
         self._negotiated_mode = None
+        self._negotiated_type = None
+        self._reply_buffer = bytearray()
         if self.transfer_mode not in ("S", "B", "C"):
             raise ValueError(f"Unsupported transfer mode: {transfer_mode!r}")
+        if self.transfer_type not in ("A", "I"):
+            raise ValueError(f"Unsupported transfer type: {transfer_type!r}")
         os.makedirs(self.download_dir, exist_ok=True)
 
     def connect(self) -> str:
@@ -50,13 +56,19 @@ class FTPClient:
     def close(self) -> None:
         try:
             self.command("QUIT")
-        except OSError:
+        except (OSError, ConnectionError):
             pass
         self.control_socket.close()
 
     def command(self, value: str) -> str:
         self.control_socket.sendall(f"{value}\r\n".encode("utf-8"))
-        return self._recv_reply()
+        command_name = value.strip().split(maxsplit=1)[0].upper() if value.strip() else ""
+        if command_name in ("LIST", "NLST"):
+            reply = self._recv_listing_reply()
+        else:
+            reply = self._recv_reply()
+        self._record_successful_negotiation(value, reply)
+        return reply
 
     def set_mode(self, mode: str) -> str:
         """Negotiate a transfer mode; the local mode only changes after a 200."""
@@ -68,6 +80,20 @@ class FTPClient:
             self.transfer_mode = normalized
             self._negotiated_mode = normalized
         return reply
+
+    def set_type(self, transfer_type: str) -> str:
+        """Negotiate ASCII/Image representation after a successful 200 reply."""
+        normalized = transfer_type.upper()
+        if normalized not in ("A", "I"):
+            raise ValueError(f"Unsupported transfer type: {transfer_type!r}")
+        return self.command(f"TYPE {normalized}")
+
+    def _ensure_transfer_type(self) -> None:
+        if self._negotiated_type == self.transfer_type:
+            return
+        reply = self.command(f"TYPE {self.transfer_type}")
+        if not reply.startswith("200"):
+            raise RuntimeError(reply.strip())
 
     def _ensure_transfer_mode(self) -> None:
         if self._negotiated_mode == self.transfer_mode:
@@ -96,6 +122,7 @@ class FTPClient:
         return data_socket, (self.server_ip, int(match.group(1)))
 
     def download_file(self, remote_filename: str, mode: str = "PASV") -> bool:
+        self._ensure_transfer_type()
         self._ensure_transfer_mode()
         if mode.upper() == "PASV":
             data_socket, endpoint = self._pasv_download_socket()
@@ -122,6 +149,7 @@ class FTPClient:
                 destination,
                 transfer_id=wire_transfer_id,
                 mode=self.transfer_mode,
+                transfer_type=self.transfer_type,
                 progress_callback=lambda _tid, done, total: self._notify_progress(
                     "download", remote_filename, done, total
                 ),
@@ -133,6 +161,7 @@ class FTPClient:
 
     def upload_file(self, local_filepath: str, remote_filename: str,
                     cmd: str = "STOR", mode: str = "PASV") -> bool:
+        self._ensure_transfer_type()
         self._ensure_transfer_mode()
         if mode.upper() == "PASV":
             data_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -151,6 +180,7 @@ class FTPClient:
                 transfer_id=normalize_transfer_id(transfer_id),
                 udp_socket=data_socket,
                 mode=self.transfer_mode,
+                transfer_type=self.transfer_type,
                 progress_cb=lambda done, total: self._notify_progress(
                     "upload", remote_filename, done, total
                 ),
@@ -161,6 +191,7 @@ class FTPClient:
             data_socket.close()
 
     def upload_unique_file(self, local_filepath: str, mode: str = "PASV") -> bool:
+        self._ensure_transfer_type()
         self._ensure_transfer_mode()
         if mode.upper() == "PASV":
             data_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -176,6 +207,7 @@ class FTPClient:
                 transfer_id=normalize_transfer_id(transfer_id),
                 udp_socket=data_socket,
                 mode=self.transfer_mode,
+                transfer_type=self.transfer_type,
             )
             return ok and self._recv_reply().startswith("226")
         finally:
@@ -214,7 +246,52 @@ class FTPClient:
         data_socket.sendto(probe.serialize(), endpoint)
 
     def _recv_reply(self) -> str:
-        return self.control_socket.recv(4096).decode("utf-8")
+        first = self._recv_line()
+        lines = [first]
+        if len(first) >= 4 and first[:3].isdigit() and first[3:4] == b"-":
+            terminal = first[:3] + b" "
+            while True:
+                line = self._recv_line()
+                lines.append(line)
+                if line.startswith(terminal):
+                    break
+        return b"".join(lines).decode("utf-8")
+
+    def _recv_listing_reply(self) -> str:
+        first = self._recv_line()
+        lines = [first]
+        if not first.startswith(b"150"):
+            return first.decode("utf-8")
+        while True:
+            line = self._recv_line()
+            lines.append(line)
+            if len(line) >= 3 and line[:3] in (b"226", b"425", b"426", b"450", b"550"):
+                break
+        return b"".join(lines).decode("utf-8")
+
+    def _recv_line(self) -> bytes:
+        while b"\r\n" not in self._reply_buffer:
+            chunk = self.control_socket.recv(4096)
+            if not chunk:
+                raise ConnectionError("Control connection closed before complete FTP reply")
+            self._reply_buffer.extend(chunk)
+        line, remainder = self._reply_buffer.split(b"\r\n", 1)
+        self._reply_buffer = bytearray(remainder)
+        return bytes(line) + b"\r\n"
+
+    def _record_successful_negotiation(self, value: str, reply: str) -> None:
+        if not reply.startswith("200"):
+            return
+        parts = value.strip().split()
+        if len(parts) != 2:
+            return
+        command_name, argument = parts[0].upper(), parts[1].upper()
+        if command_name == "MODE" and argument in ("S", "B", "C"):
+            self.transfer_mode = argument
+            self._negotiated_mode = argument
+        elif command_name == "TYPE" and argument in ("A", "I"):
+            self.transfer_type = argument
+            self._negotiated_type = argument
 
     def _notify_progress(
         self, direction: str, filename: str, transferred: int, total: int | None

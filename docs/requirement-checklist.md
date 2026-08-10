@@ -6,7 +6,7 @@
 
 | Requirement / acceptance gate | Status | Owner | Evidence |
 |---|---|---|---|
-| TCP control, replies, authentication, MODE S/B/C, and session isolation | In progress | A | MODE S/B/C functional and tested; strict auth, STAT/HELP/STOU and client framing still pending A |
+| TCP control, replies, authentication, MODE S/B/C, and session isolation | Integrated | A; C review | Strict auth, STAT/HELP/STOU, buffered framing and MODE/TYPE state verified; A screenshots/release review pending |
 | Commands, filesystem routing, and FTP-root safety | In progress | A/C | C filesystem scope verified; A command compliance re-verification pending |
 | UDP/RDT ACK, retry, checksum, FIN, and Go-Back-N | Done | B/C | Protocol and fault tests |
 | Active/PASV upload and download | Done | A/B/C | Localhost and LAN SHA-256 evidence; current post-handoff regression passes |
@@ -29,5 +29,11 @@
 - Reliability: B/C-encoded payloads recover under loss/corruption/ACK-loss via
   RDT; malformed stream returns 426 with no partial file. Tests:
   `tests/test_rdt_fault_injection.py`, `tests/test_transfer_manager.py`.
-- Full regression: `python3 -m pytest -q` — **256 passed, 357 subtests in
-  167.08s**.
+- Full regression: `python3 -m pytest -q` — **271 passed, 357 subtests in
+  192.88s** after C production review.
+- Negative production evidence now covers MODE mismatch → `426`, atomic client
+  download preserving an existing destination, strict authentication and split/
+  coalesced/multiline TCP replies. Evidence:
+  `docs/evidence/role-a-production-review-2026-08-10.md`.
+- Remaining: Role B review of the 10-byte START payload and Role A MODE B/C
+  screenshot capture/embedding. Do not mark Accepted before both records exist.

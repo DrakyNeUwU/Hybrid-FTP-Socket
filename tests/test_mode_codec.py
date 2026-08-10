@@ -21,6 +21,7 @@ from common.mode_codec import (
     decode_chunks,
     encode_chunks,
     normalize_mode,
+    normalize_transfer_type,
 )
 
 WIRE_CHUNK_SIZE = 1024
@@ -126,6 +127,15 @@ class TestWireFormat(unittest.TestCase):
         # empty file -> bare EOF escape
         self.assertEqual(join(compressed_encode([b""])), b"\x00\x40")
 
+    def test_compressed_filler_depends_on_transfer_type(self):
+        ascii_wire = join(compressed_encode([b"   "], "A"))
+        image_wire = join(compressed_encode([b"\x00\x00\x00"], "I"))
+        self.assertEqual(ascii_wire, b"\xc3\x00\x40")
+        self.assertEqual(image_wire, b"\xc3\x00\x40")
+        self.assertEqual(join(compressed_decode([ascii_wire], "A")), b"   ")
+        self.assertEqual(join(compressed_decode([image_wire], "I")), b"\x00" * 3)
+        self.assertNotEqual(join(compressed_decode([ascii_wire], "I")), b"   ")
+
     def test_wire_chunks_never_exceed_budget(self):
         for mode in (MODE_STREAM, MODE_BLOCK, MODE_COMPRESSED):
             for payload in (os.urandom(100000), b"Z" * 100000, b"\x00" * 100000):
@@ -201,6 +211,8 @@ class TestDispatcher(unittest.TestCase):
         self.assertEqual(normalize_mode("b"), "B")
         self.assertEqual(normalize_mode(" c "), "C")
         self.assertEqual(normalize_mode(None), "S")
+        self.assertEqual(normalize_transfer_type("a"), "A")
+        self.assertEqual(normalize_transfer_type(None), "I")
 
     def test_mode_error_maps_to_426(self):
         try:

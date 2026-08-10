@@ -6,7 +6,7 @@ from collections.abc import Iterable, Iterator
 from typing import Callable
 
 from common.RDTHeader import RDTHeader
-from common.rdt_context import normalize_transfer_id
+from common.rdt_context import encode_start_metadata, normalize_transfer_id
 
 DEFAULT_TIMEOUT_S: float = 0.5
 DEFAULT_RETRY_LIMIT: int = 10
@@ -32,6 +32,8 @@ class RDTSenderAdapter:
         cancel_event: threading.Event | None = getattr(context, "cancel_event", None)
         total_bytes: int | None = getattr(context, "total_bytes", None)
         window_size: int = int(getattr(context, "window_size", DEFAULT_WINDOW_SIZE))
+        transfer_mode: str = getattr(context, "transfer_mode", "S")
+        transfer_type: str = getattr(context, "transfer_type", "I")
 
         try:
             return send_chunks_rdt(
@@ -45,6 +47,8 @@ class RDTSenderAdapter:
                 cancel_event=cancel_event,
                 total_bytes=total_bytes,
                 window_size=window_size,
+                transfer_mode=transfer_mode,
+                transfer_type=transfer_type,
             )
         except RuntimeError as exc:
             raise RuntimeError(str(exc)) from exc
@@ -62,6 +66,8 @@ def send_chunks_rdt(
     cancel_event: threading.Event | None = None,
     total_bytes: int | None = None,
     window_size: int = DEFAULT_WINDOW_SIZE,
+    transfer_mode: str = "S",
+    transfer_type: str = "I",
 ) -> int:
     """Send chunks with a bounded Go-Back-N window.
 
@@ -85,6 +91,7 @@ def send_chunks_rdt(
         _send_start_with_ack(
             udp_socket, transfer_id, total_bytes, resolved_ip, dest_port,
             retry_limit, cancel_event,
+            transfer_mode, transfer_type,
         )
         pending = enumerate(_lookahead(chunks))
         pending_exhausted = False
@@ -160,6 +167,7 @@ def send_file_rdt(
     transfer_id: int | None = None,
     udp_socket: socket.socket | None = None,
     mode: str = "S",
+    transfer_type: str = "I",
 ) -> bool:
     import random
     import os
@@ -193,7 +201,7 @@ def send_file_rdt(
 
     try:
         send_chunks_rdt(
-            encode_chunks(_counted(read_file_chunks(filepath)), mode),
+            encode_chunks(_counted(read_file_chunks(filepath)), mode, transfer_type),
             dest_ip,
             dest_port,
             transfer_id,
@@ -201,6 +209,8 @@ def send_file_rdt(
             retry_limit=max_retries,
             cancel_event=cancel_event,
             total_bytes=total_size,
+            transfer_mode=mode,
+            transfer_type=transfer_type,
         )
         return True
     except RuntimeError as exc:
@@ -250,9 +260,10 @@ def _send_start(
     total_bytes: int | None,
     dest_ip: str,
     dest_port: int,
+    transfer_mode: str,
+    transfer_type: str,
 ) -> None:
-    import struct as _struct
-    size_payload = _struct.pack("!Q", total_bytes if total_bytes is not None else 0)
+    size_payload = encode_start_metadata(total_bytes, transfer_mode, transfer_type)
     try:
         hdr = RDTHeader(
             transfer_id=transfer_id,
@@ -275,13 +286,18 @@ def _send_start_with_ack(
     dest_port: int,
     retry_limit: int,
     cancel_event: threading.Event,
+    transfer_mode: str,
+    transfer_type: str,
 ) -> None:
     """Send START until its ACK arrives or the bounded retry limit is reached."""
     for attempt in range(1, retry_limit + 1):
         if cancel_event.is_set():
             _send_abort(sock, transfer_id, 0, dest_ip, dest_port)
             raise RuntimeError("Transfer cancelled before START")
-        _send_start(sock, transfer_id, total_bytes, dest_ip, dest_port)
+        _send_start(
+            sock, transfer_id, total_bytes, dest_ip, dest_port,
+            transfer_mode, transfer_type,
+        )
         try:
             ack_data, addr = sock.recvfrom(RDTHeader.size + 64)
         except socket.timeout:

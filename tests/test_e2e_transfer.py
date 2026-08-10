@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import socket
 import tempfile
 import threading
 import time
@@ -10,6 +11,8 @@ import unittest
 
 from client.ftp_client import FTPClient
 from common.file_handler import compute_hash, read_file_bytes, write_file
+from common.rdt_context import normalize_transfer_id
+from common.rdt_sender import send_file_rdt
 from server.threaded_server import FTPServer
 
 
@@ -116,6 +119,7 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
         addition = os.path.join(self.temp_dir.name, "block-add.bin")
         write_file(addition, b"block-append-" * 300)
 
+        self.assertTrue(self.client.set_mode("B").startswith("200"))
         self.assertTrue(self.client.upload_file(addition, "block-append.bin", cmd="APPE", mode="PASV"))
         target = os.path.join(self.root, "block-append.bin")
         self.assertEqual(read_file_bytes(target), read_file_bytes(addition))
@@ -132,6 +136,35 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
             self.assertEqual(compute_hash(addition), compute_hash(unique_path))
         finally:
             client.close()
+
+    def test_start_metadata_mode_mismatch_fails_without_publishing(self):
+        """A sender using S after MODE B must get 426, never silent corruption."""
+        source = os.path.join(self.temp_dir.name, "crafted-stream.bin")
+        write_file(source, b"\x40\x00\x03abc")
+        self.assertTrue(self.client.set_mode("B").startswith("200"))
+        data_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        data_socket.bind(("0.0.0.0", 0))
+        endpoint = self.client.enter_pasv()
+        try:
+            preliminary = self.client.command("STOR mismatch.bin")
+            transfer_id = self.client._transfer_id_from_reply(preliminary)
+            self.assertFalse(
+                send_file_rdt(
+                    source,
+                    endpoint[0],
+                    endpoint[1],
+                    transfer_id=normalize_transfer_id(transfer_id),
+                    udp_socket=data_socket,
+                    mode="S",
+                    transfer_type="I",
+                )
+            )
+            final_reply = self.client._recv_reply()
+            self.assertTrue(final_reply.startswith("426"), final_reply)
+            self.assertFalse(os.path.exists(os.path.join(self.root, "mismatch.bin")))
+            self.assertFalse(self._temporary_files("mismatch.bin"))
+        finally:
+            data_socket.close()
 
     def test_mode_progress_counts_logical_bytes(self):
         """B/C progress never exceeds the logical size and reaches it exactly."""

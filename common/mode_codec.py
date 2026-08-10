@@ -37,7 +37,8 @@ BLOCK_FLAG_RESTART = 0x10  # 16: data block is a restart marker
 # RFC 959 §3.4.3 Compressed mode primitives.
 COMPRESSED_MAX_LITERAL = 127
 COMPRESSED_MAX_RUN = 63
-COMPRESSED_FILLER_BYTE = 0x00  # Image/Local representation type filler
+COMPRESSED_FILLER_BINARY = 0x00
+COMPRESSED_FILLER_ASCII = 0x20
 COMPRESSED_ESCAPE_BYTE = 0x00
 COMPRESSED_DESCRIPTOR_EOF = BLOCK_FLAG_EOF  # 0x00 0x40 escape ends the file
 
@@ -56,6 +57,22 @@ def normalize_mode(mode: str | None) -> str:
     if normalized not in VALID_MODES:
         raise ModeCodecError(f"Unknown transfer mode: {mode!r}")
     return normalized
+
+
+def normalize_transfer_type(transfer_type: str | None) -> str:
+    """Return the supported FTP representation type (ASCII or Image)."""
+    normalized = "I" if transfer_type is None else str(transfer_type).strip().upper()
+    if normalized not in ("A", "I"):
+        raise ModeCodecError(f"Unknown transfer type: {transfer_type!r}")
+    return normalized
+
+
+def compressed_filler_byte(transfer_type: str | None) -> int:
+    return (
+        COMPRESSED_FILLER_ASCII
+        if normalize_transfer_type(transfer_type) == "A"
+        else COMPRESSED_FILLER_BINARY
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -144,9 +161,12 @@ def block_decode(chunks: Iterable[bytes]) -> Iterator[bytes]:
 #   escape         00 40                 (EOF)
 # ---------------------------------------------------------------------------
 
-def compressed_encode(chunks: Iterable[bytes]) -> Iterator[bytes]:
+def compressed_encode(
+    chunks: Iterable[bytes], transfer_type: str | None = "I"
+) -> Iterator[bytes]:
     source = iter(chunks)
     buffer = bytearray()
+    filler_byte = compressed_filler_byte(transfer_type)
 
     def fill(needed: int) -> bool:
         nonlocal buffer
@@ -172,7 +192,7 @@ def compressed_encode(chunks: Iterable[bytes]) -> Iterator[bytes]:
 
         if run >= 2:
             del buffer[:run]
-            if byte == COMPRESSED_FILLER_BYTE:
+            if byte == filler_byte:
                 yield bytes([0xC0 | run])
             else:
                 yield bytes([0x80 | run, byte])
@@ -191,10 +211,13 @@ def compressed_encode(chunks: Iterable[bytes]) -> Iterator[bytes]:
     yield bytes([COMPRESSED_ESCAPE_BYTE, COMPRESSED_DESCRIPTOR_EOF])
 
 
-def compressed_decode(chunks: Iterable[bytes]) -> Iterator[bytes]:
+def compressed_decode(
+    chunks: Iterable[bytes], transfer_type: str | None = "I"
+) -> Iterator[bytes]:
     source = iter(chunks)
     buffer = bytearray()
     eof_seen = False
+    filler_byte = compressed_filler_byte(transfer_type)
 
     def fill(needed: int) -> bool:
         nonlocal buffer
@@ -237,7 +260,7 @@ def compressed_decode(chunks: Iterable[bytes]) -> Iterator[bytes]:
             count = header & 0x3F
             if count == 0:
                 raise ModeCodecError("Invalid zero-length filler run")
-            yield bytes([COMPRESSED_FILLER_BYTE]) * count
+            yield bytes([filler_byte]) * count
         else:
             count = header & 0x3F
             if count == 0:
@@ -268,21 +291,25 @@ def _batch_wire(primitives: Iterable[bytes], size: int = WIRE_CHUNK_SIZE) -> Ite
 # Dispatchers used by the transfer boundary (server and client).
 # ---------------------------------------------------------------------------
 
-def encode_chunks(chunks: Iterable[bytes], mode: str | None) -> Iterator[bytes]:
+def encode_chunks(
+    chunks: Iterable[bytes], mode: str | None, transfer_type: str | None = "I"
+) -> Iterator[bytes]:
     normalized = normalize_mode(mode)
     if normalized == MODE_STREAM:
         yield from chunks
     elif normalized == MODE_BLOCK:
         yield from _batch_wire(block_encode(chunks))
     else:
-        yield from _batch_wire(compressed_encode(chunks))
+        yield from _batch_wire(compressed_encode(chunks, transfer_type))
 
 
-def decode_chunks(chunks: Iterable[bytes], mode: str | None) -> Iterator[bytes]:
+def decode_chunks(
+    chunks: Iterable[bytes], mode: str | None, transfer_type: str | None = "I"
+) -> Iterator[bytes]:
     normalized = normalize_mode(mode)
     if normalized == MODE_STREAM:
         yield from chunks
     elif normalized == MODE_BLOCK:
         yield from block_decode(chunks)
     else:
-        yield from compressed_decode(chunks)
+        yield from compressed_decode(chunks, transfer_type)

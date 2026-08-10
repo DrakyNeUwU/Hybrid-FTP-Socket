@@ -1,5 +1,6 @@
 import os
 import hashlib
+import tempfile
  
 DEFAULT_CHUNK_SIZE = 1024
 
@@ -38,6 +39,37 @@ def write_file_from_chunks(path: str, chunks) -> int:
             written = f.write(chunk)
             total_written += written
     return total_written
+
+
+def write_file_from_chunks_atomic(path: str, chunks) -> int:
+    """Write a client download atomically while preserving an existing target."""
+    parent_dir = os.path.dirname(path) or "."
+    os.makedirs(parent_dir, exist_ok=True)
+    basename = os.path.basename(path)
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            prefix=f".{basename}.",
+            suffix=".part",
+            dir=parent_dir,
+            delete=False,
+        ) as output:
+            temporary_path = output.name
+            total_written = 0
+            for chunk in chunks:
+                total_written += output.write(chunk)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary_path, path)
+        temporary_path = None
+        return total_written
+    finally:
+        if temporary_path is not None:
+            try:
+                os.remove(temporary_path)
+            except OSError:
+                pass
 
 def append_to_file(path: str, data: bytes) -> int:
     parent_dir = os.path.dirname(path)

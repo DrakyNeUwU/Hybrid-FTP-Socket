@@ -60,7 +60,7 @@ server; Role B giữ RDT wire layout 20-byte.
 | Transfer manager | `pytest tests/test_transfer_manager.py -q` | 12 passed (0.06s) |
 | RDT fault B/C | `pytest tests/test_rdt_fault_injection.py -q` | 19 passed, 11 subtests (71.99s) |
 | E2E matrix | `pytest tests/test_e2e_transfer.py -q` | 13 passed, 8 subtests (77.13s) |
-| Full regression | `pytest -q` | 256 passed, 357 subtests (167.08s) |
+| Full regression after C production review | `pytest -q` | 271 passed, 357 subtests (192.88s) |
 
 Baseline lịch sử: focused Role A pre-MODE (C-FIX03) = **24 passed / 33.80s**.
 Re-run hiện tại của 4-file set đó = **39 passed, 8 subtests / 80.48s** vì
@@ -103,6 +103,8 @@ transfer-manager tăng 10→12 và e2e tăng 12→13.
 
 ## 7. Kết luận
 
-Full regression **256 passed, 357 subtests, không failure**. RDT wire layout
-không đổi; filesystem sandbox, atomic `.part`, shared locks và concurrency của
-Role C giữ nguyên. Chờ cross-review B/C và git release để đóng release.
+Full regression **271 passed, 357 subtests, không failure** sau khi C sửa silent
+MODE mismatch, client atomic download, TCP framing và command gaps. RDT header
+vẫn 20 byte; START payload thêm MODE/TYPE cần B review. Filesystem sandbox,
+atomic `.part`, shared locks và concurrency của Role C giữ nguyên. Chờ screenshot
+Role A, cross-review B và git release để đóng release.

@@ -147,6 +147,8 @@ class TransferContext:
     max_timeouts: int
     window_size: int = 4
     total_bytes: int | None
+    transfer_mode: str = "S"
+    transfer_type: str = "I"
 
 @dataclass(frozen=True)
 class TransferResult:
@@ -159,7 +161,10 @@ class TransferResult:
 
 `transfer_id` is generated per transfer by the session/command lifecycle and is
 copied into every RDT packet as a normalized unsigned 32-bit wire value.
-**Status:** Existing and covered by protocol plus FTP E2E tests.
+`transfer_mode` and `transfer_type` are copied from the authenticated session;
+they are validated against the RDT START metadata before a receiver publishes
+decoded bytes. **Status:** Implemented and verified; Role B contract review of
+the START payload extension remains pending.
 
 ## 5. FTP reply mapping
 
@@ -233,8 +238,8 @@ split or coalesce `150` and `226` without changing transfer lifecycle order.
 `LIST`/`NLST` use a dedicated reader that collects the textual body through its
 final `226`; RETR/STOR still return after `150` so UDP transfer can proceed.
 
-**Status:** Existing and verified by split, coalesced, multiline and listing
-client tests.
+**Status:** Existing and verified by `tests/test_ftp_client.py` split,
+coalesced, multiline and listing tests on 10/08/2026.
 
 ## 6.3 MODE handoff boundary
 
@@ -246,9 +251,12 @@ ordered, checksum-validated RDT delivery, so the FTP root only ever stores
 logical decoded bytes. This implementation remains entirely outside the
 canonical 20-byte RDT header.
 
-**Status:** S/B/C implemented and verified (exact replies/state, codec
-round-trips, PASV/ACTIVE SHA-256 E2E, malformed → 426 atomic, RDT fault
-recovery over B/C payloads). Cross-role contract review pending.
+TYPE A uses the RFC ASCII space filler in compressed mode; TYPE I uses NUL.
+The START payload carries MODE/TYPE so a mismatched encoder is rejected with
+`426` before publication. **Status:** integrated and verified (exact replies,
+state, codec round-trips, PASV/ACTIVE SHA-256 E2E, mismatch/malformed → atomic
+`426`, and RDT fault recovery). Role B review and Role A screenshots remain
+pending before final acceptance.
 
 ## 7. RDT packet contract
 
@@ -271,7 +279,11 @@ wire-breaking header redesign.
 
 Flag values are DATA `0x01`, ACK `0x02`, FIN `0x04`, START `0x08` and ABORT
 `0x10`; illegal combinations are dropped.
-`START` carries transfer metadata; `DATA` carries bytes; `ACK` carries the exact
+`START` carries a 10-byte metadata payload: unsigned 64-bit logical size, one
+ASCII MODE byte (`S/B/C`) and one ASCII TYPE byte (`A/I`). This extends the
+former size-only payload without changing the canonical 20-byte header. Direct
+low-level receivers can identify the legacy 8-byte size payload; production
+transfers require matching MODE/TYPE metadata. `DATA` carries bytes; `ACK` carries the exact
 acknowledged sequence; `FIN` explicitly closes data; `ABORT` cancels.
 
 Policy: sender accepts ACK only from the expected UDP peer, matching transfer ID
@@ -356,3 +368,4 @@ count and result. The demo client renders real upload/download progress.
 | 2026-08-10 | Accepted MODE S/B/C as per-session TCP negotiation labels | A command state; C integration review; unified RDT data path and wire layout unchanged | MODE/E2E 61 passed + 28 subtests; full WSL2 213 passed + 28 subtests in 108.71s |
 | 2026-08-10 | Reverted AI-applied Role A final-fix for owner handoff | A scope returned to A; C shared filesystem/concurrency changes retained | Role C focused 24 passed in 33.80s; current full WSL2 205 passed in 103.08s |
 | 2026-08-10 | Functional MODE S/B/C codecs on the production path | A implementation; encode before RDT, decode after RDT; canonical 20-byte RDT header unchanged; C filesystem/atomic `.part`/locks retained | Codec/command 83 passed + 338 subtests; transfer-manager 12 passed; RDT fault over B/C 19 passed + 11 subtests; E2E matrix 13 passed + 8 subtests; full pytest 256 passed, 357 subtests in 167.08s |
+| 2026-08-10 | Production review hardening for MODE/TYPE state and failure atomicity | C integration fix of A-owned requirements; START payload now includes logical size + MODE + TYPE, header stays 20 bytes; B review pending | Targeted 140 passed + 338 subtests; E2E 14 passed + 8 subtests; fault 19 passed + 11 subtests; full 271 passed + 357 subtests in 192.88s |

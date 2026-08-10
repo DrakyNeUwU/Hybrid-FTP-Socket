@@ -1,6 +1,6 @@
 # 4. Control Channel — TCP
 
-**Status:** In progress — final implementation/review returned to Role A
+**Status:** Integrated — C production audit passed; release evidence pending
 **Purpose:** Describe the TCP control-channel architecture, parser, session
 management, 28-command matrix, MODE negotiation, and FTP-reply mapping.
 **Requirement:** RQ-02, RQ-03, RQ-05, RQ-10. **Owner:** Role A. **Reviewer:** Role C.  
@@ -30,7 +30,9 @@ The required FTP commands are implemented: `USER`, `PASS`, `QUIT`, `NOOP`,
 
 `LIST` and `NLST` return textual metadata on the TCP control channel. They do
 not create a UDP endpoint or RDT transfer lifecycle. UDP/RDT is reserved for
-file payloads in `RETR`, `STOR`, `STOU`, and `APPE`.
+file payloads in `RETR`, `STOR`, `STOU`, and `APPE`. Authentication uses only
+configured credentials; `STAT <path>`, `HELP <command>` and `STOU` syntax are
+validated against the shared contract.
 
 ## 4.3 MODE and transfer lifecycle
 
@@ -42,7 +44,9 @@ packetization on send and decoding only after RDT checksum/order validation on
 receive; the FTP root always stores logical decoded bytes. Invalid
 (`MODE X`), missing-argument and unauthenticated commands return `501`/`530`
 without changing the session mode. File payload still uses the common custom
-UDP/RDT header, checksum, START/ACK, Go-Back-N and FIN lifecycle.
+UDP/RDT header, checksum, START/ACK, Go-Back-N and FIN lifecycle. START metadata
+adds logical size, MODE and TYPE while the canonical RDT header remains 20 bytes;
+a mismatch fails with `426` before file publication.
 
 For a file transfer, the handler requires `PORT` or `PASV`, sends `150` on TCP,
 and starts a bounded UDP/RDT worker. Success sends `226`; a failure or `ABOR`
@@ -59,10 +63,12 @@ python3 -m pytest tests/test_command_parser.py tests/test_commands.py \
 ```
 
 It reported **63 passed in 5.71s**, but this does not close the new Role A
-handoff. After the MODE S/B/C implementation the focused suite is
-**83 passed, 338 subtests** (`tests/test_mode_codec.py` +
-`tests/test_commands.py`) and the full suite reports **256 passed, 357 subtests
-in 167.08s**. Exact replies/state, PASV/ACTIVE SHA-256 round-trips, STOU/APPE,
+handoff. After the C production audit the targeted suite is **140 passed, 338
+subtests**, and the full suite reports **271 passed, 357 subtests in 192.88s**.
+Exact replies/state, split/coalesced/multiline client framing, PASV/ACTIVE
+SHA-256 round-trips, STOU/APPE,
 concurrent different-mode clients and logical-byte progress are covered by
-`tests/test_commands.py`, `tests/test_transfer_manager.py` and
-`tests/test_e2e_transfer.py`. RDT wire layout is unchanged.
+`tests/test_ftp_client.py`, `tests/test_commands.py`,
+`tests/test_transfer_manager.py` and `tests/test_e2e_transfer.py`. The RDT
+header layout is unchanged; B review of START metadata and A screenshots remain
+pending.
