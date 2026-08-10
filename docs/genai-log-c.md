@@ -949,3 +949,81 @@ files.
 
 **Verification:** Guide references real README commands, E2E test locator,
 existing LAN logs and SHA-256 artifacts.
+
+## August 10, 2026 — Final Shared-Filesystem and Release Evidence Pass
+
+**Exact prompt:**
+> "Implement the plan."
+
+**Raw GenAI output summary:**
+AI traced the lost-update risk to one `FilesystemService` and one lock registry
+being created per client. It proposed server ownership of a shared service,
+production-path concurrency tests, active-session log ordering, clean import
+checks and final evidence synchronization.
+
+**Manual refinement:**
+
+- Made `FTPServer` create one filesystem service after creating the FTP root;
+  each client borrows it through its `TransferManager`.
+- Added both identity and real two-client same-file APPE tests. The final file
+  must contain both complete payloads in either serialized order.
+- Moved the connected/session snapshot after `handler.start()` and verified
+  live sessions report `alive=True`.
+- Preserved the RDT binary layout and corrected only the report/API field order
+  and flag values. Embedded existing LAN logs, hashes and clean screenshots in
+  report §7.
+
+**Affected files:** threaded server/client integration, filesystem concurrency
+tests, final report/evidence, API contract, status/checklist and planning.
+
+**Verification:** focused A/C suite **71 passed + 28 subtests**; same-file APPE
+**1 passed in 3.96s**; import smoke **1 passed**; full WSL2 suite **212 passed +
+28 subtests in 97.52s**. Evidence:
+`docs/evidence/final-code-fix-verification.md`.
+
+## August 10, 2026 — MODE B/C Integration Review and Final Checklist
+
+**Exact prompt:**
+> "cái mode b/c sửa lại luôn đc không và bạn format lại final-code-fix-a-c thành các checklist cho dễ tick nha"
+
+**Raw GenAI output summary:**
+AI identified MODE as per-session TCP control state and proposed a production
+E2E transfer proving that accepting B/C does not break the shared RDT path.
+
+**Manual refinement:**
+
+- Reviewed the Role A MODE change against C's transfer boundary: no RDT header,
+  endpoint ownership, filesystem, atomic-write or cleanup rule changed.
+- Added E2E upload after MODE B and download after MODE C with SHA-256 equality.
+- Converted the A/C final code-fix document into task checklists and a DoD; Git
+  clean-after-commit remains unticked because this working tree is not committed.
+
+**Affected files:** E2E integration test, contract/report/status/evidence and
+`planning/weekly-plans/final-code-fix-a-c.md`.
+
+**Verification:** focused MODE/E2E run **61 passed + 28 subtests in 31.91s**;
+full WSL2 regression **213 passed + 28 subtests in 108.71s**. Evidence:
+`docs/evidence/final-code-fix-verification.md`.
+
+## August 10, 2026 — Revert Role A Implementation for Owner Handoff
+
+**Exact prompt:**
+> "cả 2 cái nha, coi như chỉ giao task và cho a làm"
+
+**Raw GenAI output summary:**
+AI separated the final A/C diff by module ownership and proposed reverting only
+Role A production code/tests while retaining Role C filesystem, concurrency and
+integration changes.
+
+**Manual refinement:**
+
+- Restored Role A's TCP client, command handler, command tests and legacy
+  client/server modules to their pre-final-fix Git state.
+- Removed AI-added Role A framing/import/MODE tests and the MODE B/C E2E case.
+- Kept C's shared `FilesystemService`, active-session ordering, same-file APPE
+  regression and RDT integration unchanged.
+- Converted the final-code-fix document to a Role C-only checklist; A tasks are
+  pending owner implementation and fresh evidence.
+
+**Verification:** Role C focused suite **24 passed in 33.80s**; current full
+WSL2 regression **205 passed in 103.08s**.

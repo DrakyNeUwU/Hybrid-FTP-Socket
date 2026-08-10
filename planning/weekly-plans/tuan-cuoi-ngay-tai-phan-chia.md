@@ -7,12 +7,12 @@
 
 | Task | DRI cuối | Deadline | Trạng thái | Blocker / evidence |
 |---|---|---|---|---|
-| Command/E2E must-submit | A | Trước report freeze | Done | 199 full tests; command/session audit 63 passed, FTP E2E evidence tại `docs/evidence/` |
+| Command/E2E must-submit | A | Trước report freeze | In progress | AI-applied A fixes reverted; A must implement and provide fresh evidence |
 | RDT must-submit | B | Trước report freeze | Done | RDT/fault tests trong full suite; hash Active/PASV |
 | LAN two-machine evidence | C | Khi có hai máy | Done | PASV/ACTIVE upload+download; source/server/client SHA-256 và server log khớp |
-| Final report + checklist + technical audit | B | Trước release check | Done (release pending) | A/C technical audit passed; contribution/Git release còn chờ |
+| Final report + checklist + technical audit | B | Trước release check | In progress | C audit passed; A implementation/audit, contribution and Git release pending |
 | Oral preparation + Git release check | B | Ngày trước nộp | In progress | Oral pack sẵn sàng; Git release check chưa có evidence |
-| C-F01 Excellent flow/congestion control | C | Trước C-F02/C-F03 | Done | Go-Back-N window 4; 199 full tests; B-F01 wire-contract verification complete |
+| C-F01 Excellent flow/congestion control | C | Trước C-F02/C-F03 | Done | Go-Back-N window 4; 212 full tests + 28 subtests; B-F01 wire-contract verification complete |
 
 **Thời gian:** 09/08/2026–12/08/2026  
 **Mục tiêu:** hoàn tất, kiểm chứng, demo, nộp và vấn đáp được toàn bộ Project 1.
@@ -32,11 +32,12 @@ Không tick task chỉ vì code đã có; phải có test, log, hash hoặc demo
 
 - `[x]` TCP control + session, filesystem sandbox, Active/PASV localhost,
   Go-Back-N window 4, hash, ABOR/disconnect cleanup, 3 client PASV đồng thời.
-- `[x]` Full WSL2 test after final C changes: **199 passed in 96.72s**; E2E localhost:
+- `[x]` Post-handoff full WSL2 test: **205 passed in 103.08s**; Role C focused:
+  **24 passed in 33.80s**; E2E localhost:
   **6 passed in 22.63s**.
 - `[x]` Progress CLI, server log che password và hash/log PASV đã có.
-- `[!]` `MODE B/C` hiện trả `502`; §2.2 không có cột Level thực tế, nên chỉ
-  review/ghi limitation trung thực, không tự thiết kế codec ngoài đề.
+- `[!]` `MODE S` trả `200`; `MODE B/C` hiện trả `502`. Functional block và
+  compressed algorithms được trả lại Role A triển khai/test.
 - `[x]` C-F01 dùng Go-Back-N window 4; protocol/fault/E2E/full regression đã
   pass. B wire-contract review được ghi nhận tại B-F01.
 - `[x]` START metadata có ACK và retry hữu hạn; retry/lifecycle được kiểm tra
@@ -48,7 +49,7 @@ Không tick task chỉ vì code đã có; phải có test, log, hash hoặc demo
 
 | Carry-over | Source | Trạng thái đầu tuần | Xử lý final week |
 |---|---|---|---|
-| `MODE S/B/C` command review | Week 2, requirement §2.2 | S có; B/C trả 502; bảng đề không có cột Level | `A-F01`; không thêm codec nếu không có requirement rõ |
+| `MODE S/B/C` command review | Week 2, requirement §2.2 | S có; B/C trả 502 | `A-F01`; Role A implement codec + command/session/E2E tests |
 | Congestion/flow control hoặc equivalent | Requirement §1.3 Excellent | Go-Back-N window 4 đã chốt | `C-F01` |
 | START metadata reliability | Role B Week 2 §4 | START ACK/retry hữu hạn đã chốt | `C-F01`, B review contract/test |
 | Transfer RDT core heavy coding | Week 1/2 Role B | Core đã integrate; phần mở rộng chuyển ownership | **Replaced by:** `C-F01`; B review contract/docs/test black-box trong `B-F01` |
@@ -84,7 +85,7 @@ phải qua integration/fault-injection test trước khi update report/evidence.
 
 ## 4. Role A — TCP control, command lifecycle và mode negotiation
 
-### [x] A-F01 — Rà command compliance và `MODE` theo requirement
+### [ ] A-F01 — Rà command compliance và `MODE` theo requirement
 
 **Owner:** Role A  
 **Dependency:** Không có; C-F01 chỉ nhận context RDT hiện có.  
@@ -95,37 +96,37 @@ structures.
 
 **Goal**
 
-Không trả thành công giả cho MODE chưa có data-path. Giữ `MODE S` hoạt động,
-kiểm tra B/C và ghi limitation/reply đúng theo requirement, thay vì tự thêm
-codec/format không được đề chỉ định.
+Role A hoàn thiện command compliance và triển khai MODE B/C có semantics thật;
+không chỉ đổi reply. Mode encoding nằm trước RDT và decoding nằm sau RDT để giữ
+nguyên wire header B/C.
 
 **Actions**
 
 - [x] Xác nhận `MODE S` state/reply/transfer path; test input invalid và session isolation.
-- [x] Rà `MODE B/C`: nếu không có implementation đã được requirement/team chốt,
-  giữ `502` và ghi rõ limitation trong HELP/report.
+- [ ] Role A implement `MODE B` block framing và `MODE C` compression/decompression.
 - [x] Bổ sung unit tests valid/invalid/unauthenticated/state isolation cho S/B/C.
 - [x] Cập nhật phần control/session/command map trong report và GenAI log A.
 
 **Review / Success checklist**
 
-- [x] `MODE S` trả 200; MODE B/C không bao giờ trả 200 nếu không có implementation thật.
-- [x] Một session đổi mode không ảnh hưởng session khác.
-- [x] Command matrix ghi rõ reply và status thực tế của MODE B/C.
+- [ ] `MODE S/B/C` trả reply đúng và cập nhật đúng session; invalid/unauthenticated
+  input trả `501`/`530`.
+- [ ] Một session đổi mode không ảnh hưởng session khác.
+- [ ] Command matrix ghi rõ reply và status thực tế của MODE B/C.
 
 **Definition of Done**
 
-- [x] Code + unit tests pass.
-- [x] Không có false-success cho MODE B/C.
-- [x] API contract/report/GenAI log A cập nhật.
+- [ ] Code + unit/E2E/fault tests pass.
+- [ ] B/C round-trip giữ SHA-256 ở Active/PASV và không phá RDT retry.
+- [ ] API contract/report/GenAI log A được Role A cập nhật.
 
 **Output / Deliverable:** code Role A, tests command/session, contract mode và
 phần report control channel.
 
-**Oral knowledge:** giải thích MODE khác Active/PASV và lý do `502` trung thực
-tốt hơn trả 200 cho chức năng chưa có.
+**Oral knowledge:** giải thích MODE khác Active/PASV; S/B/C là control-plane
+negotiation labels còn file payload dùng chung custom UDP/RDT data path.
 
-### [x] A-F02 — Command matrix qua TCP và transfer lifecycle cuối
+### [ ] A-F02 — Command matrix qua TCP và transfer lifecycle cuối
 
 **Owner:** Role A  
 **Dependency:** A-F01; C-F01 cho transfer mode; `FilesystemService` C.  
@@ -318,7 +319,7 @@ Role B có material kỹ thuật rõ ràng, không chỉ làm hành chính.
 | 9 | Checksum bảo vệ phần nào? | Header (checksum đặt 0 khi tính) và payload; packet lỗi bị bỏ. | `common/RDTHeader.py:66` |
 | 10 | FIN grace là gì? | Receiver còn lắng nghe ngắn để ACK lại FIN trùng khi ACK cuối bị mất. | `common/rdt_receiver.py:238` |
 | 11 | ABORT khác FIN thế nào? | FIN kết thúc thành công; ABORT hủy transfer và cleanup lỗi. | `common/rdt_receiver.py:170` |
-| 12 | MODE S/B/C hiện hỗ trợ đến đâu? | S được chấp nhận; B/C trả 502 trung thực, không claim codec chưa có. | `server/command_handler.py:245` |
+| 12 | MODE S/B/C hiện hỗ trợ đến đâu? | S trả 200; B/C đang 502 và là task Role A. | `server/command_handler.py` |
 | 13 | PORT và PASV khác nhau ở đâu? | PORT công bố endpoint client; PASV công bố endpoint server qua TCP control. | `server/command_handler.py:258`, `:296` |
 | 14 | Chặn path traversal bằng cách nào? | Resolve path rồi validate nằm trong FTP root trước thao tác. | `common/dir_manager.py:84` |
 | 15 | STOR an toàn khi bị hủy giữa chừng thế nào? | Ghi `.part`, chỉ replace atomically khi thành công; lỗi thì cleanup. | `common/filesystem_service.py:95`, `server/transfer_manager.py:40` |
@@ -326,7 +327,7 @@ Role B có material kỹ thuật rõ ràng, không chỉ làm hành chính.
 | 17 | Server nhiều client tránh race/shutdown lỗi thế nào? | Registry có lock, snapshot trước cleanup và unregister an toàn. | `server/threaded_server.py:53`, `:165`, `:212` |
 | 18 | Active session/progress được quan sát ở đâu? | Server log snapshot session; client hiển thị progress an toàn encoding. | `server/threaded_server.py:254`, `server/client_handler.py:137` |
 | 19 | Bằng chứng LAN chứng minh gì? | ACTIVE/PASV hai máy và SHA-256 source/server/client khớp. | `docs/evidence/final-lan-*-sha256.txt` |
-| 20 | Test cuối có ý nghĩa gì? | Full regression 199 passed; RDT focused/fault/E2E chứng minh từng lớp. | `docs/evidence/final-week-rdt-gbn-verification.md` |
+| 20 | Test cuối có ý nghĩa gì? | Post-handoff 205 passed; C focused 24 passed; A cần evidence mới. | `docs/evidence/final-code-fix-verification.md` |
 
 ## Role B Final Checklist
 
@@ -338,7 +339,7 @@ Role B có material kỹ thuật rõ ràng, không chỉ làm hành chính.
 | B-F02: Update API contract and GenAI log | Done | `docs/api-contract.md` and `docs/genai-log-b.md` were updated |
 | B-F02: Final report technical audit | In progress | Technical claims audited; Session, GenAI appendix and embedded §7 evidence remain |
 | B-F03: Oral / live-code locator preparation | Done | 20-question oral pack ready; dry run intentionally not a gate |
-| A/C technical audit | Done | TCP/command and filesystem/concurrency/LAN scopes reviewed against evidence |
+| A/C technical audit | In progress | C passed; A final implementation and fresh audit pending |
 ### [x] C-F01 — Hoàn tất RDT Excellent: Go-Back-N reliable lifecycle và flow control
 
 **Owner:** Role C  
@@ -380,7 +381,7 @@ Go-Back-N sliding window **4 packet** có giới hạn và SHA-256 end-to-end v�
 - [x] Unit + fault-injection + FTP integration tests pass.
 - [x] A mode selection review và B wire-contract verification đã được ghi nhận
   tại A-F01/B-F01.
-- [x] Không có regression Active/PASV; full final regression đạt 199 tests.
+- [x] Không có regression Active/PASV; full final regression đạt 212 tests + 28 subtests.
 
 **Output / Deliverable:** production RDT/data-pipeline code, test suite,
 state-machine docs và reliability evidence.
@@ -464,7 +465,7 @@ trạng thái/status/history không nói quá evidence.
 
 **Review / Success checklist**
 
-- [x] Full test pass và không có warning/traceback chưa giải thích (`199 passed`).
+- [x] Post-handoff full test pass (`205 passed`); Role A final regression vẫn pending.
 - [x] Final LAN run completed on a separate client machine, with no hidden
   localhost dependency.
 - [ ] Git diff/commit history phản ánh đúng owner và không có generated transfer data.
@@ -487,8 +488,7 @@ cách cleanup session/socket/file tạm.
 
 ### Functional
 
-- [x] Tất cả command §2.2 có handler/reply phù hợp; MODE chưa có implementation
-  data-path không được báo success giả.
+- [ ] Role A hoàn thiện command §2.2 và functional MODE B/C theo handoff.
 - [x] Client và server chạy được bằng native low-level sockets, không FTP/RDT library.
 - [x] TCP control và UDP/RDT payload tách đúng; LIST/NLST trả TCP text.
 - [x] Active/PASV, TYPE A/I, STOR/RETR/STOU/APPE/HASH/ABOR hoạt động.
@@ -548,7 +548,8 @@ tick, đặc biệt:
 2. Không còn carry-over chưa có quyết định `done`, `replaced` hoặc limitation
    được examiner chấp nhận.
 3. RDT flow/congestion control, report/oral và required demo evidence không
-   còn là TODO; MODE B/C không có success claim nếu chưa có data-path thật.
+   còn là TODO; MODE B/C encoder/decoder phải nằm quanh shared RDT data path và
+   được mô tả đúng theo evidence cuối.
 4. A/C implementation đã integrate; B protocol/report/test artifact đã review.
 5. Full test, demo live, report 7 section, GenAI appendix, peer percentage và
    clean repository đều sẵn sàng submit.

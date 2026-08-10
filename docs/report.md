@@ -134,16 +134,16 @@ The custom RDT protocol uses a fixed-size header of **20 bytes** serialized in n
 | `transfer_id` | 4 | 32-bit unsigned int | Unique transfer transaction identifier generated per connection. |
 | `sequence` | 4 | 32-bit unsigned int | Sequence number of the data or control packet. |
 | `acknowledgement`| 4 | 32-bit unsigned int | Cumulative acknowledgment number. |
-| `flags` | 2 | 16-bit unsigned int | Protocol control flags: `START` (0x08), `DATA` (0x40), `ACK` (0x02), `FIN` (0x01), `ABORT` (0x04). |
+| `flags` | 2 | 16-bit unsigned int | Protocol control flags: `DATA` (0x01), `ACK` (0x02), `FIN` (0x04), `START` (0x08), `ABORT` (0x10). |
+| `checksum` | 4 | 32-bit unsigned int | CRC-32 over transfer ID, sequence, ACK, flags, payload length and payload; the checksum field itself is excluded. |
 | `payload_length` | 2 | 16-bit unsigned int | Size of the payload following the header in bytes (0 to 1024). |
-| `checksum` | 4 | 32-bit unsigned int | Checksum computed over header fields (with checksum field set to 0) + payload. |
 
 The flags control the packet lifecycle:
 - **`START` (0x08)**: Negotiates metadata (e.g. total file size) before transmission.
-- **`DATA` (0x40)**: Indicates the packet contains a segment of file payload.
+- **`DATA` (0x01)**: Indicates the packet contains a segment of file payload.
 - **`ACK` (0x02)**: Confirms receipt of packets up to the sequence number.
-- **`FIN` (0x01)**: Gracefully terminates the data connection.
-- **`ABORT` (0x04)**: Instantly halts transfer due to errors or cancellation.
+- **`FIN` (0x04)**: Gracefully terminates the data connection.
+- **`ABORT` (0x10)**: Instantly halts transfer due to errors or cancellation.
 
 ## 3. Functional Workflows (Flowcharts)
 
@@ -338,6 +338,11 @@ stateDiagram-v2
 
 The Active and Passive modes are negotiated over the TCP control channel, while the actual file payload is transported over the UDP RDT data channel. In Active mode, the server initiates the UDP endpoint used by the client for data transfer; in Passive mode, the server listens on a negotiated port and the client connects to it. Role A establishes the endpoint state through the control channel, while Role B uses the negotiated endpoint for the RDT transfer. Role C verifies the resulting transfer lifecycle, cleanup, and filesystem side effects.
 
+FTP MODE is separate from Active/PASV endpoint selection. In the current Role A
+handoff baseline, `MODE S` returns `200`, while `MODE B/C` return `502` until
+their block/compression semantics are implemented and verified by Role A. This
+pending work does not change the existing 20-byte RDT header owned by B/C.
+
 ```mermaid
 flowchart TD
     A[Role A negotiates endpoint over TCP] --> B[Role B opens UDP RDT transfer]
@@ -428,19 +433,66 @@ The TCP control test uses the project client or Netcat (`nc`) to:
 4. Send `NOOP` and other implemented control commands.
 5. Send `QUIT`, receive `221`, and confirm safe session cleanup.
 
-The existing server logs provide the required demonstration record instead of
-screenshots: `docs/evidence/final-lan-server.log` records client IPs, executed
-commands, password redaction, active-session snapshots, transfer outcomes and
-FTP replies. The server returns the expected replies without crashing on invalid
-authentication input.
+The embedded LAN server excerpt shows the real client IP, redacted login,
+executed commands and the `150 → 226` upload/download lifecycle:
+
+```text
+Client connected session=S000002 ip=172.18.0.49:56595 active=1
+Command session=S000002 ip=172.18.0.49 command=USER admin
+Command session=S000002 ip=172.18.0.49 command=PASS ********
+Command session=S000002 ip=172.18.0.49 command=PASV
+Command session=S000002 ip=172.18.0.49 command=STOR final-lan-pasv.bin
+Transfer session=S000002 transfer_id=T000001 operation=STOR mode=PASSIVE result=success bytes=256000
+Command session=S000002 ip=172.18.0.49 command=RETR final-lan-pasv.bin
+Transfer session=S000002 transfer_id=T000002 operation=RETR mode=PASSIVE result=success bytes=256000
+```
+
+After the final concurrency fix, the active-session test records live handlers:
+
+```text
+Active sessions=[{'session_id': 'S000001', 'ip': '127.0.0.1', 'port': 57756, 'alive': True}]
+Active sessions=[{'session_id': 'S000002', 'ip': '127.0.0.1', 'port': 57768, 'alive': True}]
+1 passed in 1.10s
+```
+
+Source: `docs/evidence/final-lan-server.log` and
+`docs/evidence/final-code-fix-verification.md`.
 
 ### 7.2 Filesystem and Concurrency Evidence (Role C)
 
-The final regression suite verified the integrated server behavior under filesystem and concurrency scenarios. The completed test evidence includes the RDT and transfer suites plus the end-to-end transfer cases for concurrent upload/download, ABOR handling, and disconnect cleanup. The LAN server log additionally records IP, command, active-session and transfer-result evidence without requiring a new screenshot.
+The final regression verifies filesystem/concurrency, ABOR and disconnect cleanup.
+It also includes both independent-client and shared-file contention tests:
+
+```text
+test_three_pasv_clients_transfer_independently PASSED
+1 passed in 5.34s
+
+test_two_clients_append_same_file_without_lost_update PASSED
+1 passed in 3.96s
+```
+
+The second test confirms that the server-owned filesystem lock prevents lost
+updates when two sessions append to the same path.
 
 ### 7.3 UDP Transfer and End-to-End Evidence
 
-The final evidence bundle includes the verified RDT test suite, end-to-end transfer tests, and the SHA-256 verification artifacts for Active and Passive transfers. These artifacts are recorded under the evidence directory and were used to support the final report.
+The two-machine PASV and ACTIVE runs produced the same SHA-256 at source,
+server and downloaded destination:
+
+```text
+PASV source:     b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+PASV server:     b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+PASV download:   b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+ACTIVE source:   b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+ACTIVE server:   b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+ACTIVE download: b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+```
+
+![PASV upload and download success](evidence/screenshots/final-lan-pasv.png)
+*Figure: two-machine PASV upload/download completed with client progress.*
+
+![ACTIVE SHA-256 comparison](evidence/screenshots/active-demo-success.png)
+*Figure: ACTIVE source, server and downloaded SHA-256 values match.*
 
 #### RDT Fault-Injection Evidence (Role B)
 
@@ -524,7 +576,7 @@ only in `docs/project-status.md` and `docs/requirement-checklist.md`.
 | FIN graceful termination and duplicate FIN re-ACK | Verified | `tests/test_rdt.py::TestRDTProtocolLogic::test_receiver_graceful_fin_ack_retransmission`, `docs/report-parts/technical/05-data-channel-rdt.md` |
 | ABORT cancel/termination behavior | Verified | `tests/test_rdt.py::TestRDTProtocolLogic::test_receiver_aborts_on_abort_packet`, `docs/report-parts/technical/05-data-channel-rdt.md` |
 | Active/PASV upload/download and LAN SHA-256 integrity | Verified | `docs/evidence/final-lan-active-sha256.txt`, `docs/evidence/final-lan-pasv-sha256.txt` |
-| Final regression suite | Verified | `python3 -m pytest -q` — 199 passed in 96.72s; `docs/evidence/final-week-rdt-gbn-verification.md` |
+| Post-handoff regression suite | Verified | `python3 -m pytest -q` — 205 passed in 103.08s; Role C focused — 24 passed in 33.80s; `docs/evidence/final-code-fix-verification.md` |
 
 ### Final release note
 
@@ -538,10 +590,10 @@ only in `docs/project-status.md` and `docs/requirement-checklist.md`.
 
 ## 9. Technical Audit Review and Release Sign-off
 
-- **Role A technical audit: passed.** Reviewed TCP control, command parser,
-  session isolation and `MODE`/`PORT`/`PASV` behavior against the 28-command
-  matrix, the Role A audit (**63 passed in 5.71s**) and final regression
-  (**199 passed in 96.72s**).
+- **Role A technical audit: pending fresh implementation.** The AI-applied
+  final-fix was reverted so A can own authentication, STAT/HELP/STOU, client
+  framing, legacy cleanup and functional MODE B/C. Earlier audit results do not
+  close this handoff gate.
 - **Role C technical audit: passed.** Reviewed FTP-root/atomic lifecycle,
   concurrency/cleanup, Active/PASV and LAN evidence against the focused audit
   (**135 passed in 86.22s**), final regression, LAN SHA-256 logs and
