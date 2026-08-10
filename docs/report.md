@@ -428,6 +428,9 @@ report does not replace exact prompts and raw output.
 
 ## 7. Application Demo Evidence
 
+![Full regression — 271 passed](evidence/screenshots/01-full-pytest-271-passed.png)
+*Figure: Full WSL2 regression passed; this verifies the integrated suite.*
+
 ### 7.1 TCP Control and Authentication (Role A)
 
 The TCP control test uses the project client or Netcat (`nc`) to:
@@ -463,6 +466,9 @@ Active sessions=[{'session_id': 'S000002', 'ip': '127.0.0.1', 'port': 57768, 'al
 Source: `docs/evidence/final-lan-server.log` and
 `docs/evidence/final-code-fix-verification.md`.
 
+![PASV LAN server lifecycle](evidence/screenshots/02-lan-pasv-server-lifecycle.png)
+*Figure: LAN PASV server lifecycle showing the live client sessions and the `150 → 226` transfer flow.*
+
 ### 7.2 Filesystem and Concurrency Evidence (Role C)
 
 The final regression verifies filesystem/concurrency, ABOR and disconnect cleanup.
@@ -492,6 +498,12 @@ ACTIVE source:   b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb9093
 ACTIVE server:   b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
 ACTIVE download: b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
 ```
+
+![SHA-256 comparison for PASV and ACTIVE](evidence/screenshots/03-sha256-pasv-active.png)
+*Figure: source, server and downloaded SHA-256 values match for both PASV and ACTIVE transfers.*
+
+![Three PASV clients transferring independently](evidence/screenshots/04-three-pasv-clients.png)
+*Figure: three independent PASV clients completed their transfers without blocking each other.*
 
 ![PASV upload and download success](evidence/screenshots/final-lan-pasv.png)
 *Figure: two-machine PASV upload/download completed with client progress.*

@@ -761,3 +761,46 @@ và cross-review evidence thật.
   filesystem/atomic cleanup, git release check.
 
 ---
+
+## [10/08/2026] - Nhúng Evidence Screenshots vào Report §7 (Final Week)
+
+**Prompt:**
+Nhúng vào report `docs/report.md` §7 với caption đúng phạm vi:
+- Trong §7: dùng
+  `![Full regression — 199 passed](evidence/screenshots/01-full-pytest-199-passed.png)`
+  kèm figure caption "Full WSL2 regression passed; this verifies the integrated
+  suite."
+- Nhúng ảnh 02 dưới §7.1 hoặc §7.2.
+- Nhúng ảnh 03 và ảnh 04 dưới §7.3.
+- `final-lan-pasv.png` và `active-demo-success.png` có thể dùng bổ sung, nhưng
+  không thay thế ảnh 02–04.
+
+**Raw output:**
+AI đề xuất bố trí 4 ảnh theo thứ tự số: ảnh 01 đặt ngay đầu §7 làm bằng chứng
+full regression; ảnh 02 đặt dưới §7.1 (kế bên LAN server excerpt) hoặc §7.2;
+ảnh 03 và 04 đặt dưới §7.3; giữ 2 ảnh cũ làm bổ sung. Mỗi ảnh dùng block
+Markdown `![alt](path)` + dòng `*Figure caption*`.
+
+**Refinement:**
+- Tên file thật khác prompt: screenshot full regression là
+  `01-full-pytest-271-passed.png` hiển thị **271 passed** (sau production-review
+  hardening), không phải `01-full-pytest-199-passed.png` (199 passed là baseline
+  cũ pre-MODE). Đã dùng tên file thật và sửa alt text/caption thành
+  **271 passed** cho khớp evidence và §8 report (full 271 passed + 357 subtests
+  in 192.88s).
+- Rename 2 file có khoảng trắng thừa đầu tên (` 01-full-pytest-271-passed.png`,
+  ` 03-sha256-pasv-active.png`) → bỏ space để link Markdown sạch.
+- Đường dẫn tương đối `evidence/screenshots/…` từ `docs/report.md` resolve đúng
+  thư mục `docs/evidence/screenshots/`.
+- Bố trí cuối: 01 đầu §7; 02 dưới §7.1 (lan-pasv-server-lifecycle kế bên LAN
+  server excerpt); 03 (sha256-pasv-active) và 04 (three-pasv-clients) dưới §7.3;
+  `final-lan-pasv.png` và `active-demo-success.png` giữ nguyên làm ảnh bổ sung.
+
+**Verification:**
+- Toàn bộ 6 link ảnh trong `docs/report.md` resolve tới file tồn tại trong
+  `docs/evidence/screenshots/`.
+- Số "271 passed" khớp với §8 Final Evidence table và
+  `docs/evidence/role-a-production-review-2026-08-10.md`.
+- Danh sách chi tiết được ghi trong `docs/screenshots.md`.
+
+---
