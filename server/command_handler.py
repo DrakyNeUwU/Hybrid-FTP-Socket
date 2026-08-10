@@ -88,17 +88,12 @@ class CommandHandler:
             return "230 Already logged in\r\n"
 
         expected = self.credentials.get(session.username)
-        # If user is in credentials and password matches (or if default fallback accepted)
         if expected is not None:
             if expected == "" or arg == expected:
                 session.is_logged_in = True
                 return FTPReply.LOGIN_OK
 
-        # If user not found in explicit dict, fallback check for backward compatibility:
-        if arg == "123456":
-            session.is_logged_in = True
-            return FTPReply.LOGIN_OK
-
+        session.is_logged_in = False
         session.username = None
         return "530 Login incorrect\r\n"
 
@@ -401,7 +396,25 @@ class CommandHandler:
     def stat_cmd(self, arg, session):
         if not session.is_logged_in:
             return "530 Not logged in\r\n"
-        return "211-FTP Server status:\r\n211 End of status\r\n"
+        if not arg:
+            return (
+                "211-FTP Server status:\r\n"
+                f" User: {session.username}\r\n"
+                f" TYPE: {session.transfer_type}; MODE: {session.transfer_mode}\r\n"
+                "211 End of status\r\n"
+            )
+        try:
+            metadata = self._fs(session).stat(session.current_dir, arg)
+            return (
+                f"213-Status of {metadata['name']}:\r\n"
+                f" Type: {metadata['type']}\r\n"
+                f" Size: {metadata['size']}\r\n"
+                f" Permissions: {metadata['permissions']}\r\n"
+                f" Modified: {metadata['modified']}\r\n"
+                "213 End of status\r\n"
+            )
+        except FilesystemOperationError as error:
+            return f"{error.reply_code} {error.message}\r\n"
 
     def hash_cmd(self, arg, session):
         if not session.is_logged_in:
@@ -417,7 +430,28 @@ class CommandHandler:
             return "550 HASH failed\r\n"
 
     def help_cmd(self, arg, session):
-        return "214-Supported commands:\r\n USER PASS QUIT NOOP PWD CWD CDUP MKD RMD LIST NLST STAT SIZE MDTM TYPE MODE HELP PORT PASV RETR STOR STOU APPE DELE RNFR RNTO HASH ABOR\r\n214 Help OK\r\n"
+        commands = {
+            "USER": "USER <username>", "PASS": "PASS <password>",
+            "QUIT": "QUIT", "NOOP": "NOOP", "PWD": "PWD",
+            "CWD": "CWD <path>", "CDUP": "CDUP", "MKD": "MKD <dirname>",
+            "RMD": "RMD <dirname>", "LIST": "LIST [path]", "NLST": "NLST [path]",
+            "STAT": "STAT [path]", "SIZE": "SIZE <filename>",
+            "MDTM": "MDTM <filename>", "TYPE": "TYPE {A|I}",
+            "MODE": "MODE {S|B|C}", "PORT": "PORT h1,h2,h3,h4,p1,p2",
+            "PASV": "PASV", "RETR": "RETR <filename>",
+            "STOR": "STOR <filename>", "STOU": "STOU",
+            "APPE": "APPE <filename>", "DELE": "DELE <filename>",
+            "RNFR": "RNFR <oldname>", "RNTO": "RNTO <newname>",
+            "HASH": "HASH <filename>", "ABOR": "ABOR", "HELP": "HELP [command]",
+        }
+        if arg:
+            command_name = arg.strip().upper()
+            usage = commands.get(command_name)
+            if usage is None:
+                return "502 Unknown command for HELP\r\n"
+            return f"214 Syntax: {usage}\r\n"
+        names = " ".join(commands)
+        return f"214-Supported commands:\r\n {names}\r\n214 Help OK\r\n"
 
     @staticmethod
     def _close_data_socket(session):
@@ -534,6 +568,8 @@ class CommandHandler:
     def stou(self, arg, session):
         if not session.is_logged_in:
             return "530 Not logged in\r\n"
+        if arg:
+            return "501 Syntax error in parameters\r\n"
         if not session.data_socket and not session.data_host:
             return "425 Use PORT or PASV first\r\n"
         if self._transfer_in_progress(session):

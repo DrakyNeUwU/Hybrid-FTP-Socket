@@ -401,8 +401,8 @@ class TestAuthReset(unittest.TestCase):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_new_user_resets_login(self):
-        # Log in as user1
-        self.handler.handle(CommandParser.parse("USER user1"), self.session)
+        # Log in as a configured user before changing identity.
+        self.handler.handle(CommandParser.parse("USER admin"), self.session)
         self.handler.handle(CommandParser.parse("PASS 123456"), self.session)
         self.assertTrue(self.session.is_logged_in)
 
@@ -410,6 +410,13 @@ class TestAuthReset(unittest.TestCase):
         self.handler.handle(CommandParser.parse("USER user2"), self.session)
         self.assertFalse(self.session.is_logged_in, "is_logged_in should be False after new USER")
         self.assertEqual(self.session.username, "user2")
+
+    def test_unknown_user_cannot_use_default_password(self):
+        self.handler.handle(CommandParser.parse("USER ghost"), self.session)
+        response = self.handler.handle(CommandParser.parse("PASS 123456"), self.session)
+        self.assertTrue(response.startswith("530"))
+        self.assertFalse(self.session.is_logged_in)
+        self.assertIsNone(self.session.username)
 
     def test_wrong_password_clears_username(self):
         self.handler.handle(CommandParser.parse("USER admin"), self.session)
@@ -721,6 +728,42 @@ class TestCommandMatrix28RoleA(unittest.TestCase):
         # Check unhandled command returns 502
         unhandled_resp = self.handler.handle(CommandParser.parse("SITE"), self.session)
         self.assertTrue(unhandled_resp.startswith("502"))
+
+
+class TestRoleAFinalCommandCompliance(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.session = Session(ftp_root=self.test_dir)
+        self.session.username = "admin"
+        self.session.is_logged_in = True
+        self.handler = CommandHandler()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_stat_path_returns_filesystem_metadata(self):
+        target = os.path.join(self.test_dir, "status.bin")
+        with open(target, "wb") as output:
+            output.write(b"abc")
+        response = self.handler.handle(CommandParser.parse("STAT status.bin"), self.session)
+        self.assertTrue(response.startswith("213-"), response)
+        self.assertIn("Type: file", response)
+        self.assertIn("Size: 3", response)
+        self.assertTrue(response.endswith("213 End of status\r\n"))
+
+    def test_stat_unsafe_path_is_rejected(self):
+        response = self.handler.handle(CommandParser.parse("STAT ../outside"), self.session)
+        self.assertTrue(response.startswith("550"), response)
+
+    def test_help_known_and_unknown_commands(self):
+        known = self.handler.handle(CommandParser.parse("HELP MODE"), self.session)
+        unknown = self.handler.handle(CommandParser.parse("HELP WAT"), self.session)
+        self.assertEqual(known, "214 Syntax: MODE {S|B|C}\r\n")
+        self.assertTrue(unknown.startswith("502"), unknown)
+
+    def test_stou_rejects_extra_argument_before_endpoint_check(self):
+        response = self.handler.handle(CommandParser.parse("STOU extra"), self.session)
+        self.assertTrue(response.startswith("501"), response)
 
 
 if __name__ == "__main__":

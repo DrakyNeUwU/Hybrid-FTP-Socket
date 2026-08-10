@@ -110,12 +110,16 @@ class _SimpleContext:
         timeout_seconds: float = 0.5,
         retry_limit: int = 15,
         max_timeouts: int = 20,
+        transfer_mode: str = "S",
+        transfer_type: str = "I",
     ):
         self.transfer_id = transfer_id
         self.timeout_seconds = timeout_seconds
         self.retry_limit = retry_limit
         self.max_timeouts = max_timeouts
         self.cancel_event = threading.Event()
+        self.transfer_mode = transfer_mode
+        self.transfer_type = transfer_type
 
 def _run_transfer(
     src_path: str,
@@ -292,8 +296,10 @@ def _run_transfer_adapter_mode(
         dest_port = proxy.listen_port
 
     endpoint = _SimpleEndpoint("127.0.0.1", dest_port)
-    ctx_send = _SimpleContext(transfer_id, retry_limit=retry_limit)
-    ctx_recv = _SimpleContext(transfer_id)
+    ctx_send = _SimpleContext(
+        transfer_id, retry_limit=retry_limit, transfer_mode=mode
+    )
+    ctx_recv = _SimpleContext(transfer_id, transfer_mode=mode)
 
     recv_ok_flag: list[bool] = []
 

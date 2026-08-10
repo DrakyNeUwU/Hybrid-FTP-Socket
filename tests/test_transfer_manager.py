@@ -59,6 +59,7 @@ def test_download_reads_validated_file_and_calls_sender(tmp_path):
     assert result
     assert result.reply_code == 226
     assert sender.payload == b"hello world"
+    assert result.bytes_transferred == len(b"hello world")
 
 
 def test_cancel_sets_event_and_preserves_existing_file(tmp_path):
@@ -167,6 +168,7 @@ def test_download_encodes_mode_b_on_the_wire(tmp_path):
     assert result.reply_code == 226
     assert sender.payload != payload
     assert b"".join(decode_chunks((sender.payload,), "B")) == payload
+    assert result.bytes_transferred == len(payload)
 
 
 def test_download_encodes_mode_c_on_the_wire(tmp_path):
@@ -181,6 +183,7 @@ def test_download_encodes_mode_c_on_the_wire(tmp_path):
     assert result
     assert result.reply_code == 226
     assert b"".join(decode_chunks((sender.payload,), "C")) == payload
+    assert result.bytes_transferred == len(payload)
 
 
 def test_malformed_mode_stream_fails_atomic_426(tmp_path):

@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from common.RDTHeader import RDTHeader
+from common.rdt_context import decode_start_metadata, encode_start_metadata
 
 def make_data_packet(transfer_id: int, seq: int, payload: bytes, is_fin: bool = False) -> bytes:
     flags = RDTHeader.FLAG_FIN if is_fin else RDTHeader.FLAG_DATA
@@ -602,6 +603,25 @@ class TestRDTProtocolLogic(unittest.TestCase):
         pair.close()
 
         self.assertEqual(received, [b"Valid"], "Receiver must ignore packets with invalid payload length")
+
+class TestStartMetadata(unittest.TestCase):
+    def test_roundtrip_carries_logical_size_mode_and_type(self):
+        payload = encode_start_metadata(1234, "C", "A")
+        self.assertEqual(decode_start_metadata(payload), (1234, "C", "A"))
+        self.assertEqual(len(payload), 10)
+
+    def test_invalid_mode_or_type_is_rejected(self):
+        with self.assertRaises(ValueError):
+            encode_start_metadata(1, "X", "I")
+        with self.assertRaises(ValueError):
+            encode_start_metadata(1, "S", "X")
+
+    def test_legacy_size_metadata_remains_detectable(self):
+        self.assertEqual(
+            decode_start_metadata(struct.pack("!Q", 42)),
+            (42, None, None),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

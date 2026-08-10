@@ -139,7 +139,9 @@ The custom RDT protocol uses a fixed-size header of **20 bytes** serialized in n
 | `payload_length` | 2 | 16-bit unsigned int | Size of the payload following the header in bytes (0 to 1024). |
 
 The flags control the packet lifecycle:
-- **`START` (0x08)**: Negotiates metadata (e.g. total file size) before transmission.
+- **`START` (0x08)**: Negotiates a 10-byte payload containing logical file size,
+  MODE (`S/B/C`) and TYPE (`A/I`) before transmission. The fixed RDT header
+  remains 20 bytes.
 - **`DATA` (0x01)**: Indicates the packet contains a segment of file payload.
 - **`ACK` (0x02)**: Confirms receipt of packets up to the sequence number.
 - **`FIN` (0x04)**: Gracefully terminates the data connection.
@@ -389,7 +391,7 @@ Role A compared the final implementation with the control-channel and reply beha
 Role B successfully designed, implemented, and verified the Reliable Data Transfer (RDT) protocol running over UDP, achieving full compliance with the C-F01 requirement level:
 
 1. **Protocol Integrity**: Designed a robust 20-byte header format. Verified serialization and deserialization correctness, ensuring correct big-endian conversion (Network Byte Order).
-2. **Reliable Initialization (START Handshake)**: Replaced best-effort START delivery with a reliable handshake. The sender transmits file size metadata via a `START` packet, waiting for its corresponding `ACK` (sequence 0). Implemented a finite retry mechanism (`retry_limit`) and socket timeout to safely raise a `RuntimeError` if the peer is unresponsive, preventing hanging resources.
+2. **Reliable Initialization (START Handshake)**: Replaced best-effort START delivery with a reliable handshake. The sender transmits logical size plus negotiated MODE/TYPE via a `START` packet and waits for ACK 0. The receiver rejects a mismatch before publishing decoded bytes. A finite retry limit and socket timeout prevent hanging resources.
 3. **Flow Control & Congestion Mitigation**: Developed a Go-Back-N (GBN) sliding window protocol with a window size of 4. Correctly implemented cumulative acknowledgment parsing and fast retransmission of the active window upon socket timeout.
 4. **Error Recovery**: Used CRC-32 checksum calculations covering all header fields and payload bytes. Out-of-order packets and corrupted packets are successfully detected and dropped, forcing GBN retransmissions.
 5. **Termination Safety**: Implemented `FIN` transmission with a grace period (`_fin_grace()`). This guarantees that if the final ACK is lost in transit, the receiver remains active to re-ACK duplicate FIN packets, avoiding half-closed connections.
@@ -580,7 +582,7 @@ only in `docs/project-status.md` and `docs/requirement-checklist.md`.
 | ABORT cancel/termination behavior | Verified | `tests/test_rdt.py::TestRDTProtocolLogic::test_receiver_aborts_on_abort_packet`, `docs/report-parts/technical/05-data-channel-rdt.md` |
 | Active/PASV upload/download and LAN SHA-256 integrity | Verified | `docs/evidence/final-lan-active-sha256.txt`, `docs/evidence/final-lan-pasv-sha256.txt` |
 | Post-handoff regression suite (pre-MODE baseline) | Verified | `python3 -m pytest -q` — 205 passed in 103.08s; Role C focused — 24 passed in 33.80s; `docs/evidence/final-code-fix-verification.md` |
-| MODE S/B/C functional codecs (RFC 959 §3.4) | Verified | `common/mode_codec.py`, `server/command_handler.py` `mode_cmd`, `server/transfer_manager.py` (encode-before-RDT/decode-after-RDT), `client/ftp_client.py`; codec/command 83 passed + 338 subtests; transfer-manager 12 passed; RDT fault over B/C 19 passed + 11 subtests; E2E matrix 13 passed + 8 subtests; full `python3 -m pytest -q` — 256 passed, 357 subtests in 167.08s; `docs/evidence/final-code-fix-verification.md` |
+| MODE S/B/C functional codecs (RFC 959 §3.4) | Integrated; release evidence pending | `common/mode_codec.py`, `server/transfer_manager.py`, `client/ftp_client.py`; TYPE A/I filler, START MODE/TYPE mismatch rejection, atomic client/server paths; targeted 140 passed + 338 subtests, RDT fault 19 passed + 11 subtests, E2E 14 passed + 8 subtests, full 271 passed + 357 subtests in 192.88s; `docs/evidence/role-a-production-review-2026-08-10.md` |
 
 ### Final release note
 
@@ -599,8 +601,11 @@ only in `docs/project-status.md` and `docs/requirement-checklist.md`.
   decode-after-RDT integration, PASV/ACTIVE SHA-256 round-trips, STOU/APPE,
   concurrent different-mode clients and logical-byte progress are covered by
   codec/command/transfer-manager/fault-injection/E2E tests (full suite
-  **256 passed, 357 subtests in 167.08s**). Authentication, STAT/HELP/STOU
-  details, client framing and legacy cleanup remain pending A.
+  **271 passed, 357 subtests in 192.88s**). The C production audit also verified
+  strict authentication, STAT/HELP/STOU behavior, buffered client framing,
+  MODE/TYPE mismatch rejection and atomic client downloads. Role B review of
+  START metadata and Role A MODE screenshots remain pending; this is not final
+  team/release approval.
 - **Role C technical audit: passed.** Reviewed FTP-root/atomic lifecycle,
   concurrency/cleanup, Active/PASV and LAN evidence against the focused audit
   (**135 passed in 86.22s**), final regression, LAN SHA-256 logs and

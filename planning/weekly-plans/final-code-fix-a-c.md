@@ -201,9 +201,10 @@ C FilesystemService.read_chunks → A MODE encoder → B RDT sender → UDP
 ### A-MODE06 — Integration review và evidence gate
 
 - [x] A chạy focused MODE/command/codec tests và lưu exact command/result.
-- [ ] A+C chạy production E2E matrix S/B/C × ACTIVE/PASV × upload/download.
-- [ ] B xác nhận RDT wire header/flags/retry không đổi.
-- [ ] C xác nhận filesystem nhận decoded bytes, atomic cleanup và shared locks
+- [x] A+C chạy production E2E matrix S/B/C × ACTIVE/PASV × upload/download.
+- [ ] B xác nhận RDT header/flags/retry không đổi và review START payload 10 byte
+  (`logical_size + MODE + TYPE`).
+- [x] C xác nhận filesystem nhận decoded bytes, atomic cleanup và shared locks
   vẫn pass.
 - [x] Full `python3 -m pytest -q` pass sau tất cả focused/integration tests.
 - [x] A cập nhật `docs/api-contract.md`, control-channel report, limitations,
@@ -215,16 +216,17 @@ C FilesystemService.read_chunks → A MODE encoder → B RDT sender → UDP
   `docs/report.md` §8–9, `docs/genai-log-a.md` entry 10/08,
   `docs/project-status.md`, `docs/requirement-checklist.md`,
   `docs/evidence/final-code-fix-verification.md`.)
-- [ ] Chỉ chuyển A-MODE sang Done sau khi có code locator, test log, hash và
-  cross-review record; không đóng bằng static code review.
+- [ ] Chỉ chuyển A-MODE sang Accepted sau khi có code locator, test log, hash,
+  screenshot Role A và cross-review B; không đóng bằng static code review.
 
 ## Definition of Done — Role A MODE
 
 - [x] S/B/C có thuật toán production hai chiều, không chỉ reply/state.
 - [x] Tất cả transfer commands và Active/PASV giữ nguyên file SHA-256.
 - [x] Fault/ABOR/disconnect/malformed input không commit file lỗi.
-- [x] Không phá API, RDT wire layout, filesystem sandbox, atomic `.part`, shared
-  locks, concurrency và logging của Role C.
+- [x] Không đổi canonical RDT header 20 byte/flags/GBN; START payload được mở
+  rộng có chủ đích và đã test. Filesystem sandbox, atomic `.part`, shared locks,
+  concurrency và logging của Role C vẫn pass.
 - [x] Focused + integration + full regression đều pass và có evidence thật.
 - [x] Report mô tả đúng implementation cuối, không claim trước evidence.
 
@@ -237,52 +239,63 @@ Code locator:
   WIRE_CHUNK_SIZE=1024, `_batch_wire`.
 - `server/command_handler.py` — `mode_cmd` (200/501/530, cập nhật
   `session.transfer_mode`).
-- `server/transfer_manager.py` — TransferContext.transfer_mode; `_send` encode
+- `server/transfer_manager.py` — TransferContext MODE/TYPE; `_send` encode
   trước RDT; upload/append/upload_unique decode sau RDT; atomic `.part` giữ nguyên.
-- `client/ftp_client.py` — `transfer_mode`, `_negotiated_mode`, `_ensure_transfer_mode`,
-  send/receive_file_rdt qua codec; progress đếm logical bytes.
+- `client/ftp_client.py` — MODE/TYPE negotiation state, persistent TCP reply
+  buffer, send/receive_file_rdt qua codec; progress đếm logical bytes.
 - `client/demo_transfer.py` — `--mode` và command `MODE` với user.
 - `common/rdt_sender.py` — `send_file_rdt`: progress đếm logical bytes trước
   encoder (RDT wire layout không đổi).
-- `common/rdt_receiver.py` — `receive_file_rdt`: public progress đếm logical
-  bytes sau decoder; thứ tự progress-cb/ACK/yield chỉnh để total có trước chunk
-  đầu (không đổi wire layout; checksum/START/ACK/order giữ nguyên).
+- `common/rdt_receiver.py` — validate MODE/TYPE trong START trước decode;
+  `receive_file_rdt` dùng atomic `.part`, giữ file client cũ khi failure.
 
 Command và result:
 
 ```text
-$ python3 -m pytest tests/test_mode_codec.py tests/test_commands.py -q
-83 passed, 338 subtests passed in 0.24s
+$ python3 -m pytest tests/test_ftp_client.py tests/test_mode_codec.py \
+  tests/test_commands.py tests/test_transfer_manager.py tests/test_rdt.py -q
+140 passed, 338 subtests passed in 18.82s
 
 $ python3 -m pytest tests/test_mode_codec.py -q
 29 passed, 338 subtests passed in 0.12s
 
-$ python3 -m pytest tests/test_transfer_manager.py -q
-12 passed in 0.12s
-  (gồm block/compressed decode trên store/append/STOU, malformed→426 atomic,
-  cancel và disconnect giữa block/run giữ file cũ không để `.part`)
-
 $ python3 -m pytest tests/test_rdt_fault_injection.py -q
-19 passed, 11 subtests passed in 71.99s
+19 passed, 11 subtests passed in 80.57s
   (B/C payloads dưới loss, corruption, ACK-loss, duplicate, out-of-order)
 
 $ python3 -m pytest tests/test_e2e_transfer.py -q
-13 passed, 8 subtests passed in 77.13s
+14 passed, 8 subtests passed in 83.50s
   (gồm PASV/ACTIVE matrix S/B/C, STOU/APPE block, hai client khác mode,
   progress logical bytes B/C không vượt 100%, server stop giữa B-upload)
 
 $ python3 -m pytest -q
-256 passed, 357 subtests passed in 167.08s
+271 passed, 357 subtests passed in 192.88s
 ```
 
-Focused Role A trước đợt code này ghi nhận 24 passed (C-FIX03); sau khi Role A
-implement MODE, full regression là **256 passed** với 357 subtests, không có
-failure. Các ô chờ xác nhận của Role B/C và release git vẫn để unchecked theo
-nguyên tắc cross-review ở đầu file.
+Production audit của C phát hiện và sửa silent MODE mismatch, client download
+xóa file cũ, TCP framing và command gaps. Full regression sau fix là **271
+passed** với 357 subtests. Evidence chi tiết:
+`docs/evidence/role-a-production-review-2026-08-10.md`.
+
+## Screenshot evidence giao Role A
+
+- [ ] `role-a-mode-b-pasv-roundtrip.png`: hiện `200 Mode Block`, PASV upload +
+  download và SHA-256 source/server/client bằng nhau.
+- [ ] `role-a-mode-c-active-roundtrip.png`: hiện `200 Mode Compressed`, ACTIVE
+  upload + download và SHA-256 bằng nhau.
+- [ ] `role-a-concurrent-b-c-sessions.png`: hai client B/C đồng thời; server log
+  có client IP, command, kết quả transfer và active-session table.
+- [ ] `role-a-final-pytest.png`: fresh full regression trên commit release; không
+  tái sử dụng ảnh `pytest-186-passed.png`.
+- [ ] Lưu ảnh trong `docs/evidence/screenshots/`, không lộ password/dữ liệu riêng;
+  ghi ngày, commit hash, máy chạy và embed vào report §7. Screenshot không thay
+  thế log/hash/test text.
 
 ## Phần ngoài scope Role C
 
-Ngoài integration review nêu trên, Role C không implement thay A. Authentication,
-STAT/HELP/STOU, TCP client framing, legacy A modules và MODE codecs thuộc Role A.
+Authentication, STAT/HELP/STOU, TCP client framing, legacy A modules và MODE
+codecs thuộc ownership Role A. Theo yêu cầu implement audit ngày 10/08, C đã sửa
+các integration gap này và ghi attribution rõ trong evidence/history; việc đó
+không chuyển ownership từ A sang C.
 Session Structure, contribution percentage và GenAI historical backfill cũng
 không được tự động đóng trong checklist này.

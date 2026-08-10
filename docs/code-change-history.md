@@ -76,6 +76,19 @@ current release claim.
 | A | B/C-encoded payloads must survive RDT faults and malformed streams must not commit partial files | Added mode-aware adapter fault tests (loss/corrupt/ACK-loss/duplicate/out-of-order); malformed stream → 426 with old file intact and no `.part`; cancel/disconnect mid-block tests | `tests/test_rdt_fault_injection.py`, `tests/test_transfer_manager.py` |
 | A | PASV/ACTIVE × S/B/C must round-trip unchanged | E2E matrix, STOU/APPE block codec, concurrent different-mode clients, server-stop mid-B-transfer cleanup | `tests/test_e2e_transfer.py` |
 
+## 10/08/2026 — C production audit of A-owned control/MODE path
+
+| Role | Problem | Files / behavior changed | Verification |
+|---|---|---|---|
+| A owner; C reviewer/fixer | Raw MODE could desynchronize client/server and silently decode valid-looking bytes with the wrong codec | FTPClient tracks successful raw/convenience MODE/TYPE; START payload carries logical size + MODE + TYPE and rejects mismatch with `426`; 20-byte RDT header unchanged | Crafted mismatch E2E returns `426`; E2E 14 passed + 8 subtests |
+| A owner; C reviewer/fixer | Malformed client download deleted an existing destination; TCP client assumed one `recv()` per reply | Same-directory atomic `.part` + `os.replace`; persistent CRLF/multiline/listing reply buffer | `tests/test_ftp_client.py`; targeted 140 passed + 338 subtests |
+| A owner; C reviewer/fixer | Unknown-user password fallback, STAT/HELP argument handling, STOU syntax and broken legacy modules contradicted the command contract | Strict credential lookup, filesystem-backed STAT, command-specific HELP, early STOU validation; removed unreferenced broken legacy modules | Command/compile/import checks; full 271 passed + 357 subtests in 192.88s |
+| A/C/B shared | MODE C filler and transfer logging did not distinguish representation/logical bytes | TYPE A space filler, TYPE I NUL filler; RETR result logs logical size | Codec golden tests, transfer-manager assertions, fault 19 passed + 11 subtests |
+
+The randomized full run initially had one MODE-B loss/corruption subtest exceed
+its retry limit. The isolated rerun passed, followed by a complete all-green
+run. Role B START-payload review and Role A screenshots remain pending.
+
 Final verification: `python3 -m pytest -q` — **256 passed, 357 subtests passed
 in 167.08s**. The RDT 20-byte header, flags and Go-Back-N behavior are unchanged
 (RDT progress reporting order was adjusted only for logical-byte accounting).
