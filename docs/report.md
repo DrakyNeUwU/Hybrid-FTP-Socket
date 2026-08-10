@@ -104,26 +104,65 @@ with a descriptive message.
 
 ### 2.2 Session Structure (Role A)
 
-Every client owns an independent `Session` that stores authentication and
-working-directory state:
+Every client owns an independent `Session` that stores authentication,
+working-directory, and transfer state:
 
 ```python
 class Session:
-    def __init__(self):
+    _transfer_counter = itertools.count(1)
+    _transfer_counter_lock = threading.Lock()
+
+    def __init__(self, ftp_root="./ftp_root"):
         self.username = None
         self.is_logged_in = False
-        self.current_dir = os.getcwd()
+
+        self.ftp_root = os.path.abspath(ftp_root)
+        self.current_dir = self.ftp_root
+
+        self.rename_from = None
+
+        # Transfer state
+        self.transfer_type = "I"          # binary by default
+        self.transfer_mode = "S"          # stream by default
+        self.data_host = None
+        self.data_port = None
+        self.data_socket = None
+        self.data_mode = None             # 'ACTIVE' or 'PASSIVE'
+        self.transfer_cancelled = False
+        self.transfer_cancel_event = None
+        self.current_transfer = None
+        self.transfer_worker = None       # daemon thread for current transfer
+        self.transfer_id = None
+
+        # Session identity (set by ClientHandler / tests)
+        self.session_id = None
+        self.send_reply = None            # injected by ClientHandler
+        self.peer_ip = None
 ```
 
 | Attribute | Meaning |
 |---|---|
-| `username` | Account name currently used during authentication |
-| `is_logged_in` | Whether the client has authenticated successfully |
-| `current_dir` | Current working directory for this session |
+| `session_id` | Unique identifier (e.g., `S000001`) assigned by the server on connect |
+| `username` | Account name used during authentication |
+| `is_logged_in` | `True` after `PASS` succeeds |
+| `ftp_root` | Absolute path of the FTP sandbox root for this session |
+| `current_dir` | Current working directory within the sandbox |
+| `transfer_type` | `I` (binary) or `A` (ASCII); set by `TYPE` command |
+| `transfer_mode` | `S` (stream); `MODE` command updates this field |
+| `data_mode` | `ACTIVE` or `PASSIVE`; negotiated via `PORT` or `PASV` |
+| `data_host` | Remote UDP host for the data channel |
+| `data_port` | Remote UDP port for the data channel |
+| `data_socket` | Bound UDP socket used for the active transfer |
+| `rename_from` | Stores the source path between `RNFR` and `RNTO` |
+| `current_transfer` | Reference to the in-progress `TransferContext` object |
+| `transfer_cancel_event` | `threading.Event` signalled by `ABOR` to stop a running transfer |
+| `transfer_worker` | Daemon thread executing the current RDT transfer |
+| `transfer_id` | Current transfer ID (e.g., `T000001`) from the monotonic counter |
+| `send_reply` | Callable injected by `ClientHandler` to write FTP replies over TCP |
+| `peer_ip` | Client IP address for logging |
 
-Separate sessions allow a thread-per-client model without sharing client state.
-Integration will extend this structure with transfer type, Active/PASV endpoint,
-rename state, and current transfer state.
+Each connection gets its own `Session` instance; threads share no mutable
+session state. See [`server/session.py`](file:///D:/Hybrid-FTP-Socket-1/server/session.py).
 
 ### 2.3 RDT Header (Role B)
 
@@ -428,15 +467,69 @@ The TCP control test uses the project client or Netcat (`nc`) to:
 4. Send `NOOP` and other implemented control commands.
 5. Send `QUIT`, receive `221`, and confirm safe session cleanup.
 
-The existing server logs provide the required demonstration record instead of
-screenshots: `docs/evidence/final-lan-server.log` records client IPs, executed
-commands, password redaction, active-session snapshots, transfer outcomes and
-FTP replies. The server returns the expected replies without crashing on invalid
-authentication input.
+The server log below (excerpt from `docs/evidence/final-lan-server.log`) proves
+the full command/reply lifecycle on a real two-machine LAN run. IP addresses,
+password redaction, active-session table and transfer outcomes are all present.
+
+```text
+[2026-08-09 16:23:43] FTP Server listen 0.0.0.0:2121
+[2026-08-09 16:24:18] Client connected session=S000002 ip=172.18.0.49:56595 active=1
+[2026-08-09 16:24:18] Active sessions=[{'session_id': 'S000002', 'ip': '172.18.0.49', 'port': 56595, 'alive': False}]
+[2026-08-09 16:24:18] Reply session=S000002 ip=172.18.0.49 transfer_id=- code=220
+[2026-08-09 16:24:18] Command session=S000002 ip=172.18.0.49 transfer_id=- command=USER admin
+[2026-08-09 16:24:18] Reply session=S000002 ip=172.18.0.49 transfer_id=- code=331
+[2026-08-09 16:24:18] Command session=S000002 ip=172.18.0.49 transfer_id=- command=PASS ********
+[2026-08-09 16:24:18] Reply session=S000002 ip=172.18.0.49 transfer_id=- code=230
+[2026-08-09 16:24:18] Command session=S000002 ip=172.18.0.49 transfer_id=- command=PASV
+[2026-08-09 16:24:18] Reply session=S000002 ip=172.18.0.49 transfer_id=- code=227
+[2026-08-09 16:24:18] Command session=S000002 ip=172.18.0.49 transfer_id=- command=STOR final-lan-pasv.bin
+[2026-08-09 16:24:18] Reply session=S000002 ip=172.18.0.49 transfer_id=T000001 code=150
+[RDT][Start] File size: 256000 bytes
+[2026-08-09 16:24:21] Transfer session=S000002 transfer_id=T000001 operation=STOR mode=PASSIVE result=success bytes=256000
+[2026-08-09 16:24:21] Reply session=S000002 ip=172.18.0.49 transfer_id=T000001 code=226
+...
+[2026-08-09 16:24:26] Command session=S000002 ip=172.18.0.49 transfer_id=T000002 command=QUIT
+[2026-08-09 16:24:26] Reply session=S000002 ip=172.18.0.49 transfer_id=T000002 code=221
+[2026-08-09 16:24:26] Client disconnected session=S000002 ip=172.18.0.49 active=0
+[2026-08-09 16:24:26] Active sessions=[]
+```
+
+*This excerpt proves: server IP `172.18.0.48`, client IP `172.18.0.49`, password
+redacted as `********`, `220→331→230→227→150→226→221` reply flow, and
+`Active sessions=[...]` logging.*
 
 ### 7.2 Filesystem and Concurrency Evidence (Role C)
 
 The final regression suite verified the integrated server behavior under filesystem and concurrency scenarios. The completed test evidence includes the RDT and transfer suites plus the end-to-end transfer cases for concurrent upload/download, ABOR handling, and disconnect cleanup. The LAN server log additionally records IP, command, active-session and transfer-result evidence without requiring a new screenshot.
+
+#### PASV Two-Machine LAN SHA-256 Integrity
+
+```text
+# Two-machine LAN PASV SHA-256 — 09/08/2026
+Source  (client):  b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  demo.bin
+Uploaded (server): b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  ftp_root/final-lan-pasv.bin
+Download (client): b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  client/downloads/final-lan-pasv.bin
+```
+
+*All three hashes are identical — PASV upload and download over two machines preserved byte-for-byte integrity.*
+Server evidence: `STOR mode=PASSIVE result=success bytes=256000`; one bounded
+Go-Back-N retry occurred during `RETR` and recovered successfully.
+(Full log: `docs/evidence/final-lan-pasv-server.log`.)
+
+#### ACTIVE Two-Machine LAN SHA-256 Integrity
+
+```text
+# Two-machine LAN ACTIVE SHA-256 — 09/08/2026
+Source  (client):  b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  demo.bin
+Uploaded (server): b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  ftp_root/final-lan-active.bin
+Download (client): b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  client/downloads/final-lan-active.bin
+```
+
+*All three hashes are identical — ACTIVE upload and download over two machines preserved byte-for-byte integrity.*
+Server evidence (final successful run — session S000005): `STOR mode=ACTIVE
+result=success bytes=256000`; receiver handled one out-of-order packet
+(`[RDT][OOO] Got seq=178, expected=175`) and recovered correctly.
+(Full log: `docs/evidence/final-lan-server.log`.)
 
 ### 7.3 UDP Transfer and End-to-End Evidence
 
