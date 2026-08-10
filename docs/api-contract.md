@@ -62,6 +62,11 @@ class FilesystemService:
   and `os.replace`.
 - Thread safety: path locks serialize related writes/rename/delete; unrelated paths
   can proceed concurrently.
+- Server-wide ownership: `FTPServer` constructs exactly one `FilesystemService`
+  for its FTP root. Every `ClientHandler` and `TransferManager` borrows that
+  instance so the path-lock registry coordinates writes across client sessions.
+  Creating one service per client is forbidden because it creates independent
+  locks for the same server path.
 - Cleanup: C removes temporary files and releases path locks; A clears command state.
 - FTP mapping: 501 invalid argument, 550 unsafe/unavailable path, 451 local
   failure, 426 cancelled transfer.
@@ -166,8 +171,13 @@ copied into every RDT packet as a normalized unsigned 32-bit wire value.
 | Timeout, protocol error, ABOR/disconnect | 426 | A from result | Existing |
 | Invalid/unsafe/missing path | 501 or 550 | C error, A mapping | Existing in C; A integration needed |
 | Local transient filesystem error | 451 | C error, A mapping | Existing in C; integration needed |
-| Unsupported MODE B/C | 502 | A | Existing behavior |
+| `MODE S` | 200 | A | Existing and tested |
+| `MODE B/C` | 502 until functional codecs are implemented | A | Pending Role A |
 | Not authenticated | 530 | A | Existing in several handlers |
+| `STAT <path>` metadata success | 213 | A formats C metadata | Existing and tested |
+| `HELP` / `HELP <known-command>` success | 214 | A | Existing and tested |
+| Extra argument to `STOU` or malformed command argument | 501 | A | Existing and tested |
+| `HELP <unknown-command>` | 502 | A | Existing and tested |
 
 `150` must precede real data transfer; `226` is forbidden before RDT and atomic
 commit finish.
@@ -211,6 +221,28 @@ file payload.
 **Status:** Existing and aligned with
 `planning/reference/Project1_SocketProgramming_2026.md` §2.2–2.3.
 
+## 6.2 TCP client reply framing
+
+`FTPClient` maintains a persistent byte buffer and consumes replies by CRLF
+lines. A normal reply ends after one line; an `xyz-` multiline reply ends at
+the matching `xyz ` line. Bytes for later replies remain buffered, so TCP may
+split or coalesce `150` and `226` without changing transfer lifecycle order.
+`LIST`/`NLST` use a dedicated reader that collects the textual body through its
+final `226`; RETR/STOR still return after `150` so UDP transfer can proceed.
+
+**Status:** Existing and verified by split, coalesced, multiline and listing
+client tests.
+
+## 6.3 MODE handoff boundary
+
+The current baseline accepts `MODE S` and stores Stream mode in the requesting
+session. `MODE B/C` return `502` until Role A supplies functional block and
+compressed transformations plus command/session/E2E tests. That implementation
+must remain outside the canonical 20-byte RDT header: mode encoding happens
+before RDT packetization and decoding happens after ordered RDT delivery.
+
+**Status:** S existing; B/C pending Role A implementation and contract review.
+
 ## 7. RDT packet contract
 
 **Required wire order:** network byte order (big endian), fixed header, then exactly
@@ -222,15 +254,16 @@ file payload.
 | sequence | 4 bytes | DATA/FIN sequence |
 | acknowledgement | 4 bytes | ACK sequence |
 | flags | 2 bytes | DATA, ACK, FIN, START or ABORT |
+| checksum | 4 bytes | CRC-32 over agreed header fields + payload |
 | payload_length | 2 bytes | exact payload bytes after header |
-| checksum | 4 bytes | CRC/hash over agreed header fields + payload |
 
 The checksum covers transfer ID, sequence, acknowledgement, flags, payload
 length and payload. The project requirement does not prescribe transfer-ID width;
 the fixed 32-bit normalized value preserves the established public API without a
 wire-breaking header redesign.
 
-Flags: `START`, `DATA`, `ACK`, `FIN`, `ABORT`; illegal combinations are dropped.
+Flag values are DATA `0x01`, ACK `0x02`, FIN `0x04`, START `0x08` and ABORT
+`0x10`; illegal combinations are dropped.
 `START` carries transfer metadata; `DATA` carries bytes; `ACK` carries the exact
 acknowledged sequence; `FIN` explicitly closes data; `ABORT` cancels.
 
@@ -312,3 +345,6 @@ count and result. The demo client renders real upload/download progress.
 | 2026-08-08 | Normalized progress and server lifecycle logging | C integration; legacy file-helper callbacks remain backward compatible | Command/server/E2E/CLI: 62 passed; full pytest: 189 passed in 102.50s |
 | 2026-08-08 | Added `TransferContext.total_bytes` for RETR progress | A/C/B compatible optional field; sender places it in RDT START | E2E progress-total assertion: 5 passed in 17.61s; full pytest: 189 passed in 106.91s |
 | 2026-08-09 | Go-Back-N flow control and reliable START lifecycle | C implementation; header layout and public adapter signatures preserved; reviewed by A/B/C | Protocol 27 passed; fault/transfer/E2E 22 passed; full WSL2 pytest 192 passed in 91.11s |
+| 2026-08-10 | Final A/C correctness pass: server-owned filesystem locks, strict auth/command syntax and buffered TCP replies | A owns control/client behavior; C owns shared filesystem/concurrency; RDT wire layout unchanged | Focused 71 passed + 28 routing subtests; full WSL2 212 passed + 28 subtests in 97.52s |
+| 2026-08-10 | Accepted MODE S/B/C as per-session TCP negotiation labels | A command state; C integration review; unified RDT data path and wire layout unchanged | MODE/E2E 61 passed + 28 subtests; full WSL2 213 passed + 28 subtests in 108.71s |
+| 2026-08-10 | Reverted AI-applied Role A final-fix for owner handoff | A scope returned to A; C shared filesystem/concurrency changes retained | Role C focused 24 passed in 33.80s; current full WSL2 205 passed in 103.08s |

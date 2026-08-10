@@ -17,7 +17,6 @@ AI đề xuất tách mã nguồn thành các module:
 Đã điều chỉnh lại cấu trúc thư mục cho phù hợp với project, sửa lại constructor của `Session`, bổ sung `FTPReply`, sửa lỗi import và indentation, đồng thời kiểm thử lại bằng Telnet.
 
 ---
-
 ## [05/08/2026] - Session Management
 **Prompt:**
 Thiết kế lớp Session để quản lý trạng thái FTP của từng client theo chuẩn FTP.
@@ -338,20 +337,7 @@ Hiện tại `command_handler.py` dùng `except Exception: return "550 ..."` b�
 - `ErrorType.NOT_FOUND` → `550 File not found`
 - `ErrorType.PERMISSION` → `550 Permission denied`
 - `ErrorType.PATH_TRAVERSAL` → `550 Path traversal not allowed`
-- `ErrorType.IO_ERROR` → `451 Local error in processing`
-- `ErrorType.ALREADY_EXISTS` → `553 File name not allowed`
-Các lỗi không phải `FilesystemOperationError` trong transfer path → `426 Transfer aborted`; các lỗi khác → `451`.
-Xóa toàn bộ `except:` trống.
-
-**Raw output:**
-AI đề xuất helper:
-
-```python
-def _fs_error_reply(self, e: FilesystemOperationError) -> str:
-    mapping = {
-        ErrorType.NOT_FOUND:       "550 File not found.",
-        ErrorType.PERMISSION:      "550 Permission denied.",
-        ErrorType.PATH_TRAVERSAL:  "550 Path traversal not allowed.",
+- `ErrorType.IO_ERROR` → `451…145 tokens truncated…d.",
         ErrorType.IO_ERROR:        "451 Local error in processing.",
         ErrorType.ALREADY_EXISTS:  "553 File name not allowed.",
     }
@@ -697,3 +683,5 @@ AI sinh danh sách 28 lệnh và ma trận test case trong `TestCommandMatrix28R
 **Verification:**
 - `TestCommandMatrix28RoleA`: đủ 28 lệnh `USER...ABOR`, `HELP` → `214`, lệnh ngoài đề (`SITE`) → `502`.
 - Final Role A audit — **63 passed in 5.71s**; full WSL2 regression — **199 passed in 96.72s**; evidence `docs/evidence/final-week-rdt-gbn-verification.md`.
+
+---

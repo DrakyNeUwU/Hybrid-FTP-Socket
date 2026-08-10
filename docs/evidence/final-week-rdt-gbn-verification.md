@@ -15,6 +15,7 @@ Environment: WSL2/Linux, Python 3, repository root `/mnt/c/Code/Code/socket`.
 | `python3 -m pytest tests/test_e2e_transfer.py::TestEndToEndPasvTransfer::test_active_upload_then_download_preserves_sha256 tests/test_cli_display.py -q` | 8 passed in 5.42s | ACTIVE download UDP probe plus CLI regression |
 | `python3 -m pytest tests/test_e2e_transfer.py::TestEndToEndPasvTransfer::test_active_upload_then_download_preserves_sha256 -q` | 1 passed in 5.47s | ACTIVE probe sent before RETR regression |
 | `python3 -m pytest -q` | 199 passed in 96.72s | Final full regression after Windows CP1252-safe CLI output and ACTIVE pre-/post-RETR UDP probes |
+| `python3 -m pytest -q` (10/08 post-Role-A handoff) | 205 passed in 103.08s | Current baseline after reverting A final-fix; retained C shared locks, same-file APPE and integration coverage |
 
 Physical two-machine verification (09/08/2026): PASV and ACTIVE both completed
 upload and download between server `172.18.0.48` and client `172.18.0.49`.

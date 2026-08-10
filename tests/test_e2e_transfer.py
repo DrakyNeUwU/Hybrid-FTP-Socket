@@ -159,6 +159,64 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
             self.assertEqual(compute_hash(source), compute_hash(os.path.join(self.root, remote)))
             self.assertEqual(compute_hash(source), compute_hash(os.path.join(download_dir, remote)))
 
+    def test_two_clients_append_same_file_without_lost_update(self):
+        remote_name = "shared-append.bin"
+        remote_path = os.path.join(self.root, remote_name)
+        base = b"base-"
+        first_payload = b"A" * (16 * 1024)
+        second_payload = b"B" * (16 * 1024)
+        write_file(remote_path, base)
+
+        first_source = os.path.join(self.temp_dir.name, "append-a.bin")
+        second_source = os.path.join(self.temp_dir.name, "append-b.bin")
+        write_file(first_source, first_payload)
+        write_file(second_source, second_payload)
+
+        clients = [
+            FTPClient("127.0.0.1", self.server.port),
+            FTPClient("127.0.0.1", self.server.port),
+        ]
+        sources = [first_source, second_source]
+        barrier = threading.Barrier(3)
+        results = []
+        results_lock = threading.Lock()
+
+        for client in clients:
+            self.assertTrue(client.connect().startswith("220"))
+            client.login()
+
+        def append_worker(client, source):
+            try:
+                barrier.wait(timeout=5)
+                result = client.upload_file(
+                    source, remote_name, cmd="APPE", mode="PASV"
+                )
+                with results_lock:
+                    results.append(result)
+            finally:
+                client.close()
+
+        workers = [
+            threading.Thread(target=append_worker, args=pair, daemon=True)
+            for pair in zip(clients, sources)
+        ]
+        for worker in workers:
+            worker.start()
+        barrier.wait(timeout=5)
+        for worker in workers:
+            worker.join(timeout=15)
+            self.assertFalse(worker.is_alive(), "concurrent APPE did not finish")
+
+        self.assertEqual(results, [True, True])
+        final = read_file_bytes(remote_path)
+        self.assertIn(
+            final,
+            (
+                base + first_payload + second_payload,
+                base + second_payload + first_payload,
+            ),
+        )
+
     def test_abor_waiting_upload_removes_temporary_file(self):
         """ABOR cancels a real PASV upload waiting for UDP data."""
         target = os.path.join(self.root, "abort-target.bin")

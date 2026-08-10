@@ -121,6 +121,33 @@ class TestThreadedServer:
         time.sleep(0.1)
         assert running_server.get_active_client_count() == 0
 
+    def test_client_handlers_share_filesystem_and_report_alive(self, running_server):
+        clients = [socket.create_connection((TEST_HOST, TEST_PORT)) for _ in range(2)]
+        try:
+            for client in clients:
+                assert client.recv(1024).startswith(b"220")
+
+            deadline = time.time() + 1
+            while running_server.get_active_client_count() < 2 and time.time() < deadline:
+                time.sleep(0.01)
+
+            with running_server.clients_lock:
+                handlers = list(running_server.active_clients)
+            assert len(handlers) == 2
+            assert all(
+                handler.filesystem_service is running_server.filesystem_service
+                for handler in handlers
+            )
+            assert all(session["alive"] for session in running_server.get_active_sessions())
+        finally:
+            for client in clients:
+                try:
+                    client.sendall(b"QUIT\r\n")
+                    client.recv(1024)
+                except OSError:
+                    pass
+                client.close()
+
     def test_server_stop_cleanup(self):
         """Check that stopping the server disconnects all active clients."""
         clean_port = TEST_PORT + 25

@@ -35,7 +35,10 @@ class ClientHandler(threading.Thread):
             self.session.server_ip = "127.0.0.1"
 
         os.makedirs(self.session.ftp_root, exist_ok=True)
-        self.filesystem_service = FilesystemService(self.session.ftp_root)
+        shared_filesystem = getattr(server, "filesystem_service", None)
+        self.filesystem_service = shared_filesystem or FilesystemService(
+            self.session.ftp_root
+        )
         self.sender_adapter = RDTSenderAdapter()
         self.receiver_adapter = RDTReceiverAdapter()
         self.transfer_manager = TransferManager(
