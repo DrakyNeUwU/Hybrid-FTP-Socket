@@ -480,7 +480,6 @@ The TCP control test uses the project client or Netcat (`nc`) to:
 4. Send `NOOP` and other implemented control commands.
 5. Send `QUIT`, receive `221`, and confirm safe session cleanup.
 
-<<<<<<< HEAD
 The server log below (excerpt from `docs/evidence/final-lan-server.log`) proves
 the full command/reply lifecycle on a real two-machine LAN run. IP addresses,
 password redaction, active-session table and transfer outcomes are all present.
@@ -511,35 +510,6 @@ password redaction, active-session table and transfer outcomes are all present.
 *This excerpt proves: server IP `172.18.0.48`, client IP `172.18.0.49`, password
 redacted as `********`, `220→331→230→227→150→226→221` reply flow, and
 `Active sessions=[...]` logging.*
-=======
-The embedded LAN server excerpt shows the real client IP, redacted login,
-executed commands and the `150 → 226` upload/download lifecycle:
-
-```text
-Client connected session=S000002 ip=172.18.0.49:56595 active=1
-Command session=S000002 ip=172.18.0.49 command=USER admin
-Command session=S000002 ip=172.18.0.49 command=PASS ********
-Command session=S000002 ip=172.18.0.49 command=PASV
-Command session=S000002 ip=172.18.0.49 command=STOR final-lan-pasv.bin
-Transfer session=S000002 transfer_id=T000001 operation=STOR mode=PASSIVE result=success bytes=256000
-Command session=S000002 ip=172.18.0.49 command=RETR final-lan-pasv.bin
-Transfer session=S000002 transfer_id=T000002 operation=RETR mode=PASSIVE result=success bytes=256000
-```
-
-After the final concurrency fix, the active-session test records live handlers:
-
-```text
-Active sessions=[{'session_id': 'S000001', 'ip': '127.0.0.1', 'port': 57756, 'alive': True}]
-Active sessions=[{'session_id': 'S000002', 'ip': '127.0.0.1', 'port': 57768, 'alive': True}]
-1 passed in 1.10s
-```
-
-Source: `docs/evidence/final-lan-server.log` and
-`docs/evidence/final-code-fix-verification.md`.
-
-![PASV LAN server lifecycle](evidence/screenshots/02-lan-pasv-server-lifecycle.png)
-*Figure: LAN PASV server lifecycle showing the live client sessions and the `150 → 226` transfer flow.*
->>>>>>> 4cde269bfedc1a2b092bf6f16ea38779c22d6670
 
 ### 7.2 Filesystem and Concurrency Evidence (Role C)
 
