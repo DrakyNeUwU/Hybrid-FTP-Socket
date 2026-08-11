@@ -19,6 +19,9 @@
   103.08s**; Role C focused regression — **24 passed in 33.80s**.
 - Full regression after Role A MODE S/B/C: `python3 -m pytest -q` —
   **271 passed, 357 subtests in 192.88s** after production review hardening.
+- Latest full regression after interactive demo-login changes:
+  `python3 -m pytest -q` — **274 passed, 357 subtests in 186.46s** on
+  11/08/2026.
 - Production audit reproduced silent MODE mismatch corruption, client destination
   deletion, TCP framing and command gaps. C applied the integration fixes; see
   `docs/evidence/role-a-production-review-2026-08-10.md`. Role B START-metadata
@@ -29,10 +32,11 @@
   Implementation: `common/mode_codec.py`, `server/command_handler.py`,
   `server/transfer_manager.py`, `client/ftp_client.py`.
 - Manual terminal operation is available through `python3 -m client.ftp_cli`.
-  It sends normal control commands directly and routes `STOR`/`RETR`/`STOU`/
-  `APPE` through the existing production FTPClient UDP/RDT path; it does not
-  change the wire contract. CLI/client tests: **7 passed in 0.60s**; relevant
-  E2E transfer suite: **14 passed + 8 subtests in 83.16s** on 11/08/2026.
+  The user sends visible `USER` and `PASS` commands; the demo server accepts
+  any non-empty username/password for session access. `STOR`/`RETR`/`STOU`/`APPE` still use
+  the existing FTPClient UDP/RDT path, so the wire contract is unchanged.
+  Command/client suite: **66 passed in 0.97s**; E2E transfer suite:
+  **14 passed + 8 subtests in 83.99s** on 11/08/2026.
 - Protocol verification: `tests/test_rdt.py` — **27 passed in 14.76s**.
 - Fault, transfer-manager, and FTP E2E verification — **22 passed in 70.44s**;
   expanded FTP E2E — **6 passed in 22.63s**; MODE E2E matrix (PASV/ACTIVE S/B/C,

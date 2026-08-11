@@ -41,7 +41,7 @@ class TestCommands(unittest.TestCase):
         self.assertEqual(self.session.username, "testuser")
 
         # 2. PASS
-        pass_cmd = CommandParser.parse("PASS 123456")
+        pass_cmd = CommandParser.parse("PASS test-password")
         resp_pass = self.handler.handle(pass_cmd, self.session)
         self.assertTrue(resp_pass.startswith("230"))
         self.assertTrue(self.session.is_logged_in)
@@ -281,7 +281,7 @@ class TestTCPFraming(unittest.TestCase):
             ch, client_sock = self._make_handler(test_dir)
 
             # Simulate receiving two commands at once
-            data = b"USER testuser\r\nPASS 123456\r\n"
+            data = b"USER testuser\r\nPASS test-password\r\n"
             ch.buffer += data
             responses = []
             while b"\r\n" in ch.buffer:
@@ -401,9 +401,9 @@ class TestAuthReset(unittest.TestCase):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_new_user_resets_login(self):
-        # Log in as a configured user before changing identity.
+        # Log in before changing identity.
         self.handler.handle(CommandParser.parse("USER admin"), self.session)
-        self.handler.handle(CommandParser.parse("PASS 123456"), self.session)
+        self.handler.handle(CommandParser.parse("PASS test-password"), self.session)
         self.assertTrue(self.session.is_logged_in)
 
         # New USER must reset is_logged_in
@@ -411,22 +411,21 @@ class TestAuthReset(unittest.TestCase):
         self.assertFalse(self.session.is_logged_in, "is_logged_in should be False after new USER")
         self.assertEqual(self.session.username, "user2")
 
-    def test_unknown_user_cannot_use_default_password(self):
+    def test_any_nonempty_credentials_are_accepted(self):
         self.handler.handle(CommandParser.parse("USER ghost"), self.session)
-        response = self.handler.handle(CommandParser.parse("PASS 123456"), self.session)
-        self.assertTrue(response.startswith("530"))
-        self.assertFalse(self.session.is_logged_in)
-        self.assertIsNone(self.session.username)
+        response = self.handler.handle(CommandParser.parse("PASS test-password"), self.session)
+        self.assertTrue(response.startswith("230"))
+        self.assertTrue(self.session.is_logged_in)
 
-    def test_wrong_password_clears_username(self):
+    def test_empty_password_clears_username(self):
         self.handler.handle(CommandParser.parse("USER admin"), self.session)
-        resp = self.handler.handle(CommandParser.parse("PASS wrongpass"), self.session)
+        resp = self.handler.handle(CommandParser.parse("PASS"), self.session)
         self.assertTrue(resp.startswith("530"))
         self.assertFalse(self.session.is_logged_in)
         self.assertIsNone(self.session.username)
 
     def test_pass_before_user_returns_503(self):
-        resp = self.handler.handle(CommandParser.parse("PASS 123456"), self.session)
+        resp = self.handler.handle(CommandParser.parse("PASS test-password"), self.session)
         self.assertTrue(resp.startswith("503"), resp)
 
 

@@ -47,8 +47,10 @@ class FTPClient:
         self.control_socket.connect((self.server_ip, self.control_port))
         return self._recv_reply()
 
-    def login(self, username: str = "admin", password: str = "123456") -> None:
-        self.command(f"USER {username}")
+    def login(self, username: str, password: str) -> None:
+        reply = self.command(f"USER {username}")
+        if not reply.startswith("331"):
+            raise RuntimeError(reply.strip())
         reply = self.command(f"PASS {password}")
         if not reply.startswith("230"):
             raise RuntimeError(reply.strip())

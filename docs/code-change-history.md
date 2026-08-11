@@ -111,3 +111,12 @@ in 167.08s**. The RDT 20-byte header, flags and Go-Back-N behavior are unchanged
 
 This is a client usability addition only: no TCP reply, RDT header, MODE codec,
 or A/B/C shared API contract changed.
+
+## 11/08/2026 — Interactive demo login
+
+| Role | Problem | Files / behavior changed | Verification |
+|---|---|---|---|
+| C | Credentials were hard-coded; terminal users needed an interactive login path | Removed credential matching from the demo server. The interactive client sends visible `USER <name>` and `PASS <password>` commands, and the server accepts any non-empty pair for session access. This keeps the requirement command flow without storing credentials in source code. TCP/UDP/RDT wire behavior is unchanged. | `python3 -m pytest tests/test_ftp_cli.py tests/test_ftp_client.py tests/test_commands.py -q` — **66 passed in 0.97s**; `python3 -m pytest tests/test_e2e_transfer.py -v` — **14 passed + 8 subtests in 83.99s** |
+
+Final regression: `python3 -m pytest -q` — **274 passed, 357 subtests passed
+in 186.46s**.

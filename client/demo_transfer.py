@@ -36,6 +36,8 @@ def main() -> int:
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=2121)
+    parser.add_argument("--username", help="server account username")
+    parser.add_argument("--password", help="server account password")
     args = parser.parse_args()
 
     remote = args.remote or args.local_file.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
@@ -47,7 +49,9 @@ def main() -> int:
                        transfer_mode=args.transfer_mode)
     try:
         _print_console(client.connect().strip())
-        client.login()
+        username = args.username or input("Username: ").strip()
+        password = args.password if args.password is not None else input("Password: ")
+        client.login(username, password)
         _print_console(client.set_mode(args.transfer_mode).strip())
         if not client.upload_file(args.local_file, remote, mode=args.mode):
             _print_console("Upload failed")

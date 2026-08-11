@@ -31,10 +31,14 @@ def test_terminal_transfer_commands_use_production_client(tmp_path):
 
     assert run_command(client, f'STOR "{source}" remote.bin', "PASV") == ("226 Transfer complete", False)
     assert run_command(client, "RETR remote.bin", "PASV") == ("226 Transfer complete", False)
+    assert run_command(client, "USER alice", "PASV") == ("200 OK", False)
+    assert run_command(client, "PASS secret", "PASV") == ("200 OK", False)
     assert run_command(client, "PWD", "PASV") == ("200 OK", False)
 
     assert client.calls == [
         ("upload", str(source), "remote.bin", "STOR", "PASV"),
         ("download", "remote.bin", "PASV"),
+        ("command", "USER alice"),
+        ("command", "PASS secret"),
         ("command", "PWD"),
     ]
