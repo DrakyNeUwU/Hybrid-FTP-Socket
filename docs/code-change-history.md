@@ -102,3 +102,12 @@ run. Role B START-payload review and Role A screenshots remain pending.
 Final verification: `python3 -m pytest -q` — **256 passed, 357 subtests passed
 in 167.08s**. The RDT 20-byte header, flags and Go-Back-N behavior are unchanged
 (RDT progress reporting order was adjusted only for logical-byte accounting).
+
+## 11/08/2026 — Interactive terminal client
+
+| Role | Problem | Files / behavior changed | Verification |
+|---|---|---|---|
+| C | The repository exposed `demo_transfer` but had no terminal client that could execute control commands and route file commands through the real UDP/RDT path | Added `client/ftp_cli.py`: raw control commands use `FTPClient.command()`; `STOR`, `RETR`, `STOU`, and `APPE` call the existing production transfer methods using the selected PASV/ACTIVE data mode. README now documents server → login → interactive-command usage. | `python3 -m pytest tests/test_ftp_cli.py tests/test_ftp_client.py -v` — **7 passed**; `python3 -m pytest tests/test_e2e_transfer.py -v` — **14 passed + 8 subtests** |
+
+This is a client usability addition only: no TCP reply, RDT header, MODE codec,
+or A/B/C shared API contract changed.

@@ -1,7 +1,7 @@
 # Project Status — Hybrid FTP
 
 **Source of truth for current status.**
-**Updated:** 10/08/2026
+**Updated:** 11/08/2026
 
 | Item | Status | Final owner | Evidence / blocker |
 |---|---|---|---|
@@ -28,6 +28,11 @@
   unauthenticated return `501`/`530` without changing session mode.
   Implementation: `common/mode_codec.py`, `server/command_handler.py`,
   `server/transfer_manager.py`, `client/ftp_client.py`.
+- Manual terminal operation is available through `python3 -m client.ftp_cli`.
+  It sends normal control commands directly and routes `STOR`/`RETR`/`STOU`/
+  `APPE` through the existing production FTPClient UDP/RDT path; it does not
+  change the wire contract. CLI/client tests: **7 passed in 0.60s**; relevant
+  E2E transfer suite: **14 passed + 8 subtests in 83.16s** on 11/08/2026.
 - Protocol verification: `tests/test_rdt.py` — **27 passed in 14.76s**.
 - Fault, transfer-manager, and FTP E2E verification — **22 passed in 70.44s**;
   expanded FTP E2E — **6 passed in 22.63s**; MODE E2E matrix (PASV/ACTIVE S/B/C,
