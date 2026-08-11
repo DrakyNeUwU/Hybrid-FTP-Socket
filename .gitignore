@@ -19,12 +19,26 @@ Thumbs.db
 tests/sample_files/*
 !tests/sample_files/.gitkeep
 client/downloads/
+tests/_flaky_*.dat
+
+# Runtime FTP uploads (server data dir) — only committed fixtures stay tracked
+ftp_root/*.bin
+!ftp_root/demo-active.bin
+!ftp_root/demo-pasv.bin
+!ftp_root/demo-progress.bin
+!ftp_root/final-lan-active.bin
+!ftp_root/final-lan-pasv.bin
+
+# Ad-hoc demo binaries at repo root (demo.bin is the tracked fixture)
+demo-concurrent.bin
+demo-lan.bin
 
 # Logs
 *.log
 # Curated final evidence belongs in the submission pack; runtime logs elsewhere
 # remain ignored.
 !docs/evidence/final-*.log
+!docs/evidence/role-a-*.log
 
 # Personal notes — không commit lên repo
 second-brain.md

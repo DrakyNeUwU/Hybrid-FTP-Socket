@@ -526,6 +526,44 @@ password redaction, active-session table and transfer outcomes are all present.
 redacted as `********`, `220→331→230→227→150→226→221` reply flow, and
 `Active sessions=[...]` logging.*
 
+#### Role A Oral-Defense Evidence (2026-08-11, macOS localhost, commit `43764fd`)
+
+MODE B (Block) round-trip over PASV — server replies `200 Mode Block`, then
+uploads and downloads the same file; SHA-256 matches at source, server and
+downloaded destination:
+
+![MODE B PASV round-trip](evidence/screenshots/role-a-mode-b-pasv-roundtrip.png)
+*Figure: MODE B PASV upload/download — `200 Mode Block`, SHA-256
+`b57b64b1…` source/server/download khớp (commit 43764fd).*
+
+MODE C (Compressed) round-trip over ACTIVE — server replies
+`200 Mode Compressed` and completes the transfer; hashes match:
+
+![MODE C ACTIVE round-trip](evidence/screenshots/role-a-mode-c-active-roundtrip.png)
+*Figure: MODE C ACTIVE upload/download — `200 Mode Compressed`, SHA-256
+`b57b64b1…` khớp (localhost).*
+
+Two clients (MODE B + MODE C) transfer concurrently; the server keeps both
+sessions `alive: True` (`S000001`, `S000002`) without blocking:
+
+![Two concurrent B/C sessions](evidence/screenshots/role-a-concurrent-b-c-sessions.png)
+*Figure: server log — `S000001` (MODE C) and `S000002` (MODE B) both active with
+`'alive': True`, each STOR `result=success bytes=256000`.*
+
+Control-channel transcript covering banner, failed login (`530`), successful
+login (`230`), `STAT` (`213`), `HELP MODE` (`214`), rejected `STOU` (`501`) and
+`QUIT` (`221`):
+
+![Control command evidence](evidence/screenshots/role-a-control-command-evidence.png)
+*Figure: full control-channel sequence `220 → 331 → 530 → 230 → 213 → 214 →
+501 → 221`, run on commit 43764fd.*
+
+Final regression on the release commit:
+
+![Final regression — 271 passed](evidence/screenshots/role-a-final-pytest.png)
+*Figure: `python3 -m pytest -q` → `271 passed, 357 subtests passed in 177.16s`
+(macOS, commit 43764fd).*
+
 ### 7.2 Filesystem and Concurrency Evidence (Role C)
 
 The final regression verifies filesystem/concurrency, ABOR and disconnect cleanup.

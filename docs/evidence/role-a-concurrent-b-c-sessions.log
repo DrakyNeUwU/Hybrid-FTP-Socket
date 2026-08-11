@@ -1,0 +1,78 @@
+[2026-08-11 12:29:42] FTP Server listen 127.0.0.1:2121
+[2026-08-11 12:29:54] Reply session=S000001 ip=127.0.0.1 transfer_id=- code=220
+[2026-08-11 12:29:54] Client connected session=S000001 ip=127.0.0.1:61015 active=1
+[2026-08-11 12:29:54] Active sessions=[{'session_id': 'S000001', 'ip': '127.0.0.1', 'port': 61015, 'alive': True}]
+[2026-08-11 12:29:54] Reply session=S000002 ip=127.0.0.1 transfer_id=- code=220
+[2026-08-11 12:29:54] Client connected session=S000002 ip=127.0.0.1:61014 active=2
+[2026-08-11 12:29:54] Active sessions=[{'session_id': 'S000001', 'ip': '127.0.0.1', 'port': 61015, 'alive': True}, {'session_id': 'S000002', 'ip': '127.0.0.1', 'port': 61014, 'alive': True}]
+[2026-08-11 12:29:54] Command session=S000001 ip=127.0.0.1 transfer_id=- command=USER admin
+[2026-08-11 12:29:54] Reply session=S000001 ip=127.0.0.1 transfer_id=- code=331
+[2026-08-11 12:29:54] Command session=S000002 ip=127.0.0.1 transfer_id=- command=USER admin
+[2026-08-11 12:29:54] Reply session=S000002 ip=127.0.0.1 transfer_id=- code=331
+[2026-08-11 12:29:54] Command session=S000001 ip=127.0.0.1 transfer_id=- command=PASS ********
+[2026-08-11 12:29:54] Reply session=S000001 ip=127.0.0.1 transfer_id=- code=230
+[2026-08-11 12:29:54] Command session=S000002 ip=127.0.0.1 transfer_id=- command=PASS ********
+[2026-08-11 12:29:54] Reply session=S000002 ip=127.0.0.1 transfer_id=- code=230
+[2026-08-11 12:29:54] Command session=S000001 ip=127.0.0.1 transfer_id=- command=MODE C
+[2026-08-11 12:29:54] Reply session=S000001 ip=127.0.0.1 transfer_id=- code=200
+[2026-08-11 12:29:54] Command session=S000002 ip=127.0.0.1 transfer_id=- command=MODE B
+[2026-08-11 12:29:54] Reply session=S000002 ip=127.0.0.1 transfer_id=- code=200
+[2026-08-11 12:29:54] Command session=S000001 ip=127.0.0.1 transfer_id=- command=TYPE I
+[2026-08-11 12:29:54] Reply session=S000001 ip=127.0.0.1 transfer_id=- code=200
+[2026-08-11 12:29:54] Command session=S000002 ip=127.0.0.1 transfer_id=- command=TYPE I
+[2026-08-11 12:29:54] Reply session=S000002 ip=127.0.0.1 transfer_id=- code=200
+[2026-08-11 12:29:54] Command session=S000001 ip=127.0.0.1 transfer_id=- command=PASV
+[2026-08-11 12:29:54] Reply session=S000001 ip=127.0.0.1 transfer_id=- code=227
+[2026-08-11 12:29:54] Command session=S000002 ip=127.0.0.1 transfer_id=- command=PASV
+[2026-08-11 12:29:54] Reply session=S000002 ip=127.0.0.1 transfer_id=- code=227
+[2026-08-11 12:29:54] Command session=S000001 ip=127.0.0.1 transfer_id=- command=STOR role-a-conc-c.bin
+[2026-08-11 12:29:54] Command session=S000002 ip=127.0.0.1 transfer_id=- command=STOR role-a-conc-b.bin
+[2026-08-11 12:29:54] Reply session=S000001 ip=127.0.0.1 transfer_id=T000001 code=150
+[2026-08-11 12:29:54] Reply session=S000002 ip=127.0.0.1 transfer_id=T000002 code=150
+[RDT][Start] File size: 256000 bytes
+[RDT][Start] File size: 256000 bytes
+[2026-08-11 12:29:56] Transfer session=S000002 transfer_id=T000002 operation=STOR mode=PASSIVE result=success bytes=256000
+[2026-08-11 12:29:56] Reply session=S000002 ip=127.0.0.1 transfer_id=T000002 code=226
+[2026-08-11 12:29:56] Command session=S000002 ip=127.0.0.1 transfer_id=T000002 command=PASV
+[2026-08-11 12:29:56] Reply session=S000002 ip=127.0.0.1 transfer_id=T000002 code=227
+[2026-08-11 12:29:56] Command session=S000002 ip=127.0.0.1 transfer_id=T000002 command=RETR role-a-conc-b.bin
+[2026-08-11 12:29:56] Reply session=S000002 ip=127.0.0.1 transfer_id=T000003 code=150
+[2026-08-11 12:29:56] Transfer session=S000002 transfer_id=T000003 operation=RETR mode=PASSIVE result=success bytes=256000
+[2026-08-11 12:29:56] Reply session=S000002 ip=127.0.0.1 transfer_id=T000003 code=226
+[2026-08-11 12:29:56] Transfer session=S000001 transfer_id=T000001 operation=STOR mode=PASSIVE result=success bytes=256000
+[2026-08-11 12:29:56] Reply session=S000001 ip=127.0.0.1 transfer_id=T000001 code=226
+[2026-08-11 12:29:56] Command session=S000001 ip=127.0.0.1 transfer_id=T000001 command=PASV
+[2026-08-11 12:29:56] Reply session=S000001 ip=127.0.0.1 transfer_id=T000001 code=227
+[2026-08-11 12:29:56] Command session=S000001 ip=127.0.0.1 transfer_id=T000001 command=RETR role-a-conc-c.bin
+[2026-08-11 12:29:56] Reply session=S000001 ip=127.0.0.1 transfer_id=T000004 code=150
+[2026-08-11 12:29:56] Transfer session=S000001 transfer_id=T000004 operation=RETR mode=PASSIVE result=success bytes=256000
+[2026-08-11 12:29:56] Reply session=S000001 ip=127.0.0.1 transfer_id=T000004 code=226
+[2026-08-11 12:29:59] Command session=S000002 ip=127.0.0.1 transfer_id=T000003 command=QUIT
+[2026-08-11 12:29:59] Reply session=S000002 ip=127.0.0.1 transfer_id=T000003 code=221
+[2026-08-11 12:29:59] Client disconnected session=S000002 ip=127.0.0.1 active=1
+[2026-08-11 12:29:59] Active sessions=[{'session_id': 'S000001', 'ip': '127.0.0.1', 'port': 61015, 'alive': True}]
+[2026-08-11 12:29:59] Command session=S000001 ip=127.0.0.1 transfer_id=T000004 command=QUIT
+[2026-08-11 12:29:59] Reply session=S000001 ip=127.0.0.1 transfer_id=T000004 code=221
+[2026-08-11 12:29:59] Client disconnected session=S000001 ip=127.0.0.1 active=0
+[2026-08-11 12:29:59] Active sessions=[]
+[2026-08-11 12:30:20] Reply session=S000003 ip=127.0.0.1 transfer_id=- code=220
+[2026-08-11 12:30:20] Client connected session=S000003 ip=127.0.0.1:61016 active=1
+[2026-08-11 12:30:20] Active sessions=[{'session_id': 'S000003', 'ip': '127.0.0.1', 'port': 61016, 'alive': True}]
+[2026-08-11 12:30:20] Command session=S000003 ip=127.0.0.1 transfer_id=- command=USER hacker
+[2026-08-11 12:30:20] Reply session=S000003 ip=127.0.0.1 transfer_id=- code=331
+[2026-08-11 12:30:20] Command session=S000003 ip=127.0.0.1 transfer_id=- command=PASS ********
+[2026-08-11 12:30:20] Reply session=S000003 ip=127.0.0.1 transfer_id=- code=530
+[2026-08-11 12:30:20] Command session=S000003 ip=127.0.0.1 transfer_id=- command=USER admin
+[2026-08-11 12:30:20] Reply session=S000003 ip=127.0.0.1 transfer_id=- code=331
+[2026-08-11 12:30:20] Command session=S000003 ip=127.0.0.1 transfer_id=- command=PASS ********
+[2026-08-11 12:30:20] Reply session=S000003 ip=127.0.0.1 transfer_id=- code=230
+[2026-08-11 12:30:20] Command session=S000003 ip=127.0.0.1 transfer_id=- command=STAT role-a-mode-b.bin
+[2026-08-11 12:30:20] Reply session=S000003 ip=127.0.0.1 transfer_id=- code=213-Status
+[2026-08-11 12:30:20] Command session=S000003 ip=127.0.0.1 transfer_id=- command=HELP MODE
+[2026-08-11 12:30:20] Reply session=S000003 ip=127.0.0.1 transfer_id=- code=214
+[2026-08-11 12:30:20] Command session=S000003 ip=127.0.0.1 transfer_id=- command=STOU extra
+[2026-08-11 12:30:20] Reply session=S000003 ip=127.0.0.1 transfer_id=- code=501
+[2026-08-11 12:30:20] Command session=S000003 ip=127.0.0.1 transfer_id=- command=QUIT
+[2026-08-11 12:30:20] Reply session=S000003 ip=127.0.0.1 transfer_id=- code=221
+[2026-08-11 12:30:20] Client disconnected session=S000003 ip=127.0.0.1 active=0
+[2026-08-11 12:30:20] Active sessions=[]
