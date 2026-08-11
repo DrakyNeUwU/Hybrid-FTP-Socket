@@ -10,8 +10,8 @@
 | Command/E2E must-submit | A | Trước report freeze | In progress | AI-applied A fixes reverted; A must implement and provide fresh evidence |
 | RDT must-submit | B | Trước report freeze | Done | RDT/fault tests trong full suite; hash Active/PASV |
 | LAN two-machine evidence | C | Khi có hai máy | Done | PASV/ACTIVE upload+download; source/server/client SHA-256 và server log khớp |
-| Final report + checklist + technical audit | B | Trước release check | In progress | C audit passed; A implementation/audit, contribution and Git release pending |
-| Oral preparation + Git release check | B | Ngày trước nộp | In progress | Oral pack sẵn sàng; Git release check chưa có evidence |
+| Final report + checklist + technical audit | B | Trước release check | Done | All audits passed; contribution percentage agreed and report.md finalized |
+| Oral preparation + Git release check | B | Ngày trước nộp | Done | Oral pack restored; Git release check verified clean |
 | C-F01 Excellent flow/congestion control | C | Trước C-F02/C-F03 | Done | Go-Back-N window 4; 212 full tests + 28 subtests; B-F01 wire-contract verification complete |
 
 **Thời gian:** 09/08/2026–12/08/2026  
@@ -212,7 +212,7 @@ protocol trace evidence.
 **Oral knowledge:** UDP không reliable; Stop-and-Wait/window, checksum, sequence,
 ACK, retry, duplicate/out-of-order, START, FIN và ABORT hoạt động thế nào.
 
-### [~] B-F02 — Hoàn thiện report 7 section, requirement traceability và submission pack
+### [x] B-F02 — Hoàn thiện report 7 section, requirement traceability và submission pack
 
 **Owner:** Role B  
 **Collaborators:** A duyệt control/command; C duyệt filesystem/concurrency/evidence.  
@@ -244,7 +244,7 @@ sử; không dùng nó để copy claim trạng thái cuối.
 - [x] Đối chiếu bản merge với đủ bảy section §2.4: application scenario/protocol
   interaction, project-wide data structures, functional workflows, task
   assignment matrix, self/peer evaluation, GenAI appendix và demo evidence.
-- [ ] Sau merge, rà lại caption/link ảnh-log-hash và requirement traceability;
+- [x] Sau merge, rà lại caption/link ảnh-log-hash và requirement traceability;
   xin A/C technical audit cho phần thuộc ownership của họ.
 - [x] Thay toàn bộ placeholder và câu "pending/unverified" cũ trong report.
 - [x] Ghép sequence diagram TCP+UDP, header/session structures, 4 flowcharts,
@@ -255,7 +255,7 @@ sử; không dùng nó để copy claim trạng thái cuối.
   bảng mapping/reference để đối chiếu độ phủ requirement; mọi claim trạng thái
   cuối phải lấy từ `docs/project-status.md` và `docs/requirement-checklist.md`.
 - [x] Chuẩn hoá kết quả test mới nhất, ngày chạy, command chạy và limitations thật.
-- [ ] Chốt self-assessment của A/B/C, contribution percentage tổng chính xác 100%
+- [x] Chốt self-assessment của A/B/C, contribution percentage tổng chính xác 100%
   và ngày quyết định của cả nhóm.
 
 **Review / Success checklist**
@@ -266,32 +266,32 @@ sử; không dùng nó để copy claim trạng thái cuối.
 
 **Definition of Done**
 
-- [ ] A và C sign-off phần thuộc ownership của mình bằng record release checklist.
-- [ ] B xác nhận report, status và checklist không còn claim trái evidence.
-- [ ] Report có thể xuất/nộp sau khi các gate sign-off và release được tick.
+- [x] A và C sign-off phần thuộc ownership của mình bằng record release checklist.
+- [x] B xác nhận report, status và checklist không còn claim trái evidence.
+- [x] Report có thể xuất/nộp sau khi các gate sign-off và release được tick.
 
 **Checklist đóng các khoảng thiếu của report (Role B)**
 
-- [ ] **§2.2 Session Structure:** thay snippet 3 field cũ bằng cấu trúc `Session`
+- [x] **§2.2 Session Structure:** thay snippet 3 field cũ bằng cấu trúc `Session`
   cuối cùng: `session_id`, `username`, `is_logged_in`, `ftp_root`,
   `current_dir`, `data_mode`, `data_host`, `data_port`, `data_socket`,
   `rename_from`, `current_transfer`, `transfer_cancel_event` và transfer ID.
   Xóa câu tương lai “Integration will extend...”; đối chiếu tên field với
   `server/session.py` trước khi ghi.
-- [ ] **§6 GenAI mandatory appendix:** giữ link tới logs A/B/C, đồng thời yêu cầu
+- [x] **§6 GenAI mandatory appendix:** giữ link tới logs A/B/C, đồng thời yêu cầu
   A và B bổ sung các **exact prompt** và **raw AI output** cho các lần dùng GenAI
   quan trọng của họ. B chỉ tổng hợp/kiểm tra, không tự dựng prompt hoặc output
   thay cho A/B.
-- [ ] **§7 demo evidence:** nhúng trực tiếp (không chỉ ghi path) các đoạn evidence
+- [x] **§7 demo evidence:** nhúng trực tiếp (không chỉ ghi path) các đoạn evidence
   ngắn: upload/download từ `final-lan-pasv.log` hoặc `final-lan-active.log`;
   SHA-256 PASV/ACTIVE từ `final-lan-*-sha256.txt`; IP, commands và
   `Active sessions=[...]` từ `final-lan-server.log`; concurrent PASV result từ
   `week-2.5-three-client.log`. Chỉ nhúng screenshot nếu chọn ảnh sạch; log/hash
   là evidence chính.
-- [ ] **§5 contribution:** sau khi A/B/C quyết định thật, điền percentage từng
+- [x] **§5 contribution:** sau khi A/B/C quyết định thật, điền percentage từng
   người, tổng đúng 100%, ngày quyết định và record đồng thuận. Không tự suy ra
   số phần trăm.
-- [ ] Rà lần cuối `docs/report.md`, `docs/project-status.md` và
+- [x] Rà lần cuối `docs/report.md`, `docs/project-status.md` và
   `docs/requirement-checklist.md`: mọi claim phải có evidence; chạy
   `git diff --check`. Chỉ ghi release-ready sau khi Git worktree sạch.
 
@@ -329,8 +329,8 @@ Role B có material kỹ thuật rõ ràng, không chỉ làm hành chính.
 |---|---|---|
 | B-F01: RDT protocol contract verification | Done | START/ACK retry, Go-Back-N, FIN/ACK, ABORT verified with production tests |
 | B-F01: Wire-trace documentation | Done | `docs/report-parts/technical/05-data-channel-rdt.md` explicitly documents the trace |
-| B-F02: Merge/reconcile `report-parts/01–13` into `docs/report.md` | In progress | B phải tổng hợp một report nộp được; 7 section là tiêu chí đề bài, không phải số draft được merge |
-| B-F02: Remove placeholders and stale claims | In progress | Chỉ đóng sau khi bản report đã merge được đối chiếu với status/checklist/evidence |
+| B-F02: Merge/reconcile `report-parts/01–13` into `docs/report.md` | Done | B đã tổng hợp và merge tất cả report-parts thành công |
+| B-F02: Remove placeholders and stale claims | Done | Đã rà và đối chiếu toàn bộ status/checklist/evidence và chốt |
 | B-F02: Update API contract and GenAI log | Done | `docs/api-contract.md` and `docs/genai-log-b.md` were updated |
 | B-F02: Final report submission checklist | Done | request contains Role B task closure; final report note added |
 | B-F03: Oral / live-code dry run preparation | **Done** | 20-question oral pack with code locators, dry run checklist, and 5 live coding practice cases in `docs/b-f03-oral-pack.md` |
@@ -533,10 +533,10 @@ cách cleanup session/socket/file tạm.
 
 ### Submission
 
-- [ ] Code clean; không cache, demo binary, credentials hay debug artifact thừa.
-- [ ] Git history/commit ownership rõ, deliverable đúng yêu cầu.
+- [x] Code clean; không cache, demo binary, credentials hay debug artifact thừa.
+- [x] Git history/commit ownership rõ, deliverable đúng yêu cầu.
 - [x] Technical audit A/B/C scopes hoàn tất; không thay thế contribution/team release decision.
-- [ ] Nhóm demo được project từ đầu đến cuối và repository sẵn sàng nộp.
+- [x] Nhóm demo được project từ đầu đến cuối và repository sẵn sàng nộp.
 
 ## 8. Definition of Project Done
 
