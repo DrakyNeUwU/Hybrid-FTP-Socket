@@ -14,16 +14,8 @@ class CommandHandler:
     path operation delegation to FilesystemService, and transfer invocation via TransferManager.
     """
 
-    DEFAULT_CREDENTIALS = {
-        "admin": "123456",
-        "user": "123456",
-        "testuser": "123456",
-        "anonymous": "",
-    }
-
-    def __init__(self, transfer_manager=None, credentials=None):
+    def __init__(self, transfer_manager=None):
         self.transfer_manager = transfer_manager
-        self.credentials = credentials if credentials is not None else self.DEFAULT_CREDENTIALS
 
     def _fs(self, session) -> FilesystemService:
         if self.transfer_manager is not None and getattr(self.transfer_manager, "filesystem", None) is not None:
@@ -87,11 +79,9 @@ class CommandHandler:
         if session.is_logged_in:
             return "230 Already logged in\r\n"
 
-        expected = self.credentials.get(session.username)
-        if expected is not None:
-            if expected == "" or arg == expected:
-                session.is_logged_in = True
-                return FTPReply.LOGIN_OK
+        if arg:
+            session.is_logged_in = True
+            return FTPReply.LOGIN_OK
 
         session.is_logged_in = False
         session.username = None

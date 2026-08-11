@@ -1131,3 +1131,33 @@ existing `FTPClient` production methods.
 **Verification:** `python3 -m pytest tests/test_ftp_cli.py
 tests/test_ftp_client.py -v` — **7 passed in 0.60s**; `python3 -m pytest
 tests/test_e2e_transfer.py -v` — **14 passed + 8 subtests in 83.16s**.
+
+## August 11, 2026 — Interactive Demo Login
+
+**Exact prompt:**
+> "mỗi làn làm là mỗi lần reset ah"
+
+**Raw GenAI output summary:**
+AI explained that real authentication needs a server-side source of truth. The
+user chose a demo-only policy instead: accept any non-empty username/password
+entered by the client.
+
+**Manual refinement:**
+
+- Removed production default credentials and the unused server-side credential
+  plumbing.
+- Kept interactive CLI login as explicit `USER`/`PASS` lines, matching the
+  required FTP command surface and avoiding hidden `getpass` input.
+- Kept empty-password rejection and client retry behavior in the terminal UI.
+- Updated command tests to cover the agreed non-empty credential policy.
+
+**Affected files:** server startup/handler modules, client login/CLI/demo,
+authentication/E2E tests, README, project status and code history.
+
+**Verification:** `python3 -m pytest tests/test_ftp_cli.py
+tests/test_ftp_client.py tests/test_commands.py -q` — **66 passed in 0.97s**;
+`python3 -m pytest tests/test_e2e_transfer.py -v` — **14 passed + 8 subtests
+in 83.99s**.
+
+**Final regression:** `python3 -m pytest -q` — **274 passed, 357 subtests
+passed in 186.46s**.

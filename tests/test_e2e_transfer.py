@@ -16,6 +16,10 @@ from common.rdt_sender import send_file_rdt
 from server.threaded_server import FTPServer
 
 
+TEST_USERNAME = "testuser"
+TEST_PASSWORD = "test-password"
+
+
 class TestEndToEndPasvTransfer(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -34,7 +38,7 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
             progress_callback=lambda *event: self.progress_events.append(event),
         )
         self.assertTrue(self.client.connect().startswith("220"))
-        self.client.login()
+        self.client.login(TEST_USERNAME, TEST_PASSWORD)
 
     def tearDown(self):
         try:
@@ -78,7 +82,7 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
                 )
                 try:
                     self.assertTrue(client.connect().startswith("220"))
-                    client.login()
+                    client.login(TEST_USERNAME, TEST_PASSWORD)
                     self.assertTrue(client.upload_file(source, f"remote-{mode}.bin", mode="PASV"))
                     remote = os.path.join(self.root, f"remote-{mode}.bin")
                     self.assertEqual(compute_hash(source), compute_hash(remote))
@@ -103,7 +107,7 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
                 )
                 try:
                     self.assertTrue(client.connect().startswith("220"))
-                    client.login()
+                    client.login(TEST_USERNAME, TEST_PASSWORD)
                     self.assertTrue(client.upload_file(source, f"active-{mode}.bin", mode="ACTIVE"))
                     remote = os.path.join(self.root, f"active-{mode}.bin")
                     self.assertEqual(compute_hash(source), compute_hash(remote))
@@ -127,7 +131,7 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
         client = FTPClient("127.0.0.1", self.server.port, transfer_mode=mode)
         try:
             self.assertTrue(client.connect().startswith("220"))
-            client.login()
+            client.login(TEST_USERNAME, TEST_PASSWORD)
             before = set(os.listdir(self.root))
             self.assertTrue(client.upload_unique_file(addition, mode="PASV"))
             created = set(os.listdir(self.root)) - before
@@ -182,7 +186,7 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
                 )
                 try:
                     self.assertTrue(client.connect().startswith("220"))
-                    client.login()
+                    client.login(TEST_USERNAME, TEST_PASSWORD)
                     self.assertTrue(client.upload_file(source, f"progress-{mode}.bin", mode="PASV"))
                     self.assertEqual(
                         compute_hash(source),
@@ -222,7 +226,7 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
         sources = [(mode_b_source, "mode-b.bin"), (mode_c_source, "mode-c.bin")]
         for client in clients:
             self.assertTrue(client.connect().startswith("220"))
-            client.login()
+            client.login(TEST_USERNAME, TEST_PASSWORD)
 
         errors = []
         errors_lock = threading.Lock()
@@ -319,7 +323,7 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
             try:
                 if not client.connect().startswith("220"):
                     raise RuntimeError("server banner was not 220")
-                client.login()
+                client.login(TEST_USERNAME, TEST_PASSWORD)
                 ready.wait(timeout=5)
                 if not start_transfers.wait(timeout=5):
                     raise RuntimeError("transfer start signal timed out")
@@ -379,7 +383,7 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
 
         for client in clients:
             self.assertTrue(client.connect().startswith("220"))
-            client.login()
+            client.login(TEST_USERNAME, TEST_PASSWORD)
 
         def append_worker(client, source):
             try:
@@ -436,7 +440,7 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
         client = FTPClient("127.0.0.1", self.server.port, os.path.join(self.temp_dir.name, "disconnect-downloads"))
         try:
             self.assertTrue(client.connect().startswith("220"))
-            client.login()
+            client.login(TEST_USERNAME, TEST_PASSWORD)
             client.enter_pasv()
             self.assertTrue(client.command("STOR disconnect-target.bin").startswith("150"))
             self._wait_until(lambda: bool(self._temporary_files("disconnect-target.bin")))
@@ -461,7 +465,7 @@ class TestEndToEndPasvTransfer(unittest.TestCase):
             transfer_mode="B",
         )
         self.assertTrue(client.connect().startswith("220"))
-        client.login()
+        client.login(TEST_USERNAME, TEST_PASSWORD)
 
         worker = threading.Thread(
             target=client.upload_file, args=(source, "stop-b.bin"),

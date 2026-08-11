@@ -23,30 +23,33 @@ In terminal 2, start the interactive client. It keeps one TCP session open and
 automatically creates the UDP/RDT data channel for file commands.
 
 ```bash
-python3 -m client.ftp_cli --host 127.0.0.1 --port 2121 --data-mode PASV
+python3 -m client.ftp_cli --host 127.0.0.1 --port 2121
 ```
 
 For a server on another LAN machine, replace the address with that server's
 LAN IPv4 address, for example:
 
 ```bash
-python3 -m client.ftp_cli --host 172.20.10.2 --port 2121 --data-mode PASV
+python3 -m client.ftp_cli --host 172.20.10.2 --port 2121
 ```
 
-After the `220` greeting, enter one command per line:
+After the `220` greeting, enter the required FTP `USER` and `PASS` commands.
+Both arguments must be non-empty; if either reply indicates failure, enter
+`USER` and `PASS` again:
 
 ```text
-USER admin
-PASS 123456
-PWD
-LIST
-STAT
-QUIT
+ftp> USER alice
+331 Username OK, need password
+ftp> PASS secret
+230 Login successful
+ftp> PWD
+ftp> LIST
+ftp> STAT
+ftp> QUIT
 ```
 
-Expected login replies are `220`, then `331`, then `230`. This is the normal
-way to inspect and demonstrate commands one at a time. Stop the server with
-`Ctrl+C`.
+This is the normal way to inspect and demonstrate commands one at a time. Stop
+the server with `Ctrl+C`.
 
 ### Interactive file commands
 
@@ -64,8 +67,9 @@ ftp> QUIT
 ```
 
 Downloaded files are saved in `./client/downloads`. Quote paths containing
-spaces, for example `STOR "./my file.bin" remote.bin`. Use `--data-mode ACTIVE`
-when the server can reach the client directly through the firewall/NAT.
+spaces, for example `STOR "./my file.bin" remote.bin`. PASV is the default data
+mode and affects file-transfer commands only. Use `--data-mode ACTIVE` when the
+server can reach the client directly through the firewall/NAT.
 
 ## File-transfer demo
 
@@ -76,9 +80,9 @@ For a single scripted upload/download round-trip, use the supplied demo client:
 python3 -m client.demo_transfer demo.bin --remote demo-s.bin --mode PASV --transfer-mode S
 ```
 
-The demo authenticates with the configured development account, reports the
-control replies, and validates the upload/download round-trip. Do not place
-passwords in screenshots or committed logs.
+The demo prompts for any non-empty username/password, reports the control
+replies, and validates the upload/download round-trip. Do not place passwords
+in screenshots or committed logs.
 
 ## Transfer modes and data-channel modes
 
@@ -131,7 +135,8 @@ localhost E2E result and a two-machine LAN result are separate evidence scopes.
 
 ## Control-command usage
 
-`ftp_cli` is the normal manual client. For scripted checks, use
+`ftp_cli` is the normal manual client. It sends your `USER` and `PASS` lines
+unchanged to the server. For scripted checks, use
 `FTPClient.command()` in a Python shell after the server has started:
 
 ```python
@@ -139,7 +144,7 @@ from client.ftp_client import FTPClient
 
 client = FTPClient("127.0.0.1", 2121)
 print(client.connect().strip())
-client.login()                         # configured development account
+client.login("<username>", "<password>")
 print(client.command("PWD").strip())
 print(client.command("HELP MODE").strip())
 print(client.command("STAT").strip())
