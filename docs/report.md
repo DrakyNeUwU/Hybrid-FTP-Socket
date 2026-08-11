@@ -104,24 +104,65 @@ with a descriptive message.
 
 ### 2.2 Session Structure (Role A)
 
-Every TCP client owns an independent `Session`. It contains authentication,
-working-directory and transfer state; it is not shared with another client
-thread.
+Every client owns an independent `Session` that stores authentication,
+working-directory, and transfer state:
+
+```python
+class Session:
+    _transfer_counter = itertools.count(1)
+    _transfer_counter_lock = threading.Lock()
+
+    def __init__(self, ftp_root="./ftp_root"):
+        self.username = None
+        self.is_logged_in = False
+
+        self.ftp_root = os.path.abspath(ftp_root)
+        self.current_dir = self.ftp_root
+
+        self.rename_from = None
+
+        # Transfer state
+        self.transfer_type = "I"          # binary by default
+        self.transfer_mode = "S"          # stream by default
+        self.data_host = None
+        self.data_port = None
+        self.data_socket = None
+        self.data_mode = None             # 'ACTIVE' or 'PASSIVE'
+        self.transfer_cancelled = False
+        self.transfer_cancel_event = None
+        self.current_transfer = None
+        self.transfer_worker = None       # daemon thread for current transfer
+        self.transfer_id = None
+
+        # Session identity (set by ClientHandler / tests)
+        self.session_id = None
+        self.send_reply = None            # injected by ClientHandler
+        self.peer_ip = None
+```
 
 | Attributes | Meaning |
 |---|---|
-| `session_id`, `username`, `is_logged_in`, `peer_ip` | Identity and authenticated control-session state |
-| `ftp_root`, `current_dir` | Server-owned filesystem boundary and current FTP directory |
-| `transfer_type`, `transfer_mode` | Negotiated `TYPE A/I` and `MODE S/B/C` values |
-| `data_mode`, `data_host`, `data_port`, `data_socket` | Active/PASV UDP endpoint state |
-| `rename_from` | Saved source path between `RNFR` and `RNTO` |
-| `current_transfer`, `transfer_id`, `transfer_worker` | Transfer lifecycle identity and bounded worker ownership |
-| `transfer_cancelled`, `transfer_cancel_event` | Shared cancellation signal for `ABOR`, disconnect and cleanup |
+| `session_id` | Unique identifier (e.g., `S000001`) assigned by the server on connect |
+| `username` | Account name used during authentication |
+| `is_logged_in` | `True` after `PASS` succeeds |
+| `ftp_root` | Absolute path of the FTP sandbox root for this session |
+| `current_dir` | Current working directory within the sandbox |
+| `transfer_type` | `I` (binary) or `A` (ASCII); set by `TYPE` command |
+| `transfer_mode` | `S` (stream); `MODE` command updates this field |
+| `data_mode` | `ACTIVE` or `PASSIVE`; negotiated via `PORT` or `PASV` |
+| `data_host` | Remote UDP host for the data channel |
+| `data_port` | Remote UDP port for the data channel |
+| `data_socket` | Bound UDP socket used for the active transfer |
+| `rename_from` | Stores the source path between `RNFR` and `RNTO` |
+| `current_transfer` | Reference to the in-progress `TransferContext` object |
+| `transfer_cancel_event` | `threading.Event` signalled by `ABOR` to stop a running transfer |
+| `transfer_worker` | Daemon thread executing the current RDT transfer |
+| `transfer_id` | Current transfer ID (e.g., `T000001`) from the monotonic counter |
+| `send_reply` | Callable injected by `ClientHandler` to write FTP replies over TCP |
+| `peer_ip` | Client IP address for logging |
 
-Separate sessions prevent one client's login, current directory, endpoint, mode
-or cancellation state from leaking into another client's transfer. The server
-owns one shared filesystem service and its path-lock registry; session state is
-per-client while locks are intentionally server-wide.
+Each connection gets its own `Session` instance; threads share no mutable
+session state. See [`server/session.py`](file:///D:/Hybrid-FTP-Socket-1/server/session.py).
 
 ### 2.3 RDT Header (Role B)
 
@@ -441,6 +482,9 @@ their exact records.
 
 ## 7. Application Demo Evidence
 
+![Full regression — 271 passed](evidence/screenshots/01-full-pytest-271-passed.png)
+*Figure: Full WSL2 regression passed; this verifies the integrated suite.*
+
 ### 7.1 TCP Control and Authentication (Role A)
 
 The TCP control test uses the project client or Netcat (`nc`) to:
@@ -451,30 +495,36 @@ The TCP control test uses the project client or Netcat (`nc`) to:
 4. Send `NOOP` and other implemented control commands.
 5. Send `QUIT`, receive `221`, and confirm safe session cleanup.
 
-The embedded LAN server excerpt shows the real client IP, redacted login,
-executed commands and the `150 → 226` upload/download lifecycle:
+The server log below (excerpt from `docs/evidence/final-lan-server.log`) proves
+the full command/reply lifecycle on a real two-machine LAN run. IP addresses,
+password redaction, active-session table and transfer outcomes are all present.
 
 ```text
-Client connected session=S000002 ip=172.18.0.49:56595 active=1
-Command session=S000002 ip=172.18.0.49 command=USER admin
-Command session=S000002 ip=172.18.0.49 command=PASS ********
-Command session=S000002 ip=172.18.0.49 command=PASV
-Command session=S000002 ip=172.18.0.49 command=STOR final-lan-pasv.bin
-Transfer session=S000002 transfer_id=T000001 operation=STOR mode=PASSIVE result=success bytes=256000
-Command session=S000002 ip=172.18.0.49 command=RETR final-lan-pasv.bin
-Transfer session=S000002 transfer_id=T000002 operation=RETR mode=PASSIVE result=success bytes=256000
+[2026-08-09 16:23:43] FTP Server listen 0.0.0.0:2121
+[2026-08-09 16:24:18] Client connected session=S000002 ip=172.18.0.49:56595 active=1
+[2026-08-09 16:24:18] Active sessions=[{'session_id': 'S000002', 'ip': '172.18.0.49', 'port': 56595, 'alive': False}]
+[2026-08-09 16:24:18] Reply session=S000002 ip=172.18.0.49 transfer_id=- code=220
+[2026-08-09 16:24:18] Command session=S000002 ip=172.18.0.49 transfer_id=- command=USER admin
+[2026-08-09 16:24:18] Reply session=S000002 ip=172.18.0.49 transfer_id=- code=331
+[2026-08-09 16:24:18] Command session=S000002 ip=172.18.0.49 transfer_id=- command=PASS ********
+[2026-08-09 16:24:18] Reply session=S000002 ip=172.18.0.49 transfer_id=- code=230
+[2026-08-09 16:24:18] Command session=S000002 ip=172.18.0.49 transfer_id=- command=PASV
+[2026-08-09 16:24:18] Reply session=S000002 ip=172.18.0.49 transfer_id=- code=227
+[2026-08-09 16:24:18] Command session=S000002 ip=172.18.0.49 transfer_id=- command=STOR final-lan-pasv.bin
+[2026-08-09 16:24:18] Reply session=S000002 ip=172.18.0.49 transfer_id=T000001 code=150
+[RDT][Start] File size: 256000 bytes
+[2026-08-09 16:24:21] Transfer session=S000002 transfer_id=T000001 operation=STOR mode=PASSIVE result=success bytes=256000
+[2026-08-09 16:24:21] Reply session=S000002 ip=172.18.0.49 transfer_id=T000001 code=226
+...
+[2026-08-09 16:24:26] Command session=S000002 ip=172.18.0.49 transfer_id=T000002 command=QUIT
+[2026-08-09 16:24:26] Reply session=S000002 ip=172.18.0.49 transfer_id=T000002 code=221
+[2026-08-09 16:24:26] Client disconnected session=S000002 ip=172.18.0.49 active=0
+[2026-08-09 16:24:26] Active sessions=[]
 ```
 
-After the final concurrency fix, the active-session test records live handlers:
-
-```text
-Active sessions=[{'session_id': 'S000001', 'ip': '127.0.0.1', 'port': 57756, 'alive': True}]
-Active sessions=[{'session_id': 'S000002', 'ip': '127.0.0.1', 'port': 57768, 'alive': True}]
-1 passed in 1.10s
-```
-
-Source: `docs/evidence/final-lan-server.log` and
-`docs/evidence/final-code-fix-verification.md`.
+*This excerpt proves: server IP `172.18.0.48`, client IP `172.18.0.49`, password
+redacted as `********`, `220→331→230→227→150→226→221` reply flow, and
+`Active sessions=[...]` logging.*
 
 ### 7.2 Filesystem and Concurrency Evidence (Role C)
 
@@ -491,6 +541,35 @@ test_two_clients_append_same_file_without_lost_update PASSED
 
 The second test confirms that the server-owned filesystem lock prevents lost
 updates when two sessions append to the same path.
+
+#### PASV Two-Machine LAN SHA-256 Integrity
+
+```text
+# Two-machine LAN PASV SHA-256 — 09/08/2026
+Source  (client):  b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  demo.bin
+Uploaded (server): b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  ftp_root/final-lan-pasv.bin
+Download (client): b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  client/downloads/final-lan-pasv.bin
+```
+
+*All three hashes are identical — PASV upload and download over two machines preserved byte-for-byte integrity.*
+Server evidence: `STOR mode=PASSIVE result=success bytes=256000`; one bounded
+Go-Back-N retry occurred during `RETR` and recovered successfully.
+(Full log: `docs/evidence/final-lan-pasv-server.log`.)
+
+#### ACTIVE Two-Machine LAN SHA-256 Integrity
+
+```text
+# Two-machine LAN ACTIVE SHA-256 — 09/08/2026
+Source  (client):  b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  demo.bin
+Uploaded (server): b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  ftp_root/final-lan-active.bin
+Download (client): b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  client/downloads/final-lan-active.bin
+```
+
+*All three hashes are identical — ACTIVE upload and download over two machines preserved byte-for-byte integrity.*
+Server evidence (final successful run — session S000005): `STOR mode=ACTIVE
+result=success bytes=256000`; receiver handled one out-of-order packet
+(`[RDT][OOO] Got seq=178, expected=175`) and recovered correctly.
+(Full log: `docs/evidence/final-lan-server.log`.)
 
 ### 7.3 UDP Transfer and End-to-End Evidence
 
@@ -514,6 +593,12 @@ ACTIVE source:   b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb9093
 ACTIVE server:   b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
 ACTIVE download: b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
 ```
+
+![SHA-256 comparison for PASV and ACTIVE](evidence/screenshots/03-sha256-pasv-active.png)
+*Figure: source, server and downloaded SHA-256 values match for both PASV and ACTIVE transfers.*
+
+![Three PASV clients transferring independently](evidence/screenshots/04-three-pasv-clients.png)
+*Figure: three independent PASV clients completed their transfers without blocking each other.*
 
 ![PASV upload and download success](evidence/screenshots/final-lan-pasv.png)
 *Figure: two-machine PASV upload/download completed with client progress.*
