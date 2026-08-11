@@ -1102,3 +1102,32 @@ or evidence instead of filling them from stale planning claims.
   tests/test_e2e_transfer.py -q` — **24 passed in 31.37s**.
 - Microsoft Word PDF export + PyMuPDF PNG render — **19/19 pages inspected**;
   no clipping, overlap or split table rows in the final build.
+
+## August 11, 2026 — Interactive Terminal Client
+
+**Exact prompt:**
+> "tôi muốn vậy á, tôi phải thực hiện command từ terminal"
+
+**Raw GenAI output summary:**
+AI identified that `nc` can send TCP control text but cannot create the
+project's UDP/RDT data channel. It proposed a small `python3 -m client.ftp_cli`
+entry point: preserve raw control commands and dispatch file commands to the
+existing `FTPClient` production methods.
+
+**Manual refinement:**
+
+- Kept the shared TCP/UDP/RDT contract unchanged; the CLI is only an adapter.
+- Used `shlex` so quoted local file paths work, and rejected missing local
+  upload files before initiating a server transfer.
+- Preserved FTP wire syntax at the server boundary while documenting the CLI
+  convenience syntax `STOR <local-file> [remote-file]` and `APPE <local-file>
+  [remote-file]`.
+- Added a focused dispatch test, then ran the existing E2E suite that exercises
+  the exact production transfer methods called by the CLI.
+
+**Affected files:** `client/ftp_cli.py`, `tests/test_ftp_cli.py`, `README.md`,
+`docs/project-status.md`, and `docs/code-change-history.md`.
+
+**Verification:** `python3 -m pytest tests/test_ftp_cli.py
+tests/test_ftp_client.py -v` — **7 passed in 0.60s**; `python3 -m pytest
+tests/test_e2e_transfer.py -v` — **14 passed + 8 subtests in 83.16s**.
