@@ -140,7 +140,7 @@ class Session:
         self.peer_ip = None
 ```
 
-| Attribute | Meaning |
+| Attributes | Meaning |
 |---|---|
 | `session_id` | Unique identifier (e.g., `S000001`) assigned by the server on connect |
 | `username` | Account name used during authentication |
@@ -377,7 +377,15 @@ stateDiagram-v2
 
 ### 3.7 Active/Passive Mode Workflow (Roles A, B, and C)
 
-The Active and Passive modes are negotiated over the TCP control channel, while the actual file payload is transported over the UDP RDT data channel. In Active mode, the server initiates the UDP endpoint used by the client for data transfer; in Passive mode, the server listens on a negotiated port and the client connects to it. Role A establishes the endpoint state through the control channel, while Role B uses the negotiated endpoint for the RDT transfer. Role C verifies the resulting transfer lifecycle, cleanup, and filesystem side effects.
+The Active and Passive modes are negotiated over TCP, while file payload uses
+UDP/RDT. In **PASV**, the server allocates and returns a UDP endpoint in `227`;
+the client sends UDP packets to that endpoint. In **ACTIVE**, the client
+announces its UDP endpoint through `PORT`; the server uses that endpoint. This
+endpoint choice is separate from transfer direction: `STOR` sends file data
+client-to-server, while `RETR` sends file data server-to-client; the receiving
+peer sends RDT ACKs in either mode. Role A records endpoint state, Role B uses
+the negotiated endpoint for RDT, and Role C verifies lifecycle, cleanup and
+filesystem effects.
 
 FTP MODE is separate from Active/PASV endpoint selection. All three transfer
 modes are implemented by Role A: `MODE S` (stream passthrough), `MODE B` (RFC
@@ -408,6 +416,7 @@ This flow was verified as part of the end-to-end transfer and LAN evidence colle
 | Filesystem and path sandbox | Role C | Role A (command integration) |
 | Multithreaded server and active-session registry | Role C | Roles A and B (review) |
 | End-to-end integration | Role C | Roles A and B |
+| Client CLI progress and operational logging | Role C | Role A (control events), Role B (RDT progress) |
 | TCP-plus-UDP sequence diagram | Roles A and B | Role C (code verification) |
 | RDT state machines and header table | Role B | — |
 | Thread dispatch, path validation, and file lifecycle diagrams | Role C | — |
@@ -418,12 +427,13 @@ The matrix above reflects the implemented ownership boundaries for the final sub
 
 ### 5.1 Role A — Self-Assessment
 
-Role A implemented the TCP control channel, command parser, user authentication,
-and basic session management. The `USER`, `PASS`, `QUIT`, and `NOOP` flows and
-invalid authentication cases use FTP reply codes. Session state is separated in
-preparation for concurrent clients.
-
-Role A compared the final implementation with the control-channel and reply behavior used in the completed project, and the final regression suite confirms the integrated command lifecycle remains stable under the verified test run.
+Role A implemented the TCP control channel, CRLF command parsing, reply mapping,
+authentication, isolated session state, Active/PASV endpoint negotiation and
+transfer-command orchestration. The control layer handles the 28-command matrix
+and maintains the `150 → 226/4xx` lifecycle while the shared transfer manager
+performs the UDP/RDT and filesystem work. The reviewed suite covers invalid
+authentication, fragmented/coalesced TCP replies, command-specific syntax and
+the integrated command lifecycle.
 
 ### 5.2 Role B — Self-Assessment
 
@@ -454,16 +464,21 @@ count or self-assessment; see `docs/report-parts/submission/11-contribution.md`.
 
 ## 6. GenAI Usage & Code Refinement Log
 
-GenAI is used for reference and review. Every member must inspect, understand,
-test, and refine generated material before integrating it. Exact prompts, raw
-output, and manual refinements are stored in:
+GenAI was used for analysis, design, test planning and documentation drafting;
+it did not replace manual review, ownership decisions or test evidence. Every
+member inspected, refined and tested generated material before integration.
+The mandatory appendix records the exact prompts, raw-output summaries, manual
+refinements, affected files and verification in:
 
 - Role A: `docs/genai-log-a.md`
 - Role B: `docs/genai-log-b.md`
 - Role C: `docs/genai-log-c.md`
 
-The final appendix must include or attach these logs. A general summary in this
-report does not replace exact prompts and raw output.
+Role A used GenAI for command framing, authentication and validation; Role B
+used it for RDT contract/test review; Role C used it for filesystem/concurrency
+analysis, Go-Back-N integration and evidence organization. The final submitted
+appendix must include or attach the three logs; this summary does not replace
+their exact records.
 
 ## 7. Application Demo Evidence
 
@@ -480,7 +495,6 @@ The TCP control test uses the project client or Netcat (`nc`) to:
 4. Send `NOOP` and other implemented control commands.
 5. Send `QUIT`, receive `221`, and confirm safe session cleanup.
 
-<<<<<<< HEAD
 The server log below (excerpt from `docs/evidence/final-lan-server.log`) proves
 the full command/reply lifecycle on a real two-machine LAN run. IP addresses,
 password redaction, active-session table and transfer outcomes are all present.
@@ -511,35 +525,6 @@ password redaction, active-session table and transfer outcomes are all present.
 *This excerpt proves: server IP `172.18.0.48`, client IP `172.18.0.49`, password
 redacted as `********`, `220→331→230→227→150→226→221` reply flow, and
 `Active sessions=[...]` logging.*
-=======
-The embedded LAN server excerpt shows the real client IP, redacted login,
-executed commands and the `150 → 226` upload/download lifecycle:
-
-```text
-Client connected session=S000002 ip=172.18.0.49:56595 active=1
-Command session=S000002 ip=172.18.0.49 command=USER admin
-Command session=S000002 ip=172.18.0.49 command=PASS ********
-Command session=S000002 ip=172.18.0.49 command=PASV
-Command session=S000002 ip=172.18.0.49 command=STOR final-lan-pasv.bin
-Transfer session=S000002 transfer_id=T000001 operation=STOR mode=PASSIVE result=success bytes=256000
-Command session=S000002 ip=172.18.0.49 command=RETR final-lan-pasv.bin
-Transfer session=S000002 transfer_id=T000002 operation=RETR mode=PASSIVE result=success bytes=256000
-```
-
-After the final concurrency fix, the active-session test records live handlers:
-
-```text
-Active sessions=[{'session_id': 'S000001', 'ip': '127.0.0.1', 'port': 57756, 'alive': True}]
-Active sessions=[{'session_id': 'S000002', 'ip': '127.0.0.1', 'port': 57768, 'alive': True}]
-1 passed in 1.10s
-```
-
-Source: `docs/evidence/final-lan-server.log` and
-`docs/evidence/final-code-fix-verification.md`.
-
-![PASV LAN server lifecycle](evidence/screenshots/02-lan-pasv-server-lifecycle.png)
-*Figure: LAN PASV server lifecycle showing the live client sessions and the `150 → 226` transfer flow.*
->>>>>>> 4cde269bfedc1a2b092bf6f16ea38779c22d6670
 
 ### 7.2 Filesystem and Concurrency Evidence (Role C)
 
@@ -587,6 +572,15 @@ result=success bytes=256000`; receiver handled one out-of-order packet
 (Full log: `docs/evidence/final-lan-server.log`.)
 
 ### 7.3 UDP Transfer and End-to-End Evidence
+
+The recorded final regression command, `python3 -m pytest -q`, passed **271
+tests and 357 subtests in 192.88 seconds**. Focused verification additionally
+covered codec/command behavior (83 passed, 338 subtests), transfer-manager mode
+integration (12 passed), RDT B/C fault injection (19 passed, 11 subtests), and
+the FTP E2E mode matrix (13 passed, 8 subtests). These checks cover command and
+session behavior, filesystem-root safety, RDT checksum/retry/FIN/ABORT,
+Active/PASV, concurrency, cancellation/disconnect cleanup, CLI progress/log
+redaction, shared locks and functional MODE S/B/C paths.
 
 The two-machine PASV and ACTIVE runs produced the same SHA-256 at source,
 server and downloaded destination:
@@ -676,6 +670,16 @@ tests/test_rdt_fault_injection.py::TestRDTAdapterFaultInjection::test_adapter_pa
 
 - **Checksum Protection**: Verified by the RDT header and fault-injection tests in the current suite.
 - **Packet Loss Recovery**: Covered by the fault-injection and transfer-manager tests verifying recovery from dropped packets and retransmission.
+
+### 7.4 Limitations and Future Work
+
+`MODE C` uses the fixed FTP RLE scheme rather than adaptive per-file
+compression. RDT uses a fixed bounded Go-Back-N window of four packets rather
+than adaptive congestion control, and the client defaults to `MODE S` unless a
+user selects B/C. Future work could add TLS, configurable authentication,
+interoperability tests with standard FTP servers and broader network-performance
+measurement. These are limitations, not claims that the verified S/B/C, RDT or
+Active/PASV paths are absent.
 
 ## 8. Requirement Traceability & Final Evidence
 
