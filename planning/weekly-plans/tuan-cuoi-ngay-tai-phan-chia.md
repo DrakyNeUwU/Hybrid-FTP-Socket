@@ -227,8 +227,25 @@ ACK, retry, duplicate/out-of-order, START, FIN và ABORT hoạt động thế n�
 Tạo report thống nhất, đúng code cuối, có map mỗi requirement đến code/test/evidence
 và đủ thông tin cho examiner kiểm tra đóng góp.
 
+**Quy tắc merge bắt buộc**
+
+Role B phải trực tiếp tổng hợp nội dung còn hợp lệ từ
+`docs/report-parts/technical/01–09` và `docs/report-parts/submission/10–13`
+vào một bản nộp duy nhất là `docs/report.md`. “7 section” là bảy section bắt
+buộc theo đề §2.4, **không phải** chỉ chọn bảy trong mười bốn file draft để
+merge. `submission/14-requirement-compliance.md` chỉ là mapping/reference lịch
+sử; không dùng nó để copy claim trạng thái cuối.
+
 **Actions**
 
+- [x] **Merge/reconciliation:** đã rà từng report-part `01–13`, merge hoặc
+  đối chiếu nội dung vào đúng section của `docs/report.md`; không để report chỉ
+  link sang draft thay cho nội dung examiner cần đọc.
+- [x] Đối chiếu bản merge với đủ bảy section §2.4: application scenario/protocol
+  interaction, project-wide data structures, functional workflows, task
+  assignment matrix, self/peer evaluation, GenAI appendix và demo evidence.
+- [ ] Sau merge, rà lại caption/link ảnh-log-hash và requirement traceability;
+  xin A/C technical audit cho phần thuộc ownership của họ.
 - [x] Thay toàn bộ placeholder và câu "pending/unverified" cũ trong report.
 - [x] Ghép sequence diagram TCP+UDP, header/session structures, 4 flowcharts,
   task assignment matrix, self/peer evaluation, GenAI appendix, demo evidence.
@@ -335,7 +352,8 @@ Role B có material kỹ thuật rõ ràng, không chỉ làm hành chính.
 |---|---|---|
 | B-F01: RDT protocol contract verification | Done | START/ACK retry, Go-Back-N, FIN/ACK, ABORT verified with production tests |
 | B-F01: Wire-trace documentation | Done | `docs/report-parts/technical/05-data-channel-rdt.md` explicitly documents the trace |
-| B-F02: Merge full report sections and remove placeholders | In progress | Core sections are assembled; complete the report-closure checklist below |
+| B-F02: Merge/reconcile `report-parts/01–13` into `docs/report.md` | In progress | B phải tổng hợp một report nộp được; 7 section là tiêu chí đề bài, không phải số draft được merge |
+| B-F02: Remove placeholders and stale claims | In progress | Chỉ đóng sau khi bản report đã merge được đối chiếu với status/checklist/evidence |
 | B-F02: Update API contract and GenAI log | Done | `docs/api-contract.md` and `docs/genai-log-b.md` were updated |
 | B-F02: Final report technical audit | In progress | Technical claims audited; Session, GenAI appendix and embedded §7 evidence remain |
 | B-F03: Oral / live-code locator preparation | Done | 20-question oral pack ready; dry run intentionally not a gate |
