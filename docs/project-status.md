@@ -1,6 +1,7 @@
 # Project Status — Hybrid FTP
 
-**Source of truth for current status.**
+**Source of truth for current status.** See [documentation source of truth](source-of-truth.md)
+for the authority of requirements, contracts, evidence, and report material.
 **Updated:** 12/08/2026
 
 | Item | Status | Final owner | Evidence / blocker |

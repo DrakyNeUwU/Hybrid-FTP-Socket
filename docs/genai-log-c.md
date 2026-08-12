@@ -1190,3 +1190,99 @@ documents, and `docs/evidence/cli-transfer-replies-150-226*`.
 tests/test_ftp_client.py -v` — **7 passed in 1.86s**. A localhost PASV CLI run
 showed `150` before both `STOR` and `RETR`, `226` after each transfer, and
 identical SHA-256 values for source, server upload and client download.
+
+## August 12, 2026 — Documentation Source of Truth
+
+**Exact prompt:**
+> "bạn thêm cho tôi đi, sau khi đọc các folder trong mục docs. Trước khi làm cái đó, pull code về, review lại, bỏ các artifact bi dư, thêm file md source of truth roi push lên github lại"
+
+**Raw GenAI output summary:**
+
+The review found that the project already had separate authoritative files for
+requirements, API ownership, current status, acceptance evidence, and report
+narrative, but no concise index explaining their precedence. It also found a
+duplicate A/C report whose content had been moved to planning, a duplicate
+screenshot index represented in `report.md`, and ignored runtime output.
+
+**Manual refinement:**
+
+- Kept the new document as a short routing page rather than copying technical
+  details that would drift.
+- Kept tracked FTP fixtures and curated evidence; removed only the confirmed
+  duplicate documents and ignored runtime artifacts.
+- Made `project-status.md` link to the index without changing any acceptance
+  claim, API, or protocol behavior.
+
+**Affected files:** `docs/source-of-truth.md`, `docs/project-status.md`,
+`docs/code-change-history.md`, `docs/genai-log-a.md`, `docs/genai-log-c.md`; moved
+`docs/report-fix-a-c.md` and removed ignored runtime artifacts.
+
+**Verification:** `git pull --rebase` reported the branch up to date; all
+Markdown headings under `docs/` were reviewed; `git diff --check` passed.
+
+## August 12, 2026 — Final PDF and Screenshot Compatibility
+
+**Exact prompt:**
+> "bạn sửa cái đó + source of truth lại nhá, tôi ms thêm cái file pdf final của team á"
+
+**Raw GenAI output summary:**
+
+The newly added `docs/Hybrid_FTP_Technical_Report.pdf` is the final team
+submission artifact. The prior removal of `docs/screenshots.md` can cause a
+delete/modify conflict for teammates with older branches.
+
+**Manual refinement:**
+
+- Restored `screenshots.md` as a short compatibility index, without duplicating
+  the full report captions.
+- Linked the final PDF from `source-of-truth.md` while retaining code/tests and
+  `project-status.md` as authorities for current technical behavior and status.
+
+**Affected files:** `docs/Hybrid_FTP_Technical_Report.pdf`,
+`docs/screenshots.md`, `docs/source-of-truth.md`,
+`docs/code-change-history.md`, and `docs/genai-log-c.md`.
+
+**Verification:** confirmed the PDF and every indexed screenshot file exists.
+
+## August 12, 2026 — README Documentation Links
+
+**Exact prompt:**
+> "bạn nhớ cập nhật readme nx nhé"
+
+**Raw GenAI output summary:**
+
+The README already had a documentation section, so the minimal change was to
+link the source-of-truth page and final PDF there.
+
+**Manual refinement:**
+
+- Added the two links in both the directory map and documentation rules.
+- Did not duplicate the source-of-truth ordering in README.
+
+**Affected files:** `README.md`, `docs/code-change-history.md`, and
+`docs/genai-log-c.md`.
+
+**Verification:** `git diff --check` passed; both linked files exist.
+
+## August 12, 2026 — Remove Redundant Screenshot Index
+
+**Exact prompt:**
+> "nhưng tôi cần xoá file screenshots.md ra khỏi file docs ah"
+
+**Raw GenAI output summary:**
+
+The screenshot index was not required because `docs/report.md` already embeds
+the evidence and `docs/evidence/` stores the actual files.
+
+**Manual refinement:**
+
+- Deleted `docs/screenshots.md` as explicitly requested.
+- Kept the screenshots and supporting logs under `docs/evidence/` unchanged.
+- Corrected the current change-history summary so it no longer says the index
+  is retained.
+
+**Affected files:** removed `docs/screenshots.md`; updated
+`docs/code-change-history.md` and `docs/genai-log-c.md`.
+
+**Verification:** no live Markdown link points to `docs/screenshots.md`;
+`git diff --check` passed.

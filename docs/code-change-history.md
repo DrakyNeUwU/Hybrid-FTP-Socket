@@ -131,3 +131,13 @@ The TCP reply lifecycle, RDT wire format and server behavior are unchanged.
 Evidence: `.gitignore`, `docs/evidence/cli-transfer-replies-150-226.log`,
 `docs/evidence/cli-transfer-replies-150-226-server.log`, and
 `docs/evidence/cli-transfer-replies-150-226-sha256.txt`.
+
+## 12/08/2026 — Documentation authority index
+
+| Role | Problem | Files / behavior changed | Verification |
+|---|---|---|---|
+| C | Requirements, current status, report material, planning, and historical logs were spread across multiple folders with no explicit conflict rule | Added `docs/source-of-truth.md`; moved duplicate `docs/report-fix-a-c.md` to `planning/weekly-plans/`; removed the redundant screenshot index because `docs/report.md` already embeds the evidence | Checked all Markdown headings under `docs/`, confirmed the moved report has the same content, and verified only ignored runtime artifacts were removed |
+
+| C | The final team PDF needed a discoverable place in the documentation hierarchy | Added `docs/Hybrid_FTP_Technical_Report.pdf` to the source-of-truth submission links | Verified the PDF exists; screenshot evidence remains under `docs/evidence/` and is embedded by `docs/report.md` |
+
+| C | New contributors could miss the documentation authority page and final PDF from the repository landing page | Linked both items from `README.md` directory structure and documentation rules | `git diff --check` passed; README links resolve to tracked files |
