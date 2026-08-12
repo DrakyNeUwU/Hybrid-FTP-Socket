@@ -1,0 +1,23 @@
+# Three concurrent PASV clients — 12/08/2026
+
+Three `demo_transfer` clients ran in parallel against one server
+(127.0.0.1:2121), each uploading + downloading `demo.bin` as a separate
+remote file. No client blocked another.
+
+Command (3 clients in parallel):
+python3 -m client.demo_transfer demo.bin --remote con-N.bin --mode PASV --transfer-mode B --username alice --password secret
+
+Server evidence: Active sessions showed 3 simultaneous sessions
+S000001, S000002, S000003 (active=1 -> active=2 -> active=3), all alive.
+
+SHA-256 (source / server / download per client):
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  demo.bin
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  ftp_root/con-1.bin
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  client/downloads/con-1.bin
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  ftp_root/con-2.bin
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  client/downloads/con-2.bin
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  ftp_root/con-3.bin
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  client/downloads/con-3.bin
+
+Result: three PASV clients transferred independently in parallel with
+byte-for-byte integrity; no cross-contamination, no blocking.

@@ -493,7 +493,7 @@ three logs with these details; this summary does not replace their exact records
 
 ## 7. Application Demo Evidence
 
-![Full regression — 271 passed](evidence/screenshots/01-full-pytest-271-passed.png)
+![Full regression — 273 passed](evidence/screenshots/01-full-pytest-273-passed.png)
 *Figure: Full WSL2 regression passed; this verifies the integrated suite.*
 
 ### 7.1 TCP Control and Authentication (Role A)
@@ -673,8 +673,8 @@ with 256000 bytes, and clean disconnect with empty session list.*
 
 ### 7.3 UDP Transfer and End-to-End Evidence
 
-The recorded final regression command, `python3 -m pytest -q`, passed **271
-tests and 357 subtests in 192.88 seconds**. Focused verification additionally
+The recorded final regression command, `python3 -m pytest -q`, passed **273
+tests and 357 subtests in 182.14 seconds**. Focused verification additionally
 covered codec/command behavior (83 passed, 338 subtests), transfer-manager mode
 integration (12 passed), RDT B/C fault injection (19 passed, 11 subtests), and
 the FTP E2E mode matrix (13 passed, 8 subtests). These checks cover command and
@@ -799,7 +799,7 @@ only in `docs/project-status.md` and `docs/requirement-checklist.md`.
 | ABORT cancel/termination behavior | Verified | `tests/test_rdt.py::TestRDTProtocolLogic::test_receiver_aborts_on_abort_packet`, `docs/report-parts/technical/05-data-channel-rdt.md` |
 | Active/PASV upload/download and LAN SHA-256 integrity | Verified | `docs/evidence/final-lan-active-sha256.txt`, `docs/evidence/final-lan-pasv-sha256.txt` |
 | Post-handoff regression suite (pre-MODE baseline) | Verified | `python3 -m pytest -q` — 205 passed in 103.08s; Role C focused — 24 passed in 33.80s; `docs/evidence/final-code-fix-verification.md` |
-| MODE S/B/C functional codecs (RFC 959 §3.4) | Integrated; release evidence pending | `common/mode_codec.py`, `server/transfer_manager.py`, `client/ftp_client.py`; TYPE A/I filler, START MODE/TYPE mismatch rejection, atomic client/server paths; targeted 140 passed + 338 subtests, RDT fault 19 passed + 11 subtests, E2E 14 passed + 8 subtests, full 271 passed + 357 subtests in 192.88s; `docs/evidence/role-a-production-review-2026-08-10.md` |
+| MODE S/B/C functional codecs (RFC 959 §3.4) | Integrated; release evidence pending | `common/mode_codec.py`, `server/transfer_manager.py`, `client/ftp_client.py`; TYPE A/I filler, START MODE/TYPE mismatch rejection, atomic client/server paths; targeted 140 passed + 338 subtests, RDT fault 19 passed + 11 subtests, E2E 14 passed + 8 subtests, full 273 passed + 357 subtests in 182.14s; `docs/evidence/role-a-production-review-2026-08-10.md` |
 
 ### Final release note
 
@@ -818,7 +818,7 @@ only in `docs/project-status.md` and `docs/requirement-checklist.md`.
   decode-after-RDT integration, PASV/ACTIVE SHA-256 round-trips, STOU/APPE,
   concurrent different-mode clients and logical-byte progress are covered by
   codec/command/transfer-manager/fault-injection/E2E tests (full suite
-  **271 passed, 357 subtests in 192.88s**). The C production audit also verified
+  **273 passed, 357 subtests in 182.14s**). The C production audit also verified
   strict authentication, STAT/HELP/STOU behavior, buffered client framing,
   MODE/TYPE mismatch rejection and atomic client downloads. Role B review of
   START metadata and Role A MODE screenshots have been verified and integrated.

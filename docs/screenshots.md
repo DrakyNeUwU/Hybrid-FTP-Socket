@@ -6,7 +6,7 @@
 
 | # | File | Nội dung | Vị trí trong report.md |
 |---:|---|---|---|
-| 01 | `evidence/screenshots/01-full-pytest-271-passed.png` | Full WSL2 regression — **271 passed** | §7 (intro, figure full regression) |
+| 01 | `evidence/screenshots/01-full-pytest-273-passed.png` | Full WSL2 regression — **273 passed** | §7 (intro, figure full regression) |
 | 02 | `evidence/screenshots/02-lan-pasv-server-lifecycle.png` | LAN PASV server lifecycle (client sessions + luồng `150 → 226`) | §7.1 |
 | 03 | `evidence/screenshots/03-sha256-pasv-active.png` | So sánh SHA-256 PASV và ACTIVE (source/server/download khớp) | §7.3 |
 | 04 | `evidence/screenshots/04-three-pasv-clients.png` | Ba PASV client transfer độc lập không block nhau | §7.3 |
@@ -57,8 +57,9 @@ Mỗi ảnh được nhúng bằng block Markdown từ `docs/report.md` (đườ
 - Đã rename 2 file có khoảng trắng thừa đầu tên để link Markdown sạch:
   - ` 01-full-pytest-271-passed.png` → `01-full-pytest-271-passed.png`
   - ` 03-sha256-pasv-active.png` → `03-sha256-pasv-active.png`
-- Caption ảnh 01 dùng **271 passed** (khớp tên file thật và §8 report: full
-  **271 passed + 357 subtests in 192.88s**), không dùng 199 passed — 199 là
-  baseline lịch sử pre-MODE, không phản ánh screenshot hiện tại.
+- Caption ảnh 01 dùng **273 passed** (khớp tên file thật và §7/§8 report: full
+  **273 passed + 357 subtests in 182.14s**). Số 271 passed là bản chụp cũ trên
+  commit `43764fd` (Role A, `role-a-final-pytest.png`); file chụp mới ngày
+  12/08/2026 là **273 passed**.
 - Chi tiết GenAI usage được ghi trong `docs/genai-log-a.md` mục
   "Nhúng Evidence Screenshots vào Report §7".

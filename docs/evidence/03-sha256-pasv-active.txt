@@ -1,0 +1,17 @@
+# Localhost PASV + ACTIVE SHA-256 — 12/08/2026
+
+PASV = demo.bin -> ftp_root/demo-b.bin (MODE B) -> client/downloads/demo-b.bin
+ACTIVE = demo.bin -> ftp_root/demo-c.bin (MODE C) -> client/downloads/demo-c.bin
+
+Command:
+shasum -a 256 demo.bin ftp_root/demo-b.bin client/downloads/demo-b.bin ftp_root/demo-c.bin client/downloads/demo-c.bin
+
+Output:
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  demo.bin
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  ftp_root/demo-b.bin
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  client/downloads/demo-b.bin
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  ftp_root/demo-c.bin
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  client/downloads/demo-c.bin
+
+Result: PASV and ACTIVE upload/download both preserved byte-for-byte SHA-256
+integrity at source, server and client download.
