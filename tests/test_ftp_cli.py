@@ -9,12 +9,16 @@ class FakeClient:
         self.calls.append(("command", value))
         return "200 OK\r\n"
 
-    def upload_file(self, local, remote, cmd, mode):
+    def upload_file(self, local, remote, cmd, mode, reply_callback=None):
         self.calls.append(("upload", local, remote, cmd, mode))
+        if reply_callback:
+            reply_callback("150 Opening data connection; transfer_id=T000001")
         return True
 
-    def download_file(self, remote, mode):
+    def download_file(self, remote, mode, reply_callback=None):
         self.calls.append(("download", remote, mode))
+        if reply_callback:
+            reply_callback("150 Opening data connection; transfer_id=T000002")
         return True
 
 
@@ -24,7 +28,7 @@ def test_upload_arguments_default_remote_name(tmp_path):
     assert _upload_arguments(["STOR", str(source)]) == (str(source), "demo file.bin")
 
 
-def test_terminal_transfer_commands_use_production_client(tmp_path):
+def test_terminal_transfer_commands_use_production_client(tmp_path, capsys):
     source = tmp_path / "demo.bin"
     source.write_bytes(b"data")
     client = FakeClient()
@@ -41,4 +45,8 @@ def test_terminal_transfer_commands_use_production_client(tmp_path):
         ("command", "USER alice"),
         ("command", "PASS secret"),
         ("command", "PWD"),
+    ]
+    assert capsys.readouterr().out.splitlines() == [
+        "150 Opening data connection; transfer_id=T000001",
+        "150 Opening data connection; transfer_id=T000002",
     ]

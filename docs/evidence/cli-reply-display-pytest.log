@@ -1,0 +1,12 @@
+# Command: python3 -m pytest tests/test_ftp_cli.py tests/test_ftp_client.py -v
+# Run in WSL2 on 12/08/2026
+
+tests/test_ftp_cli.py::test_upload_arguments_default_remote_name PASSED
+tests/test_ftp_cli.py::test_terminal_transfer_commands_use_production_client PASSED
+tests/test_ftp_client.py::test_split_reply_is_reassembled PASSED
+tests/test_ftp_client.py::test_coalesced_replies_remain_buffered PASSED
+tests/test_ftp_client.py::test_multiline_and_listing_replies PASSED
+tests/test_ftp_client.py::test_failed_mode_does_not_change_local_state PASSED
+tests/test_ftp_client.py::test_malformed_download_preserves_existing_destination PASSED
+
+7 passed in 1.86s

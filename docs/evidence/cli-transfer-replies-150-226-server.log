@@ -1,0 +1,32 @@
+# Localhost PASV server evidence — 12/08/2026
+# Server: python3 -m server.threaded_server --host 127.0.0.1 --port 2127
+
+[2026-08-12 08:46:54] FTP Server listen 127.0.0.1:2127
+[2026-08-12 08:46:55] Reply session=S000001 ip=127.0.0.1 transfer_id=- code=220
+[2026-08-12 08:46:55] Client connected session=S000001 ip=127.0.0.1:49302 active=1
+[2026-08-12 08:46:55] Active sessions=[{'session_id': 'S000001', 'ip': '127.0.0.1', 'port': 49302, 'alive': True}]
+[2026-08-12 08:46:55] Command session=S000001 ip=127.0.0.1 transfer_id=- command=USER evidence
+[2026-08-12 08:46:55] Reply session=S000001 ip=127.0.0.1 transfer_id=- code=331
+[2026-08-12 08:46:55] Command session=S000001 ip=127.0.0.1 transfer_id=- command=PASS ********
+[2026-08-12 08:46:55] Reply session=S000001 ip=127.0.0.1 transfer_id=- code=230
+[2026-08-12 08:46:55] Command session=S000001 ip=127.0.0.1 transfer_id=- command=TYPE I
+[2026-08-12 08:46:55] Reply session=S000001 ip=127.0.0.1 transfer_id=- code=200
+[2026-08-12 08:46:55] Command session=S000001 ip=127.0.0.1 transfer_id=- command=MODE S
+[2026-08-12 08:46:55] Reply session=S000001 ip=127.0.0.1 transfer_id=- code=200
+[2026-08-12 08:46:55] Command session=S000001 ip=127.0.0.1 transfer_id=- command=PASV
+[2026-08-12 08:46:55] Reply session=S000001 ip=127.0.0.1 transfer_id=- code=227
+[2026-08-12 08:46:55] Command session=S000001 ip=127.0.0.1 transfer_id=- command=STOR cli-transfer-replies-150-226.bin
+[2026-08-12 08:46:55] Reply session=S000001 ip=127.0.0.1 transfer_id=T000001 code=150
+[RDT][Start] File size: 256000 bytes
+[2026-08-12 08:46:56] Transfer session=S000001 transfer_id=T000001 operation=STOR mode=PASSIVE result=success bytes=256000
+[2026-08-12 08:46:56] Reply session=S000001 ip=127.0.0.1 transfer_id=T000001 code=226
+[2026-08-12 08:46:56] Command session=S000001 ip=127.0.0.1 transfer_id=T000001 command=PASV
+[2026-08-12 08:46:56] Reply session=S000001 ip=127.0.0.1 transfer_id=T000001 code=227
+[2026-08-12 08:46:56] Command session=S000001 ip=127.0.0.1 transfer_id=T000001 command=RETR cli-transfer-replies-150-226.bin
+[2026-08-12 08:46:56] Reply session=S000001 ip=127.0.0.1 transfer_id=T000002 code=150
+[2026-08-12 08:46:57] Transfer session=S000001 transfer_id=T000002 operation=RETR mode=PASSIVE result=success bytes=256000
+[2026-08-12 08:46:57] Reply session=S000001 ip=127.0.0.1 transfer_id=T000002 code=226
+[2026-08-12 08:47:00] Command session=S000001 ip=127.0.0.1 transfer_id=T000002 command=QUIT
+[2026-08-12 08:47:00] Reply session=S000001 ip=127.0.0.1 transfer_id=T000002 code=221
+[2026-08-12 08:47:00] Client disconnected session=S000001 ip=127.0.0.1 active=0
+[2026-08-12 08:47:00] Active sessions=[]

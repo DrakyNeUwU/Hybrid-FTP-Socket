@@ -28,17 +28,19 @@ def run_command(client: FTPClient, line: str, data_mode: str) -> tuple[str, bool
 
     if command in {"STOR", "APPE"}:
         local_file, remote_file = _upload_arguments(parts)
-        ok = client.upload_file(local_file, remote_file, cmd=command, mode=data_mode)
+        ok = client.upload_file(
+            local_file, remote_file, cmd=command, mode=data_mode, reply_callback=print
+        )
         return ("226 Transfer complete" if ok else "Transfer failed"), False
     if command == "STOU":
         if len(parts) != 2 or not os.path.isfile(parts[1]):
             raise ValueError("Usage: STOU <local-file>")
-        ok = client.upload_unique_file(parts[1], mode=data_mode)
+        ok = client.upload_unique_file(parts[1], mode=data_mode, reply_callback=print)
         return ("226 Transfer complete" if ok else "Transfer failed"), False
     if command == "RETR":
         if len(parts) != 2:
             raise ValueError("Usage: RETR <remote-file>")
-        ok = client.download_file(parts[1], mode=data_mode)
+        ok = client.download_file(parts[1], mode=data_mode, reply_callback=print)
         return ("226 Transfer complete" if ok else "Transfer failed"), False
 
     return client.command(line).strip(), command == "QUIT"

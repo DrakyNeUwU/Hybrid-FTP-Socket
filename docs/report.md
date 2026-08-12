@@ -537,6 +537,11 @@ password redaction, active-session table and transfer outcomes are all present.
 redacted as `********`, `220→331→230→227→150→226→221` reply flow, and
 `Active sessions=[...]` logging.*
 
+The current interactive CLI also visibly prints its received `150` reply before
+each transfer and `226 Transfer complete` after it. The matching localhost PASV
+client/server logs and three-way SHA-256 proof are
+`docs/evidence/cli-transfer-replies-150-226*.{log,txt}`.
+
 #### Role A Oral-Defense Evidence (2026-08-11, macOS localhost, commit `43764fd`)
 
 MODE B (Block) round-trip over PASV — server replies `200 Mode Block`, then
