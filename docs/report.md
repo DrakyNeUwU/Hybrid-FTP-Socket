@@ -526,6 +526,11 @@ password redaction, active-session table and transfer outcomes are all present.
 redacted as `********`, `220→331→230→227→150→226→221` reply flow, and
 `Active sessions=[...]` logging.*
 
+The current interactive CLI also visibly prints its received `150` reply before
+each transfer and `226 Transfer complete` after it. The matching localhost PASV
+client/server logs and three-way SHA-256 proof are
+`docs/evidence/cli-transfer-replies-150-226*.{log,txt}`.
+
 ### 7.2 Filesystem and Concurrency Evidence (Role C)
 
 The final regression verifies filesystem/concurrency, ABOR and disconnect cleanup.

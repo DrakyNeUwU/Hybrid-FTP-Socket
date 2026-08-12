@@ -1161,3 +1161,32 @@ in 83.99s**.
 
 **Final regression:** `python3 -m pytest -q` — **274 passed, 357 subtests
 passed in 186.46s**.
+
+## August 12, 2026 — CLI `150` Reply Display and Evidence Refresh
+
+**Exact prompt:**
+> "ko thể chạy ra 150 mà phải sửa lại hả" and "ok v đi"
+
+**Raw GenAI output summary:**
+
+The review found that the server already sent `150`, but `FTPClient` consumed
+it internally to obtain `transfer_id`; the interactive CLI printed only its
+final `226` summary. The proposed minimal change was an optional callback for
+the received initial reply, called only by the terminal adapter.
+
+**Manual refinement:**
+
+- Kept the TCP `150 → 226` lifecycle, UDP/RDT path and server code unchanged.
+- Passed `print` only from `ftp_cli` to the existing upload/download methods;
+  no new dependency, protocol field or CLI option was added.
+- Added one focused assertion that transfer commands expose both initial replies
+  through the callback, then captured a real localhost PASV upload/download.
+
+**Affected files:** `.gitignore`, `client/ftp_client.py`, `client/ftp_cli.py`,
+`tests/test_ftp_cli.py`, `README.md`, report/client-logging/status/history
+documents, and `docs/evidence/cli-transfer-replies-150-226*`.
+
+**Verification:** `python3 -m pytest tests/test_ftp_cli.py
+tests/test_ftp_client.py -v` — **7 passed in 1.86s**. A localhost PASV CLI run
+showed `150` before both `STOR` and `RETR`, `226` after each transfer, and
+identical SHA-256 values for source, server upload and client download.

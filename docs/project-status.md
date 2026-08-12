@@ -1,7 +1,7 @@
 # Project Status — Hybrid FTP
 
 **Source of truth for current status.**
-**Updated:** 11/08/2026
+**Updated:** 12/08/2026
 
 | Item | Status | Final owner | Evidence / blocker |
 |---|---|---|---|
@@ -37,6 +37,10 @@
   the existing FTPClient UDP/RDT path, so the wire contract is unchanged.
   Command/client suite: **66 passed in 0.97s**; E2E transfer suite:
   **14 passed + 8 subtests in 83.99s** on 11/08/2026.
+- CLI transfer-reply display was verified on 12/08/2026: it visibly prints
+  `150` before PASV `STOR` and `RETR`, then `226` after each success. Focused
+  client tests: **7 passed in 1.86s**; matching CLI/server logs and three-way
+  SHA-256 values: `docs/evidence/cli-transfer-replies-150-226*`.
 - Protocol verification: `tests/test_rdt.py` — **27 passed in 14.76s**.
 - Fault, transfer-manager, and FTP E2E verification — **22 passed in 70.44s**;
   expanded FTP E2E — **6 passed in 22.63s**; MODE E2E matrix (PASV/ACTIVE S/B/C,

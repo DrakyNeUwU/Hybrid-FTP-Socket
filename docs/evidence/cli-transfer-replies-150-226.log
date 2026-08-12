@@ -1,0 +1,12 @@
+# Localhost PASV CLI evidence — 12/08/2026
+# Command: python3 -m client.ftp_cli --host 127.0.0.1 --port 2127 --data-mode PASV
+
+220 Hybrid FTP Server Ready
+ftp> 331 Username OK
+ftp> 230 Login successful
+ftp> 150 Opening data connection; transfer_id=T000001
+226 Transfer complete
+ftp> 150 Opening data connection; transfer_id=T000002
+[RDT][Start] File size: 256000 bytes
+226 Transfer complete
+ftp> 221 Goodbye

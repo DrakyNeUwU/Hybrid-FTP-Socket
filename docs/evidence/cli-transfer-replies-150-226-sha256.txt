@@ -1,0 +1,6 @@
+# Localhost PASV integrity evidence — 12/08/2026
+# Source, server upload and client download hashes from one CLI run.
+
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  demo.bin (client source)
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  cli-transfer-replies-150-226.bin (server temporary FTP root)
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934  client/downloads/cli-transfer-replies-150-226.bin

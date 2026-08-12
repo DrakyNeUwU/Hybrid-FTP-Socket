@@ -120,3 +120,14 @@ or A/B/C shared API contract changed.
 
 Final regression: `python3 -m pytest -q` — **274 passed, 357 subtests passed
 in 186.46s**.
+
+## 12/08/2026 — CLI transfer-reply visibility
+
+| Role | Problem | Files / behavior changed | Verification |
+|---|---|---|---|
+| C | The interactive CLI hid the server's intermediate `150` reply, so a terminal demonstration showed only the final `226` result | `FTPClient` accepts an optional display callback for the received initial transfer reply; `ftp_cli` prints it for `STOR`, `RETR`, `STOU`, and `APPE` | Focused CLI/client suite: **7 passed in 1.86s**; localhost PASV upload/download showed `150 → 226` twice and matching source/server/download SHA-256 values |
+
+The TCP reply lifecycle, RDT wire format and server behavior are unchanged.
+Evidence: `.gitignore`, `docs/evidence/cli-transfer-replies-150-226.log`,
+`docs/evidence/cli-transfer-replies-150-226-server.log`, and
+`docs/evidence/cli-transfer-replies-150-226-sha256.txt`.

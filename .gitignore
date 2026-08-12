@@ -25,6 +25,9 @@ client/downloads/
 # Curated final evidence belongs in the submission pack; runtime logs elsewhere
 # remain ignored.
 !docs/evidence/final-*.log
+!docs/evidence/cli-transfer-replies-150-226.log
+!docs/evidence/cli-transfer-replies-150-226-server.log
+!docs/evidence/cli-reply-display-pytest.log
 
 # Personal notes — không commit lên repo
 second-brain.md

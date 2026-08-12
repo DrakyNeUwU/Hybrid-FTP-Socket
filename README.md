@@ -66,6 +66,8 @@ ftp> STOU ./demo.bin
 ftp> QUIT
 ```
 
+For every file transfer, the CLI prints the server's `150` start reply before
+the RDT progress, then `226 Transfer complete` only after the final reply.
 Downloaded files are saved in `./client/downloads`. Quote paths containing
 spaces, for example `STOR "./my file.bin" remote.bin`. PASV is the default data
 mode and affects file-transfer commands only. Use `--data-mode ACTIVE` when the

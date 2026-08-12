@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import socket
+from typing import Callable
 from collections.abc import Callable
 
 from common.RDTHeader import RDTHeader
@@ -123,7 +124,12 @@ class FTPClient:
             raise RuntimeError(reply.strip())
         return data_socket, (self.server_ip, int(match.group(1)))
 
-    def download_file(self, remote_filename: str, mode: str = "PASV") -> bool:
+    def download_file(
+        self,
+        remote_filename: str,
+        mode: str = "PASV",
+        reply_callback: Callable[[str], None] | None = None,
+    ) -> bool:
         self._ensure_transfer_type()
         self._ensure_transfer_mode()
         if mode.upper() == "PASV":
@@ -138,6 +144,8 @@ class FTPClient:
                 # datagram before accepting the server's first START.
                 self._send_active_download_probe(data_socket, endpoint, 0)
             reply = self.command(f"RETR {remote_filename}")
+            if reply_callback:
+                reply_callback(reply.strip())
             transfer_id = self._transfer_id_from_reply(reply)
             wire_transfer_id = normalize_transfer_id(transfer_id)
             if mode.upper() == "ACTIVE":
@@ -161,8 +169,14 @@ class FTPClient:
         finally:
             data_socket.close()
 
-    def upload_file(self, local_filepath: str, remote_filename: str,
-                    cmd: str = "STOR", mode: str = "PASV") -> bool:
+    def upload_file(
+        self,
+        local_filepath: str,
+        remote_filename: str,
+        cmd: str = "STOR",
+        mode: str = "PASV",
+        reply_callback: Callable[[str], None] | None = None,
+    ) -> bool:
         self._ensure_transfer_type()
         self._ensure_transfer_mode()
         if mode.upper() == "PASV":
@@ -174,6 +188,8 @@ class FTPClient:
 
         try:
             reply = self.command(f"{cmd} {remote_filename}")
+            if reply_callback:
+                reply_callback(reply.strip())
             transfer_id = self._transfer_id_from_reply(reply)
             ok = send_file_rdt(
                 local_filepath,
@@ -192,7 +208,12 @@ class FTPClient:
         finally:
             data_socket.close()
 
-    def upload_unique_file(self, local_filepath: str, mode: str = "PASV") -> bool:
+    def upload_unique_file(
+        self,
+        local_filepath: str,
+        mode: str = "PASV",
+        reply_callback: Callable[[str], None] | None = None,
+    ) -> bool:
         self._ensure_transfer_type()
         self._ensure_transfer_mode()
         if mode.upper() == "PASV":
@@ -203,6 +224,8 @@ class FTPClient:
             data_socket, endpoint = self.enter_port()
         try:
             reply = self.command("STOU")
+            if reply_callback:
+                reply_callback(reply.strip())
             transfer_id = self._transfer_id_from_reply(reply)
             ok = send_file_rdt(
                 local_filepath, endpoint[0], endpoint[1],
