@@ -131,3 +131,9 @@ The TCP reply lifecycle, RDT wire format and server behavior are unchanged.
 Evidence: `.gitignore`, `docs/evidence/cli-transfer-replies-150-226.log`,
 `docs/evidence/cli-transfer-replies-150-226-server.log`, and
 `docs/evidence/cli-transfer-replies-150-226-sha256.txt`.
+
+## 12/08/2026 — Documentation authority index
+
+| Role | Problem | Files / behavior changed | Verification |
+|---|---|---|---|
+| C | Requirements, current status, report material, planning, and historical logs were spread across multiple folders with no explicit conflict rule | Added `docs/source-of-truth.md`; removed duplicate `docs/report-fix-a-c.md` after its content had moved to `planning/weekly-plans/`; removed duplicate screenshot index now covered by `docs/report.md` | Checked all Markdown headings under `docs/`, confirmed the moved report has the same content, and verified only ignored runtime artifacts were removed |

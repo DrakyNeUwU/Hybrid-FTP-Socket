@@ -757,7 +757,8 @@ Fixes during verification: block wire chunks batched to ≤1024; compressed lite
   `genai-log-b.md`, `05-data-channel-rdt.md`; §12 limitations accurate.
 - Đồng bộ số liệu cuối vào 9 docs (code-change-history, project-status,
   requirement-checklist, api-contract, report.md, report-parts 04/10/12,
-  evidence, genai-log-a) và viết `docs/report-fix-a-c.md`.
+  evidence, genai-log-a) và viết báo cáo A/C (nay ở
+  `planning/weekly-plans/report-fix-a-c.md`).
 - Đóng checklist item "Report mô tả đúng implementation cuối" (`final-code-fix-a-c.md:229`).
 
 **Review and refinement:**
@@ -769,7 +770,8 @@ Fixes during verification: block wire chunks batched to ≤1024; compressed lite
 
 **Verification:**
 - Full `python3 -m pytest -q` — **256 passed, 357 subtests, không failure**.
-- Mọi số trong `docs/report-fix-a-c.md`, `docs/evidence/final-code-fix-verification.md`
+- Mọi số trong `planning/weekly-plans/report-fix-a-c.md`,
+  `docs/evidence/final-code-fix-verification.md`
   và §8 report.md đều là kết quả chạy thật.
 - Còn pending: A+C production E2E matrix, B confirm RDT wire layout, C confirm
   filesystem/atomic cleanup, git release check.
@@ -815,6 +817,6 @@ Markdown `![alt](path)` + dòng `*Figure caption*`.
   `docs/evidence/screenshots/`.
 - Số "271 passed" khớp với §8 Final Evidence table và
   `docs/evidence/role-a-production-review-2026-08-10.md`.
-- Danh sách chi tiết được ghi trong `docs/screenshots.md`.
+- Danh sách và các link ảnh hiện nằm trong `docs/report.md` §7.
 
 ---

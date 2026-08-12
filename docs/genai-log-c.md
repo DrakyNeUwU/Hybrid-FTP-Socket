@@ -1190,3 +1190,32 @@ documents, and `docs/evidence/cli-transfer-replies-150-226*`.
 tests/test_ftp_client.py -v` — **7 passed in 1.86s**. A localhost PASV CLI run
 showed `150` before both `STOR` and `RETR`, `226` after each transfer, and
 identical SHA-256 values for source, server upload and client download.
+
+## August 12, 2026 — Documentation Source of Truth
+
+**Exact prompt:**
+> "bạn thêm cho tôi đi, sau khi đọc các folder trong mục docs. Trước khi làm cái đó, pull code về, review lại, bỏ các artifact bi dư, thêm file md source of truth roi push lên github lại"
+
+**Raw GenAI output summary:**
+
+The review found that the project already had separate authoritative files for
+requirements, API ownership, current status, acceptance evidence, and report
+narrative, but no concise index explaining their precedence. It also found a
+duplicate A/C report whose content had been moved to planning, a duplicate
+screenshot index represented in `report.md`, and ignored runtime output.
+
+**Manual refinement:**
+
+- Kept the new document as a short routing page rather than copying technical
+  details that would drift.
+- Kept tracked FTP fixtures and curated evidence; removed only the confirmed
+  duplicate documents and ignored runtime artifacts.
+- Made `project-status.md` link to the index without changing any acceptance
+  claim, API, or protocol behavior.
+
+**Affected files:** `docs/source-of-truth.md`, `docs/project-status.md`,
+`docs/code-change-history.md`, `docs/genai-log-a.md`, `docs/genai-log-c.md`; removed
+`docs/report-fix-a-c.md`, `docs/screenshots.md`, and ignored runtime artifacts.
+
+**Verification:** `git pull --rebase` reported the branch up to date; all
+Markdown headings under `docs/` were reviewed; `git diff --check` passed.
