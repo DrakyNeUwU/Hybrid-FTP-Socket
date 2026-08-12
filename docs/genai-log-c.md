@@ -1214,8 +1214,32 @@ screenshot index represented in `report.md`, and ignored runtime output.
   claim, API, or protocol behavior.
 
 **Affected files:** `docs/source-of-truth.md`, `docs/project-status.md`,
-`docs/code-change-history.md`, `docs/genai-log-a.md`, `docs/genai-log-c.md`; removed
-`docs/report-fix-a-c.md`, `docs/screenshots.md`, and ignored runtime artifacts.
+`docs/code-change-history.md`, `docs/genai-log-a.md`, `docs/genai-log-c.md`; moved
+`docs/report-fix-a-c.md` and removed ignored runtime artifacts.
 
 **Verification:** `git pull --rebase` reported the branch up to date; all
 Markdown headings under `docs/` were reviewed; `git diff --check` passed.
+
+## August 12, 2026 — Final PDF and Screenshot Compatibility
+
+**Exact prompt:**
+> "bạn sửa cái đó + source of truth lại nhá, tôi ms thêm cái file pdf final của team á"
+
+**Raw GenAI output summary:**
+
+The newly added `docs/Hybrid_FTP_Technical_Report.pdf` is the final team
+submission artifact. The prior removal of `docs/screenshots.md` can cause a
+delete/modify conflict for teammates with older branches.
+
+**Manual refinement:**
+
+- Restored `screenshots.md` as a short compatibility index, without duplicating
+  the full report captions.
+- Linked the final PDF from `source-of-truth.md` while retaining code/tests and
+  `project-status.md` as authorities for current technical behavior and status.
+
+**Affected files:** `docs/Hybrid_FTP_Technical_Report.pdf`,
+`docs/screenshots.md`, `docs/source-of-truth.md`,
+`docs/code-change-history.md`, and `docs/genai-log-c.md`.
+
+**Verification:** confirmed the PDF and every indexed screenshot file exists.

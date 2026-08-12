@@ -14,6 +14,9 @@ not another copy of the requirements or results.
 
 ## Supporting documents
 
+- [Hybrid_FTP_Technical_Report.pdf](Hybrid_FTP_Technical_Report.pdf) is the
+  final team submission artifact. Use it for submission/review; its technical
+  claims must remain traceable to the authoritative sources above.
 - [report.md](report.md) and [report-parts/](report-parts/) are submission
   narrative; they must follow the sources above.
 - [code-change-history.md](code-change-history.md) and `genai-log-*.md` are

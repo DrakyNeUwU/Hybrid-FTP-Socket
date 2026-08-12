@@ -136,4 +136,6 @@ Evidence: `.gitignore`, `docs/evidence/cli-transfer-replies-150-226.log`,
 
 | Role | Problem | Files / behavior changed | Verification |
 |---|---|---|---|
-| C | Requirements, current status, report material, planning, and historical logs were spread across multiple folders with no explicit conflict rule | Added `docs/source-of-truth.md`; removed duplicate `docs/report-fix-a-c.md` after its content had moved to `planning/weekly-plans/`; removed duplicate screenshot index now covered by `docs/report.md` | Checked all Markdown headings under `docs/`, confirmed the moved report has the same content, and verified only ignored runtime artifacts were removed |
+| C | Requirements, current status, report material, planning, and historical logs were spread across multiple folders with no explicit conflict rule | Added `docs/source-of-truth.md`; moved duplicate `docs/report-fix-a-c.md` to `planning/weekly-plans/`; retained `docs/screenshots.md` as a small compatibility index | Checked all Markdown headings under `docs/`, confirmed the moved report has the same content, and verified only ignored runtime artifacts were removed |
+
+| C | The final team PDF needed a discoverable place in the documentation hierarchy | Added `docs/Hybrid_FTP_Technical_Report.pdf` to the source-of-truth submission links and restored the screenshot compatibility index to avoid delete/modify merge conflicts | Verified the PDF exists and all referenced screenshot files resolve under `docs/evidence/` |
