@@ -139,3 +139,5 @@ Evidence: `.gitignore`, `docs/evidence/cli-transfer-replies-150-226.log`,
 | C | Requirements, current status, report material, planning, and historical logs were spread across multiple folders with no explicit conflict rule | Added `docs/source-of-truth.md`; moved duplicate `docs/report-fix-a-c.md` to `planning/weekly-plans/`; retained `docs/screenshots.md` as a small compatibility index | Checked all Markdown headings under `docs/`, confirmed the moved report has the same content, and verified only ignored runtime artifacts were removed |
 
 | C | The final team PDF needed a discoverable place in the documentation hierarchy | Added `docs/Hybrid_FTP_Technical_Report.pdf` to the source-of-truth submission links and restored the screenshot compatibility index to avoid delete/modify merge conflicts | Verified the PDF exists and all referenced screenshot files resolve under `docs/evidence/` |
+
+| C | New contributors could miss the documentation authority page and final PDF from the repository landing page | Linked both items from `README.md` directory structure and documentation rules | `git diff --check` passed; README links resolve to tracked files |

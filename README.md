@@ -264,10 +264,12 @@ and active-session state for the concurrent-session evidence.
 ├── common/                     # Shared RDT, protocol, and filesystem helpers
 ├── tests/                      # Pytest unit, fault-injection, and E2E tests
 ├── docs/                       # Contract, evidence, status, checklist, report
+│   ├── source-of-truth.md       # Documentation reading order and conflict rules
 │   ├── project-status.md       # Source of truth for current status
 │   ├── requirement-checklist.md# Pre-submission acceptance gates
 │   ├── api-contract.md         # Shared A/B/C contract
 │   ├── report.md               # Final report — maintained by Role B
+│   ├── Hybrid_FTP_Technical_Report.pdf # Final team submission artifact
 │   ├── report-parts/           # Technical and submission drafts
 │   └── evidence/               # Verified logs and hashes
 └── planning/                   # Requirements, ownership, and weekly plans
@@ -278,6 +280,9 @@ and active-session state for the concurrent-session evidence.
 
 ## Documentation and Git rules
 
+- Start with [`docs/source-of-truth.md`](docs/source-of-truth.md). It defines
+  which requirement, code/test, contract, status, evidence, and report file
+  wins when documentation disagrees.
 - `planning/reference/Project1_SocketProgramming_2026.md` is read-only; do not
   update progress there.
 - `docs/project-status.md` is the single current-status source. Do not claim
@@ -285,6 +290,7 @@ and active-session state for the concurrent-session evidence.
 - `docs/requirement-checklist.md` is the pre-submission acceptance gate.
 - `docs/report.md` is the report assembled by Role B; Roles A/C technically
   review their own sections.
+- `docs/Hybrid_FTP_Technical_Report.pdf` is the final team submission artifact.
 - `docs/report-parts/` is draft/history, not the current status source.
 
 Before committing documentation or code, inspect exactly what will be included:

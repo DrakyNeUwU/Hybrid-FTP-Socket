@@ -1243,3 +1243,23 @@ delete/modify conflict for teammates with older branches.
 `docs/code-change-history.md`, and `docs/genai-log-c.md`.
 
 **Verification:** confirmed the PDF and every indexed screenshot file exists.
+
+## August 12, 2026 — README Documentation Links
+
+**Exact prompt:**
+> "bạn nhớ cập nhật readme nx nhé"
+
+**Raw GenAI output summary:**
+
+The README already had a documentation section, so the minimal change was to
+link the source-of-truth page and final PDF there.
+
+**Manual refinement:**
+
+- Added the two links in both the directory map and documentation rules.
+- Did not duplicate the source-of-truth ordering in README.
+
+**Affected files:** `README.md`, `docs/code-change-history.md`, and
+`docs/genai-log-c.md`.
+
+**Verification:** `git diff --check` passed; both linked files exist.
