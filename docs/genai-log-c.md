@@ -1263,3 +1263,26 @@ link the source-of-truth page and final PDF there.
 `docs/genai-log-c.md`.
 
 **Verification:** `git diff --check` passed; both linked files exist.
+
+## August 12, 2026 — Remove Redundant Screenshot Index
+
+**Exact prompt:**
+> "nhưng tôi cần xoá file screenshots.md ra khỏi file docs ah"
+
+**Raw GenAI output summary:**
+
+The screenshot index was not required because `docs/report.md` already embeds
+the evidence and `docs/evidence/` stores the actual files.
+
+**Manual refinement:**
+
+- Deleted `docs/screenshots.md` as explicitly requested.
+- Kept the screenshots and supporting logs under `docs/evidence/` unchanged.
+- Corrected the current change-history summary so it no longer says the index
+  is retained.
+
+**Affected files:** removed `docs/screenshots.md`; updated
+`docs/code-change-history.md` and `docs/genai-log-c.md`.
+
+**Verification:** no live Markdown link points to `docs/screenshots.md`;
+`git diff --check` passed.
