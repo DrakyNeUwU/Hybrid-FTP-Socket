@@ -1,0 +1,22 @@
+220 Hybrid FTP Server Ready
+331 Username OK
+
+530 Login incorrect
+
+331 Username OK
+
+230 Login successful
+
+213-Status of role-a-mode-b.bin:
+ Type: file
+ Size: 256000
+ Permissions: rw-------
+ Modified: 20260811122830
+213 End of status
+
+214 Syntax: MODE {S|B|C}
+
+501 Syntax error in parameters
+
+221 Goodbye
+

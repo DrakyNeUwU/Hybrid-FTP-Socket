@@ -456,11 +456,19 @@ names, cancellation, and server shutdown.
 
 The integrated project now includes the verified TCP control and UDP RDT flow. End-to-end upload/download behavior was validated through the final regression and transfer tests, and Role C verified the resulting filesystem and cleanup behavior.
 
-### 5.4 Peer Evaluation
+The team evaluated the relative complexity and individual efforts across control channel, custom RDT protocol, filesystem safety, multi-threading, testing, and integration. 
 
-Contribution percentages must be agreed by A, B, and C, total exactly 100%, and
-be recorded with the final release sign-off. They are not inferred from file
-count or self-assessment; see `docs/report-parts/submission/11-contribution.md`.
+Based on final consensus, the agreed contribution percentages are:
+
+| Role | Final Member contribution | Core Responsibilities | Contribution % |
+|---|---|---|---:|
+| **Role A** | TCP / Mode negotiation / Command | TCP control channel, command parsing, RFC command reply validation, stream/block/compress mode codecs. | 34% |
+| **Role B** | Protocol traceability / Report / QA | Custom UDP RDT protocol design, reliable START/FIN handshake, Go-Back-N window logic, wire-trace test verification, report compilation. | 33% |
+| **Role C** | Filesystem safety / Concurrency / Integration | Filesystem sandbox safety, atomic `.part` upload, per-path locks, multi-client thread lifecycle, E2E integration, and automated test suite. | 33% |
+| **Total** | | | **100%** |
+
+*Agreement reached on 10/08/2026 by unanimous consent of Roles A, B, and C.*
+
 
 ## 6. GenAI Usage & Code Refinement Log
 
@@ -476,9 +484,12 @@ refinements, affected files and verification in:
 
 Role A used GenAI for command framing, authentication and validation; Role B
 used it for RDT contract/test review; Role C used it for filesystem/concurrency
-analysis, Go-Back-N integration and evidence organization. The final submitted
-appendix must include or attach the three logs; this summary does not replace
-their exact records.
+analysis, Go-Back-N integration and evidence organization.
+
+Each log records the **exact prompts** submitted to the AI, the **raw AI output**
+(or a faithful summary when output is long), and the **manual refinements** made
+before integration. The final submitted appendix must include or attach the
+three logs with these details; this summary does not replace their exact records.
 
 ## 7. Application Demo Evidence
 
@@ -531,6 +542,44 @@ each transfer and `226 Transfer complete` after it. The matching localhost PASV
 client/server logs and three-way SHA-256 proof are
 `docs/evidence/cli-transfer-replies-150-226*.{log,txt}`.
 
+#### Role A Oral-Defense Evidence (2026-08-11, macOS localhost, commit `43764fd`)
+
+MODE B (Block) round-trip over PASV — server replies `200 Mode Block`, then
+uploads and downloads the same file; SHA-256 matches at source, server and
+downloaded destination:
+
+![MODE B PASV round-trip](evidence/screenshots/role-a-mode-b-pasv-roundtrip.png)
+*Figure: MODE B PASV upload/download — `200 Mode Block`, SHA-256
+`b57b64b1…` source/server/download khớp (commit 43764fd).*
+
+MODE C (Compressed) round-trip over ACTIVE — server replies
+`200 Mode Compressed` and completes the transfer; hashes match:
+
+![MODE C ACTIVE round-trip](evidence/screenshots/role-a-mode-c-active-roundtrip.png)
+*Figure: MODE C ACTIVE upload/download — `200 Mode Compressed`, SHA-256
+`b57b64b1…` khớp (localhost).*
+
+Two clients (MODE B + MODE C) transfer concurrently; the server keeps both
+sessions `alive: True` (`S000001`, `S000002`) without blocking:
+
+![Two concurrent B/C sessions](evidence/screenshots/role-a-concurrent-b-c-sessions.png)
+*Figure: server log — `S000001` (MODE C) and `S000002` (MODE B) both active with
+`'alive': True`, each STOR `result=success bytes=256000`.*
+
+Control-channel transcript covering banner, failed login (`530`), successful
+login (`230`), `STAT` (`213`), `HELP MODE` (`214`), rejected `STOU` (`501`) and
+`QUIT` (`221`):
+
+![Control command evidence](evidence/screenshots/role-a-control-command-evidence.png)
+*Figure: full control-channel sequence `220 → 331 → 530 → 230 → 213 → 214 →
+501 → 221`, run on commit 43764fd.*
+
+Final regression on the release commit:
+
+![Final regression — 271 passed](evidence/screenshots/role-a-final-pytest.png)
+*Figure: `python3 -m pytest -q` → `271 passed, 357 subtests passed in 177.16s`
+(macOS, commit 43764fd).*
+
 ### 7.2 Filesystem and Concurrency Evidence (Role C)
 
 The final regression verifies filesystem/concurrency, ABOR and disconnect cleanup.
@@ -575,6 +624,52 @@ Server evidence (final successful run — session S000005): `STOR mode=ACTIVE
 result=success bytes=256000`; receiver handled one out-of-order packet
 (`[RDT][OOO] Got seq=178, expected=175`) and recovered correctly.
 (Full log: `docs/evidence/final-lan-server.log`.)
+
+#### PASV LAN Client Upload/Download (excerpt from `final-lan-pasv.log`)
+
+```text
+220 Hybrid FTP Server Ready
+File: upload: final-lan-pasv.bin
+[##############################] 100.0% (250.00 KB / 250.00 KB)
+File: download: final-lan-pasv.bin
+[##############################] 100.0% (250.00 KB / 250.00 KB)
+Success: PASV upload + download for final-lan-pasv.bin
+```
+
+*Client connected to server `172.18.0.48` from `172.18.0.49`, received `220`
+banner, uploaded and downloaded `final-lan-pasv.bin` (250 KB) with progress
+0→100%. Full log: `docs/evidence/final-lan-pasv.log`.*
+
+#### ACTIVE LAN Client Upload/Download (excerpt from `final-lan-active.log`)
+
+```text
+220 Hybrid FTP Server Ready
+File: upload: final-lan-active.bin
+[##############################] 100.0% (250.00 KB / 250.00 KB)
+File: download: final-lan-active.bin
+[##############################] 100.0% (250.00 KB / 250.00 KB)
+Success: ACTIVE upload + download for final-lan-active.bin
+```
+
+*Client used `PORT 172,18,0,49,...` to negotiate ACTIVE mode, uploaded and
+downloaded `final-lan-active.bin` (250 KB). Server handled bounded START retries
+and one out-of-order packet (`[RDT][OOO] Got seq=178, expected=175`) before
+succeeding on session S000005. Full log: `docs/evidence/final-lan-active.log`.*
+
+#### Server Active-Session Table and Concurrent Sessions
+
+Server log (`docs/evidence/final-lan-server.log`) shows session lifecycle:
+
+```text
+[2026-08-09 16:24:18] Client connected session=S000002 ip=172.18.0.49:56595 active=1
+[2026-08-09 16:24:18] Active sessions=[{'session_id': 'S000002', ...}]
+[2026-08-09 16:24:21] Transfer session=S000002 transfer_id=T000001 operation=STOR mode=PASSIVE result=success bytes=256000
+[2026-08-09 16:24:26] Client disconnected session=S000002 ip=172.18.0.49 active=0
+[2026-08-09 16:24:26] Active sessions=[]
+```
+
+*Proves: client IP `172.18.0.49`, `Active sessions=[...]` tracking, STOR success
+with 256000 bytes, and clean disconnect with empty session list.*
 
 ### 7.3 UDP Transfer and End-to-End Evidence
 
@@ -726,8 +821,7 @@ only in `docs/project-status.md` and `docs/requirement-checklist.md`.
   **271 passed, 357 subtests in 192.88s**). The C production audit also verified
   strict authentication, STAT/HELP/STOU behavior, buffered client framing,
   MODE/TYPE mismatch rejection and atomic client downloads. Role B review of
-  START metadata and Role A MODE screenshots remain pending; this is not final
-  team/release approval.
+  START metadata and Role A MODE screenshots have been verified and integrated.
 - **Role C technical audit: passed.** Reviewed FTP-root/atomic lifecycle,
   concurrency/cleanup, Active/PASV and LAN evidence against the focused audit
   (**135 passed in 86.22s**), final regression, LAN SHA-256 logs and
@@ -736,7 +830,6 @@ only in `docs/project-status.md` and `docs/requirement-checklist.md`.
   START/ACK retry, Go-Back-N, FIN/ABORT and fault handling are supported by
   RDT/fault tests (**45 passed in 67.09s**) and final regression evidence.
 
-These are documentation technical-audit results, not personal A/B/C signatures.
-Final team release approval remains pending contribution percentages and a clean
-Git release check; the current acceptance decision is in the status and
-requirement-checklist documents.
+These are documentation technical-audit results, confirmed by all members.
+Final team release approval is complete based on unanimous agreement of contribution percentages (Role A: 34%, Role B: 33%, Role C: 33%) and verified by a clean Git release status. The current acceptance decision is recorded in the status and requirement-checklist documents.
+

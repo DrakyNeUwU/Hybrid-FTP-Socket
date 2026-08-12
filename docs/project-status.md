@@ -10,8 +10,8 @@
 | UDP/RDT Go-Back-N window 4 and integrity | Done | C/B | START ACK/retry; protocol, fault, and E2E tests |
 | Filesystem sandbox, atomic upload, cleanup, concurrency | Done | C | Shared server locks, same-file APPE, three clients, ABOR and disconnect |
 | Active/PASV localhost and two-machine LAN | Done | C | Matching source/server/client SHA-256 artifacts |
-| Final report, peer evaluation, and contribution percentages | In progress | B | Team percentage and release sign-off are pending |
-| Oral preparation and clean Git release check | In progress | B | Release check is pending |
+| Final report, peer evaluation, and contribution percentages | Done | B | Contribution percentages (A:34%, B:33%, C:33%) agreed and report.md finalized |
+| Oral preparation and clean Git release check | Done | B | b-f03-oral-pack.md restored and git status verified clean |
 
 ## Verified facts
 

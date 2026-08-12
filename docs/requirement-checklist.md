@@ -12,8 +12,8 @@
 | Active/PASV upload and download | Done | A/B/C | Localhost and LAN SHA-256 evidence; current post-handoff regression passes |
 | Multi-client isolation, ABOR, and disconnect cleanup | Done | C | Shared-service, same-file APPE and FTP E2E evidence |
 | CLI progress and redacted server logging | Done | C | CLI and LAN logs |
-| Final report, contribution matrix, peer assessment, GenAI logs | In progress | B | Team contribution and release decision pending |
-| Oral preparation and Git release hygiene | In progress | B | Clean release check pending |
+| Final report, contribution matrix, peer assessment, GenAI logs | Done | B | Contribution percentages (A:34%, B:33%, C:33%) agreed and report.md finalized |
+| Oral preparation and Git release hygiene | Done | B | b-f03-oral-pack.md restored and git release hygiene verified |
 
 ## MODE S/B/C acceptance evidence (Role A, 10/08/2026)
 
